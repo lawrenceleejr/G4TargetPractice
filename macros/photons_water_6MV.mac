@@ -1,0 +1,42 @@
+# =============================================================================
+# photons_water_6MV.mac
+#
+# Approximate 6 MV linac photon beam: a real 6 MV beam is a bremsstrahlung
+# spectrum extending to 6 MeV with a mean energy of ~2 MeV. Here it is
+# approximated with an exponential spectrum (E0 = 2 MeV) sampled between
+# 0.25 and 6 MeV. The depth-dose curve shows the build-up region with a
+# maximum at ~1.5 cm and a slow exponential fall-off.
+#
+# Detector: gdml/water_phantom_30cm.gdml
+#   - World:   60×60×100 cm (G4_AIR)
+#   - Phantom: 30×30 cm water tank, 40 cm deep, entrance face at z = 0
+#              (depth in water = z)
+#
+# Beam:
+#   - Particle : gamma
+#   - Energy   : exponential, E0 = 2 MeV, sampled 0.25-6 MeV
+#   - Position : upstream on the beam axis (z = -20 cm)
+#   - Direction: along +z
+#
+# Depth-dose extraction (in ROOT, z in mm, edep in MeV):
+#   tree->Draw("step_preZ>>h(200,0,400)", "step_edep")
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/water_phantom_30cm.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    gamma
+/gun/energyMode  exp
+/gun/energy      2 MeV
+/gun/energyMin   0.25 MeV
+/gun/energyMax   6 MeV
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 500
+/run/beamOn 5000

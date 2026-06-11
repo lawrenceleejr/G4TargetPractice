@@ -10,6 +10,8 @@ in the repository.
 |---|---|
 | `gdml/silicon_slab_1mm.gdml` | 10×10 cm silicon slab, 1 mm thick, in a 10 cm air box |
 | `gdml/liquid_argon_1m3.gdml` | 1 m³ liquid-argon cube in a 2 m³ air box |
+| `gdml/water_phantom_30cm.gdml` | 30×30 cm water tank, 40 cm deep, entrance face at z = 0 |
+| `gdml/tissue_phantom_layered.gdml` | Layered soft-tissue/bone/lung phantom (chest-wall analogue), entrance face at z = 0 |
 
 ## Macro overview
 
@@ -31,6 +33,32 @@ in the repository.
 | `neutrinos_lar_exp.mac` | `nu_mu` | Exponential – E₀ = 2 GeV, sampled 200 MeV–20 GeV |
 | `neutrinos_lar_arb.mac` | `nu_mu` | Arbitrary histogram (accelerator-flux-like weights) |
 | `electron_neutrinos_lar_mono.mac` | `nu_e` | Monoenergetic – 1 GeV |
+
+### Medical physics examples
+
+These macros shoot therapy-like beams at the water and layered-tissue
+phantoms. Both phantoms have their entrance face at z = 0, so depth in the
+phantom equals z and a depth-dose curve can be made directly from the
+step-level branches of `output.root` (positions are in mm, energy deposits
+in MeV), e.g. in ROOT:
+
+```cpp
+tree->Draw("step_preZ>>h(200,0,400)", "step_edep");
+```
+
+| Macro | Particle | Beam | Physics illustrated |
+|---|---|---|---|
+| `protons_water_bragg.mac` | `proton` | 150 MeV mono | Pristine Bragg peak at ~15.6 cm depth |
+| `protons_water_sobp.mac` | `proton` | 110–150 MeV weighted bins | Crude spread-out Bragg peak (range modulation) |
+| `electrons_water_20MeV.mac` | `e-` | 20 MeV mono | Electron build-up and ~10 cm practical range |
+| `photons_water_6MV.mac` | `gamma` | exp spectrum, E₀ = 2 MeV, 0.25–6 MeV | 6 MV-like depth dose with ~1.5 cm build-up |
+| `photons_water_co60.mac` | `gamma` | 1.17 + 1.33 MeV lines | Co-60 teletherapy beam |
+| `photons_tissue_6MV.mac` | `gamma` | exp spectrum, E₀ = 2 MeV, 0.25–6 MeV | Heterogeneity effects in bone and lung |
+
+All beams are pencil beams along +z starting at z = -20 cm. Note that if
+you run with a Celeritas-enabled build (see the main README), offloaded
+`e-`/`e+`/`gamma` tracks do not appear in the step-level output — for dose
+studies use the standard image or set `CELER_DISABLE=1`.
 
 ## How to run a macro
 

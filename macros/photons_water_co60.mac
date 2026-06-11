@@ -1,0 +1,41 @@
+# =============================================================================
+# photons_water_co60.mac
+#
+# Cobalt-60 teletherapy beam: Co-60 decay emits two gamma lines of equal
+# intensity at 1.17 and 1.33 MeV (often quoted as a 1.25 MeV average).
+# Both lines are modelled exactly using the arbitrary-histogram energy mode
+# with equal weights. Depth of maximum dose in water is ~0.5 cm.
+#
+# Detector: gdml/water_phantom_30cm.gdml
+#   - World:   60×60×100 cm (G4_AIR)
+#   - Phantom: 30×30 cm water tank, 40 cm deep, entrance face at z = 0
+#              (depth in water = z)
+#
+# Beam:
+#   - Particle : gamma
+#   - Energy   : 1.17 MeV and 1.33 MeV lines, equal weight
+#   - Position : upstream on the beam axis (z = -20 cm)
+#   - Direction: along +z
+#
+# Depth-dose extraction (in ROOT, z in mm, edep in MeV):
+#   tree->Draw("step_preZ>>h(200,0,400)", "step_edep")
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/water_phantom_30cm.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    gamma
+/gun/energyMode  arb
+/gun/clearEnergyBins
+/gun/addEnergyBin 1.17 MeV 1.0
+/gun/addEnergyBin 1.33 MeV 1.0
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 500
+/run/beamOn 5000

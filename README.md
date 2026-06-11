@@ -77,12 +77,16 @@ G4TargetPractice/
 ├── gdml/                    # Example GDML geometry files
 │   ├── MAIA_v0.gdml         # MAIA detector geometry
 │   ├── silicon_slab_1mm.gdml        # 1 mm silicon slab
-│   └── liquid_argon_1m3.gdml        # 1 m³ liquid argon volume
+│   ├── liquid_argon_1m3.gdml        # 1 m³ liquid argon volume
+│   ├── water_phantom_30cm.gdml      # Water phantom (medical physics)
+│   └── tissue_phantom_layered.gdml  # Tissue/bone/lung phantom (medical physics)
+├── macros/                  # Example macros (HEP + medical physics), see macros/README.md
 ├── run/                     # Example user run directory
 │   ├── run.mac              # Example macro file
 │   └── MAIA_260211.gdml     # Example GDML geometry
 ├── .github/workflows/
-│   └── build-test-deploy.yml  # CI: build, test, push Docker image
+│   ├── build-test-deploy.yml       # CI: build, test, push Docker image
+│   └── build-celeritas-deploy.yml  # CI: build, test, push Celeritas-enabled image
 ├── Dockerfile               # Alternative standalone Dockerfile
 ├── .gitignore
 └── README.md
@@ -126,8 +130,10 @@ ghcr.io/lawrenceleejr/g4targetpractice:<tag>
 | `main` | Latest stable build from the `main` branch |
 | `latest` | Alias for the default branch |
 | `<branch>-<sha>` | Per-commit image |
+| `main-celeritas` / `latest-celeritas` | Build with the Celeritas EM offload enabled (CPU-only) |
+| `<branch>-celeritas`, `<branch>-<sha>-celeritas` | Per-branch/per-commit Celeritas builds |
 
-The images are based on `ghcr.io/lobis/root-geant4-garfield` which provides a pre-built Geant4 + ROOT environment.
+The images are based on `ghcr.io/lobis/root-geant4-garfield` which provides a pre-built Geant4 + ROOT environment. The `*-celeritas` tags are produced by a separate workflow (`build-celeritas-deploy.yml`) that additionally builds [Celeritas](https://celeritas-project.github.io/celeritas/) and compiles `g4sim` with `-DWITH_CELERITAS=ON`; see the Celeritas section below.
 
 ## Physics
 
@@ -137,7 +143,19 @@ The simulation uses the `FTFP_BERT` reference physics list by default, which cov
 
 [Celeritas](https://celeritas-project.github.io/celeritas/) can take over the transport of electromagnetic tracks (`e-`, `e+`, `gamma`), running them on GPU (or multithreaded on CPU) instead of through the standard Geant4 stepping loop. This can substantially speed up EM-heavy simulations.
 
-Support is a **build-time option**, off by default, so standard builds and the published Docker images are unaffected.
+Support is a **build-time option**, off by default, so standard builds and the default Docker images are unaffected.
+
+### Pre-built Celeritas image
+
+A CPU-only Celeritas-enabled image is built and pushed automatically with a `-celeritas` tag suffix:
+
+```bash
+docker run --rm -it --init \
+  -v $PWD/myrun/:/run/ \
+  -w /run/ \
+  ghcr.io/lawrenceleejr/g4targetpractice:main-celeritas \
+  run.mac
+```
 
 ### Building with Celeritas
 

@@ -61,6 +61,7 @@ RUN if [ "$WITH_CELERITAS" = "ON" ]; then \
       cmake -S celeritas -B celeritas-build \
         -DCMAKE_BUILD_TYPE=Release \
         -DCELERITAS_USE_Geant4=ON \
+        -DCELERITAS_CORE_GEO=Geant4 \
         -DCELERITAS_USE_CUDA=OFF \
         -DCELERITAS_USE_HIP=OFF \
         -DCELERITAS_USE_ROOT=OFF \

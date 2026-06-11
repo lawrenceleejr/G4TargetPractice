@@ -1,0 +1,39 @@
+# =============================================================================
+# electrons_water_20MeV.mac
+#
+# Electron-therapy beam: shoot a 20 MeV electron pencil beam into a water
+# phantom. The depth-dose curve shows the characteristic surface build-up,
+# broad maximum and steep fall-off (practical range ~10 cm) followed by the
+# bremsstrahlung tail.
+#
+# Detector: gdml/water_phantom_30cm.gdml
+#   - World:   60×60×100 cm (G4_AIR)
+#   - Phantom: 30×30 cm water tank, 40 cm deep, entrance face at z = 0
+#              (depth in water = z)
+#
+# Beam:
+#   - Particle : e-  (electron)
+#   - Energy   : 20 MeV (monoenergetic, typical linac electron energy)
+#   - Position : upstream on the beam axis (z = -20 cm)
+#   - Direction: along +z
+#
+# Depth-dose extraction (in ROOT, z in mm, edep in MeV):
+#   tree->Draw("step_preZ>>h(150,0,150)", "step_edep")
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/water_phantom_30cm.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    e-
+/gun/energyMode  mono
+/gun/energy      20 MeV
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 100
+/run/beamOn 2000
