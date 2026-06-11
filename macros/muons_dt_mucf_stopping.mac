@@ -1,0 +1,52 @@
+# =============================================================================
+# muons_dt_mucf_stopping.mac
+#
+# Stage 2 of the muon-catalyzed fusion (muCF) chain: stop negative muons
+# in a liquid D-T cell. The stopping distribution from this run defines
+# where the muCF cycle would take place (each stopped mu- catalyzes
+# ~10^2 D-T fusions within its 2.2 us lifetime, with ~1% alpha-sticking
+# loss per cycle).
+#
+# NOTE Geant4 does NOT model the muCF cycle itself (muonic-atom
+# formation, d-mu -> t-mu transfer, resonant dt-mu molecule formation,
+# in-molecule fusion, sticking). In this simulation a stopped mu-
+# undergoes the standard muMinusCaptureAtRest / decay competition. Use
+# the stopping distribution from this run as input to a parametric
+# cycle model and source the fusion products with neutrons_dt_14MeV.mac
+# and alphas_dt_3p5MeV.mac. See macros/README.md.
+#
+# Detector: gdml/dt_target_mucf.gdml
+#   - World:  60×60×100 cm vacuum
+#   - Vessel: stainless steel, 2 mm walls (~1.6 g/cm2 entrance window)
+#   - Target: 10×10×20 cm liquid D-T (0.18 g/cm3), entrance face at z = 0
+#
+# Beam:
+#   - Particle : mu-
+#   - Energy   : Gaussian, mean 22 MeV, sigma 1.5 MeV. After the steel
+#                window this stops at ~7 cm depth in the D-T, with the
+#                energy spread distributing stops over several cm.
+#   - Position : upstream on the beam axis (z = -20 cm)
+#   - Direction: along +z
+#
+# Stopping-distribution extraction (in ROOT, z in mm; last step of the
+# primary muon track):
+#   tree->Draw("step_postZ>>h(240,-20,220)", "step_trackID==1 && step_kinE<0.01")
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/dt_target_mucf.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    mu-
+/gun/energyMode  gauss
+/gun/energy      22 MeV
+/gun/gaussSigma  1.5 MeV
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 200
+/run/beamOn 2000

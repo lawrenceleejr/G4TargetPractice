@@ -1,0 +1,39 @@
+# =============================================================================
+# neutrons_dt_14MeV.mac
+#
+# Stage 3 of the muon-catalyzed fusion (muCF) chain: fusion-product
+# neutronics. Each d-t fusion releases a 14.1 MeV neutron; this macro
+# sources them isotropically from the muon stopping region of the D-T
+# cell (see muons_dt_mucf_stopping.mac), emulating the muCF neutron
+# source for transport/shielding/blanket studies. Scale results by
+# (fusions per muon) x (muons per second) for an absolute source rate -
+# the VNS concept targets 10^15-10^17 n/s.
+#
+# Detector: gdml/dt_target_mucf.gdml
+#   - World:  60×60×100 cm vacuum
+#   - Vessel: stainless steel, 2 mm walls
+#   - Target: 10×10×20 cm liquid D-T (0.18 g/cm3), entrance face at z = 0
+#
+# Source:
+#   - Particle : neutron
+#   - Energy   : 14.1 MeV (monoenergetic)
+#   - Position : muon stopping region (0, 0, 7 cm)
+#   - Direction: isotropic (4pi)
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/dt_target_mucf.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Source ---
+/gun/particle    neutron
+/gun/energyMode  mono
+/gun/energy      14.1 MeV
+/gun/position    0 0 7 cm
+/gun/direction   0 0 0
+
+# --- Run ---
+/run/printProgress 500
+/run/beamOn 5000

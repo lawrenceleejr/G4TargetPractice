@@ -13,6 +13,8 @@ in the repository.
 | `gdml/water_phantom_30cm.gdml` | 30×30 cm water tank, 40 cm deep, entrance face at z = 0 |
 | `gdml/tissue_phantom_layered.gdml` | Layered soft-tissue/bone/lung phantom (chest-wall analogue), entrance face at z = 0 |
 | `gdml/water_phantom_tumor.gdml` | Water tank as above with a r = 1.5 cm soft-tissue tumor sphere at 10 cm depth |
+| `gdml/dt_target_mucf.gdml` | Liquid D–T cell (0.18 g/cm³, 50:50, 20 K) in a 2 mm steel vessel, in vacuum; entrance face at z = 0 |
+| `gdml/graphite_target.gdml` | 10×10×60 cm graphite pion-production target in vacuum, entrance face at z = 0 |
 
 ## Macro overview
 
@@ -94,6 +96,43 @@ The per-step process names (`step_proc`) and creator processes
 never offloaded to Celeritas (only `e-`/`e+`/`gamma` are), but their EM
 secondaries are, so the step-level caveat above applies to dose totals in
 Celeritas builds here too.
+
+### Muon-catalyzed fusion (μCF) chain
+
+These macros follow the simulation pipeline of the SNS muon-catalyzed
+fusion / Volumetric Neutron Source (VNS) concept presented at the
+[New Science and Applications at SNS workshop](https://conference.sns.gov/event/559/page/4025-presentations)
+(see in particular the talks by A. Lumsdaine on fusion requirements,
+A. Knaian on the μCF collaborative proposal, and S. Tognini on muon
+production and simulation): GeV protons → pions → muons → a liquid D–T
+cell where each stopped `mu-` catalyzes ~10² fusions within its 2.2 μs
+lifetime (capture-to-fusion time ~10⁻⁸ s, α-sticking loss ~1% per
+cycle), each fusion releasing a 14.1 MeV neutron and a 3.5 MeV alpha.
+
+| Macro | Stage | Beam / source |
+|---|---|---|
+| `protons_graphite_muonprod.mac` | 1. Production | 1.3 GeV protons on graphite; π±/μ± yields per proton from the per-event counters |
+| `muons_dt_mucf_stopping.mac` | 2. Muon stopping | 22 ± 1.5 MeV `mu-` through the steel window, stopping at ~7 cm depth in the D–T |
+| `neutrons_dt_14MeV.mac` | 3a. Fusion neutrons | isotropic 14.1 MeV neutrons from the stopping region (neutronics/shielding) |
+| `alphas_dt_3p5MeV.mac` | 3b. Fusion alphas | isotropic 3.5 MeV alphas from the stopping region (local heating; sticking context) |
+
+**What Geant4 does and does not model.** Stock Geant4 (this
+application) covers everything *around* the catalysis cycle: pion/muon
+production, muon transport and stopping, the decay/nuclear-capture fate
+of stopped muons (`muMinusCaptureAtRest`), and transport of the fusion
+products. It does **not** model the μCF cycle itself — muonic-atom
+formation, `d-mu → t-mu` transfer, resonant `dt-mu` molecule formation,
+in-molecule fusion and α-sticking are low-energy atomic/molecular
+physics outside the standard physics lists. The supported workflow here
+is parametric: take the stopped-muon distribution from stage 2, apply a
+cycle model (e.g. ~10² fusions per stopped muon at liquid-hydrogen
+density), and source the products with the stage-3 macros; the absolute
+source rate is (n per μ) × (μ per bunch) × (bunches per s). Groups that
+need the cycle in-line extend Geant4 with custom at-rest models (the
+approach used by Acceleron Fusion), and Celeritas has a native μCF
+executor under development (muonic atom → molecule → DD/DT/TT cycle),
+which this repository's `WITH_CELERITAS` build option is well placed to
+adopt once released.
 
 ## How to run a macro
 

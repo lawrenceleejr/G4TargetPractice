@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<!--
+  Liquid deuterium-tritium target cell for muon-catalyzed fusion (muCF)
+  studies, loosely following the DT-target stage of the SNS muCF/VNS
+  concept (New Science and Applications at SNS workshop, June 2026).
+
+  World:  60 x 60 x 100 cm vacuum (G4_Galactic) beamline.
+  Vessel: stainless-steel cell with 2 mm walls.
+  Target: 10 x 10 x 20 cm liquid D-T (50:50 atomic), 0.18 g/cm3 at 20 K,
+          which corresponds to about liquid-hydrogen atom density (the
+          "phi = 1" reference density used in muCF literature).
+          The entrance face of the D-T volume is at z = 0, so depth in
+          the target = z. The muon beam must cross the 2 mm steel
+          entrance window (~1.6 g/cm2).
+
+  Aim the beam along +z from negative z (e.g. /gun/position 0 0 -20 cm).
+-->
+<gdml>
+  <materials>
+    <isotope name="Deuteron" Z="1" N="2">
+      <atom unit="g/mole" value="2.0141"/>
+    </isotope>
+    <isotope name="Triton" Z="1" N="3">
+      <atom unit="g/mole" value="3.0160"/>
+    </isotope>
+    <element name="Deuterium">
+      <fraction n="1.0" ref="Deuteron"/>
+    </element>
+    <element name="Tritium">
+      <fraction n="1.0" ref="Triton"/>
+    </element>
+    <material name="LiquidDT" state="liquid">
+      <T unit="K" value="20"/>
+      <D unit="g/cm3" value="0.18"/>
+      <composite n="1" ref="Deuterium"/>
+      <composite n="1" ref="Tritium"/>
+    </material>
+  </materials>
+
+  <solids>
+    <box name="WorldBox"  x="60"   y="60"   z="100"  lunit="cm"/>
+    <box name="VesselBox" x="10.4" y="10.4" z="20.4" lunit="cm"/>
+    <box name="DTBox"     x="10"   y="10"   z="20"   lunit="cm"/>
+  </solids>
+
+  <structure>
+    <volume name="DT_vol">
+      <materialref ref="LiquidDT"/>
+      <solidref ref="DTBox"/>
+    </volume>
+
+    <volume name="Vessel_vol">
+      <materialref ref="G4_STAINLESS-STEEL"/>
+      <solidref ref="VesselBox"/>
+      <physvol>
+        <volumeref ref="DT_vol"/>
+        <position x="0" y="0" z="0"/>
+      </physvol>
+    </volume>
+
+    <volume name="World">
+      <materialref ref="G4_Galactic"/>
+      <solidref ref="WorldBox"/>
+      <physvol>
+        <volumeref ref="Vessel_vol"/>
+        <position x="0" y="0" z="10" unit="cm"/>
+      </physvol>
+    </volume>
+  </structure>
+
+  <setup name="Default" version="1.0">
+    <world ref="World"/>
+  </setup>
+</gdml>
