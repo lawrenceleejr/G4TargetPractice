@@ -79,7 +79,8 @@ G4TargetPractice/
 │   ├── silicon_slab_1mm.gdml        # 1 mm silicon slab
 │   ├── liquid_argon_1m3.gdml        # 1 m³ liquid argon volume
 │   ├── water_phantom_30cm.gdml      # Water phantom (medical physics)
-│   └── tissue_phantom_layered.gdml  # Tissue/bone/lung phantom (medical physics)
+│   ├── tissue_phantom_layered.gdml  # Tissue/bone/lung phantom (medical physics)
+│   └── water_phantom_tumor.gdml     # Water phantom with tumor sphere (muon therapy)
 ├── macros/                  # Example macros (HEP + medical physics), see macros/README.md
 ├── run/                     # Example user run directory
 │   ├── run.mac              # Example macro file

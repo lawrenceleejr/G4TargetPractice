@@ -12,6 +12,7 @@ in the repository.
 | `gdml/liquid_argon_1m3.gdml` | 1 m³ liquid-argon cube in a 2 m³ air box |
 | `gdml/water_phantom_30cm.gdml` | 30×30 cm water tank, 40 cm deep, entrance face at z = 0 |
 | `gdml/tissue_phantom_layered.gdml` | Layered soft-tissue/bone/lung phantom (chest-wall analogue), entrance face at z = 0 |
+| `gdml/water_phantom_tumor.gdml` | Water tank as above with a r = 1.5 cm soft-tissue tumor sphere at 10 cm depth |
 
 ## Macro overview
 
@@ -59,6 +60,40 @@ All beams are pencil beams along +z starting at z = -20 cm. Note that if
 you run with a Celeritas-enabled build (see the main README), offloaded
 `e-`/`e+`/`gamma` tracks do not appear in the step-level output — for dose
 studies use the standard image or set `CELER_DISABLE=1`.
+
+### Muon-therapy studies with a tumor target
+
+Muon-based therapy is an exploratory research topic: like protons, muons
+have a Bragg peak, but a stopped `mu-` undergoes nuclear capture
+(`muMinusCaptureAtRest`), releasing neutrons, gammas and nuclear fragments
+that deposit extra dose at the end of range, while a stopped `mu+` decays
+to a Michel positron (a proposed handle for in-vivo range verification).
+These macros target `gdml/water_phantom_tumor.gdml`, where a 48 MeV muon
+(or 117 MeV proton) stops at ~10 cm depth, inside the tumor sphere.
+
+| Macro | Particle | Beam | What it shows |
+|---|---|---|---|
+| `muons_minus_tumor_mono.mac` | `mu-` | 48 MeV mono | Muon Bragg peak in the tumor + capture dose at end of range |
+| `muons_minus_tumor_spread.mac` | `mu-` | 44–50 MeV weighted bins | Spread-out stopping region covering the whole tumor |
+| `muons_plus_tumor_mono.mac` | `mu+` | 48 MeV mono | Decay (no capture) end-of-range; isolates the mu- capture contribution |
+| `protons_tumor_mono.mac` | `proton` | 117 MeV mono | Same-range proton baseline for comparison |
+
+The tumor sphere is centred on the beam axis at z = 100 mm with r = 15 mm,
+so the energy deposited inside the tumor can be selected directly from the
+step-level branches, e.g. total tumor energy deposit per event:
+
+```cpp
+tree->Draw("Sum$(step_edep*(sqrt(step_preX*step_preX+step_preY*step_preY+(step_preZ-100)*(step_preZ-100))<15))>>hTumor");
+```
+
+The per-step process names (`step_proc`) and creator processes
+(`step_creatorproc`) let you separate capture products
+(`muMinusCaptureAtRest`) from decay products (`Decay`) when comparing
+`mu-` and `mu+` runs. Beam energies set the stopping depth — scan
+`/gun/energy` by a few MeV to sweep the peak through the tumor. Muons are
+never offloaded to Celeritas (only `e-`/`e+`/`gamma` are), but their EM
+secondaries are, so the step-level caveat above applies to dose totals in
+Celeritas builds here too.
 
 ## How to run a macro
 

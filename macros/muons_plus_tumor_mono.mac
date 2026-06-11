@@ -1,0 +1,41 @@
+# =============================================================================
+# muons_plus_tumor_mono.mac
+#
+# Positive-muon counterpart of muons_minus_tumor_mono.mac. A stopped mu+ is
+# not captured: it decays (mu+ -> e+ nu nu), emitting a Michel positron with
+# up to ~53 MeV that smears dose away from the stopping point and produces
+# annihilation gammas - a proposed handle for in-vivo range verification.
+# Comparing the end-of-range dose of mu+ vs mu- isolates the contribution of
+# nuclear capture in the mu- case.
+#
+# Detector: gdml/water_phantom_tumor.gdml
+#   - World:   60×60×100 cm (G4_AIR)
+#   - Phantom: 30×30 cm water tank, 40 cm deep, entrance face at z = 0
+#   - Tumor:   r = 1.5 cm soft-tissue sphere centred at 10 cm depth
+#
+# Beam:
+#   - Particle : mu+
+#   - Energy   : 48 MeV (monoenergetic; range in water ~10 cm)
+#   - Position : upstream on the beam axis (z = -20 cm)
+#   - Direction: along +z
+#
+# Depth-dose extraction (in ROOT, z in mm, edep in MeV):
+#   tree->Draw("step_preZ>>h(200,0,400)", "step_edep")
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/water_phantom_tumor.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    mu+
+/gun/energyMode  mono
+/gun/energy      48 MeV
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 200
+/run/beamOn 2000

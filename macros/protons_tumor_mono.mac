@@ -1,0 +1,40 @@
+# =============================================================================
+# protons_tumor_mono.mac
+#
+# Proton baseline for the muon-therapy studies: a 117 MeV proton beam has
+# the same ~10 cm range in water as the 48 MeV muon beams, so its Bragg
+# peak also sits in the tumor. Comparing the depth-dose and the energy
+# deposited inside the tumor sphere against the mu-/mu+ macros shows the
+# relative peak sharpness and the extra end-of-range dose from mu- capture.
+#
+# Detector: gdml/water_phantom_tumor.gdml
+#   - World:   60×60×100 cm (G4_AIR)
+#   - Phantom: 30×30 cm water tank, 40 cm deep, entrance face at z = 0
+#   - Tumor:   r = 1.5 cm soft-tissue sphere centred at 10 cm depth
+#
+# Beam:
+#   - Particle : proton
+#   - Energy   : 117 MeV (monoenergetic; range in water ~10 cm)
+#   - Position : upstream on the beam axis (z = -20 cm)
+#   - Direction: along +z
+#
+# Depth-dose extraction (in ROOT, z in mm, edep in MeV):
+#   tree->Draw("step_preZ>>h(200,0,400)", "step_edep")
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/water_phantom_tumor.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    proton
+/gun/energyMode  mono
+/gun/energy      117 MeV
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 200
+/run/beamOn 2000
