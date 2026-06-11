@@ -133,3 +133,47 @@ The images are based on `ghcr.io/lobis/root-geant4-garfield` which provides a pr
 
 The simulation uses the `FTFP_BERT` reference physics list by default, which covers hadronic and electromagnetic physics appropriate for most HEP detector studies. The physics list can be extended via the macro or by modifying the source.
 
+## Optional: Celeritas EM Offload
+
+[Celeritas](https://celeritas-project.github.io/celeritas/) can take over the transport of electromagnetic tracks (`e-`, `e+`, `gamma`), running them on GPU (or multithreaded on CPU) instead of through the standard Geant4 stepping loop. This can substantially speed up EM-heavy simulations.
+
+Support is a **build-time option**, off by default, so standard builds and the published Docker images are unaffected.
+
+### Building with Celeritas
+
+Requirements: Celeritas **v0.6 or newer**, built with Geant4 support (`CELERITAS_USE_Geant4=ON`) against the same Geant4 installation used for `g4sim`.
+
+```bash
+mkdir build
+cd build
+cmake ../g4sim/ -DWITH_CELERITAS=ON -DCMAKE_PREFIX_PATH=/path/to/celeritas-install
+cmake --build .
+```
+
+The standalone `Dockerfile` can also build a (CPU-only) Celeritas alongside Geant4:
+
+```bash
+docker build --build-arg WITH_CELERITAS=ON -t g4tp-celeritas .
+```
+
+then configure `g4sim` inside that image with `-DWITH_CELERITAS=ON`.
+
+### Enabling/disabling at runtime
+
+When compiled with `WITH_CELERITAS=ON`, the offload is **enabled by default**: all `e-`, `e+`, and `gamma` tracks are handed to Celeritas at the start of tracking. It can be controlled with standard Celeritas environment variables:
+
+| Environment variable | Effect |
+|----------------------|--------|
+| `CELER_DISABLE=1` | Disable the offload entirely; tracks are transported by Geant4 as usual |
+| `CELER_KILL_OFFLOAD=1` | Kill EM tracks instead of transporting them (for performance testing) |
+
+For example, with Docker:
+
+```bash
+docker run --rm -it --init -e CELER_DISABLE=1 ...
+```
+
+### Caveat: step-level output
+
+`g4sim` fills its ROOT tree from a Geant4 stepping action. Tracks transported by Celeritas do not pass through the Geant4 stepping loop, so **steps and energy deposition from offloaded EM tracks will not appear in the step-level branches of `output.root`**. If you need complete step records for EM particles, run with `CELER_DISABLE=1`.
+

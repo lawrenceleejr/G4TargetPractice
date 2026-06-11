@@ -14,6 +14,17 @@ find_package(Geant4 REQUIRED ui_all vis_all)
 include(${Geant4_USE_FILE})
 
 # --------------------
+# Optional: Celeritas (offload e-/e+/gamma transport to GPU or CPU)
+# --------------------
+option(WITH_CELERITAS "Enable Celeritas offload of EM tracks" OFF)
+if(WITH_CELERITAS)
+  find_package(Celeritas 0.6 REQUIRED)
+  if(NOT CELERITAS_USE_Geant4)
+    message(FATAL_ERROR "WITH_CELERITAS requires a Celeritas installation built with CELERITAS_USE_Geant4=ON")
+  endif()
+endif()
+
+# --------------------
 # Sources
 # --------------------
 set(SOURCES
@@ -39,4 +50,9 @@ add_compile_options(-Wno-shadow)
 target_compile_options(g4sim PRIVATE -Wno-shadow)
 
 # Link libraries
-target_link_libraries(g4sim ${ROOT_LIBRARIES} ${Geant4_LIBRARIES})
+if(WITH_CELERITAS)
+  target_compile_definitions(g4sim PRIVATE USE_CELERITAS)
+  celeritas_target_link_libraries(g4sim ${ROOT_LIBRARIES} ${Geant4_LIBRARIES} Celeritas::G4)
+else()
+  target_link_libraries(g4sim ${ROOT_LIBRARIES} ${Geant4_LIBRARIES})
+endif()

@@ -2,6 +2,10 @@
 #include "G4Run.hh"
 #include "EventAction.hh"
 
+#ifdef USE_CELERITAS
+#include <CeleritasG4.hh>
+#endif
+
 RunAction::RunAction()
 : G4UserRunAction(),
   fFile(nullptr), fTree(nullptr),
@@ -13,7 +17,10 @@ RunAction::RunAction()
 
 RunAction::~RunAction() {}
 
-void RunAction::BeginOfRunAction(const G4Run*) {
+void RunAction::BeginOfRunAction([[maybe_unused]] const G4Run* run) {
+#ifdef USE_CELERITAS
+    celeritas::TrackingManagerIntegration::Instance().BeginOfRunAction(run);
+#endif
     fFile = new TFile("output.root", "RECREATE");
     fTree = new TTree("tree", "Simulation data");
 
@@ -186,7 +193,10 @@ void RunAction::FillEvent(EventAction* evt)
     }
 }
 
-void RunAction::EndOfRunAction(const G4Run*) {
+void RunAction::EndOfRunAction([[maybe_unused]] const G4Run* run) {
+#ifdef USE_CELERITAS
+    celeritas::TrackingManagerIntegration::Instance().EndOfRunAction(run);
+#endif
  if(fTree && fFile) {
    fFile->cd();
    fTree->Write();

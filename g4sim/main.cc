@@ -24,6 +24,25 @@
 #include "G4EmExtraPhysics.hh"
 #include "G4ParticleTable.hh"
 
+#ifdef USE_CELERITAS
+#include <CeleritasG4.hh>
+
+namespace {
+celeritas::SetupOptions MakeCeleritasOptions()
+{
+    celeritas::SetupOptions opts;
+    // Track-slot counts sized for CPU offload; increase for GPU execution
+    opts.max_num_tracks = 2024;
+    opts.initializer_capacity = 2024 * 128;
+    // Celeritas does not support the standalone Coulomb scattering process
+    opts.ignore_processes = {"CoulombScat"};
+    // Uniform zero magnetic field (this application defines no field)
+    opts.make_along_step = celeritas::UniformAlongStepFactory();
+    return opts;
+}
+}  // namespace
+#endif
+
 
 int main(int argc, char** argv) {
 
@@ -41,6 +60,16 @@ int main(int argc, char** argv) {
 
     G4VModularPhysicsList* physics = factory.GetReferencePhysList("FTFP_BERT");
     physics->RegisterPhysics(new G4NeutrinoPhysics());
+#ifdef USE_CELERITAS
+    auto& celerIntegration = celeritas::TrackingManagerIntegration::Instance();
+    physics->RegisterPhysics(
+        new celeritas::TrackingManagerConstructor(&celerIntegration));
+    celerIntegration.SetOptions(MakeCeleritasOptions());
+    G4cout << "Celeritas offload enabled: e-/e+/gamma tracks are handed to "
+              "Celeritas for transport.\n"
+              "Set CELER_DISABLE=1 in the environment to disable the offload "
+              "at runtime." << G4endl;
+#endif
     runManager->SetUserInitialization(physics);
 
      auto runAction = new RunAction();
