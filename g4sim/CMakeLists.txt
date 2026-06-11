@@ -49,10 +49,12 @@ add_executable(g4sim ${SOURCES})
 add_compile_options(-Wno-shadow)
 target_compile_options(g4sim PRIVATE -Wno-shadow)
 
-# Link libraries
+# Link libraries. ROOT is linked via its imported targets, which carry the
+# ROOT include directories (ROOT_INCLUDE_DIRS is not reliably populated by
+# ROOT 6.26's CMake config under newer CMake versions).
 if(WITH_CELERITAS)
   target_compile_definitions(g4sim PRIVATE USE_CELERITAS)
-  celeritas_target_link_libraries(g4sim ${ROOT_LIBRARIES} ${Geant4_LIBRARIES} Celeritas::G4)
+  celeritas_target_link_libraries(g4sim ROOT::RIO ROOT::Tree ROOT::Hist ${Geant4_LIBRARIES} Celeritas::G4)
 else()
-  target_link_libraries(g4sim ${ROOT_LIBRARIES} ${Geant4_LIBRARIES})
+  target_link_libraries(g4sim ROOT::RIO ROOT::Tree ROOT::Hist ${Geant4_LIBRARIES})
 endif()

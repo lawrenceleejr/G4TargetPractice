@@ -38,6 +38,9 @@ celeritas::SetupOptions MakeCeleritasOptions()
     opts.ignore_processes = {"CoulombScat"};
     // Uniform zero magnetic field (this application defines no field)
     opts.make_along_step = celeritas::UniformAlongStepFactory();
+    // This application registers no Geant4 sensitive detectors, so disable
+    // Celeritas hit reconstruction (it errors at setup if none are found)
+    opts.sd.enabled = false;
     return opts;
 }
 }  // namespace
