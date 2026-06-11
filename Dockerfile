@@ -54,11 +54,17 @@ ENV LD_LIBRARY_PATH=/opt/geant4-install/lib:$LD_LIBRARY_PATH
 # Then configure g4sim with -DWITH_CELERITAS=ON
 ARG WITH_CELERITAS=OFF
 ENV CELERITAS_DIR=/opt/celeritas-install
+# Celeritas requires CMake >= 3.24; a recent binary release is downloaded
+# alongside it and put on PATH (also needed when building g4sim with
+# -DWITH_CELERITAS=ON, since find_package(Celeritas) uses the same modules)
 RUN if [ "$WITH_CELERITAS" = "ON" ]; then \
       apt-get update && apt-get install -y nlohmann-json3-dev && \
       rm -rf /var/lib/apt/lists/* && \
+      wget -q https://github.com/Kitware/CMake/releases/download/v3.29.6/cmake-3.29.6-linux-x86_64.tar.gz && \
+      tar -xzf cmake-3.29.6-linux-x86_64.tar.gz && \
+      rm cmake-3.29.6-linux-x86_64.tar.gz && \
       git clone --depth 1 --branch v0.6.3 https://github.com/celeritas-project/celeritas.git && \
-      cmake -S celeritas -B celeritas-build \
+      /opt/cmake-3.29.6-linux-x86_64/bin/cmake -S celeritas -B celeritas-build \
         -DCMAKE_BUILD_TYPE=Release \
         -DCELERITAS_USE_Geant4=ON \
         -DCELERITAS_CORE_GEO=Geant4 \
@@ -70,10 +76,11 @@ RUN if [ "$WITH_CELERITAS" = "ON" ]; then \
         -DCELERITAS_BUILD_TESTS=OFF \
         -DCMAKE_PREFIX_PATH=/opt/geant4-install \
         -DCMAKE_INSTALL_PREFIX=${CELERITAS_DIR} && \
-      cmake --build celeritas-build -j4 && \
-      cmake --install celeritas-build && \
+      /opt/cmake-3.29.6-linux-x86_64/bin/cmake --build celeritas-build -j4 && \
+      /opt/cmake-3.29.6-linux-x86_64/bin/cmake --install celeritas-build && \
       rm -rf celeritas celeritas-build ; \
     fi
+ENV PATH=/opt/cmake-3.29.6-linux-x86_64/bin:$PATH
 ENV LD_LIBRARY_PATH=${CELERITAS_DIR}/lib:$LD_LIBRARY_PATH
 ENV CMAKE_PREFIX_PATH=${CELERITAS_DIR}:$CMAKE_PREFIX_PATH
 

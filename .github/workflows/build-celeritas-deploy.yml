@@ -44,8 +44,14 @@ jobs:
           # plus build dependencies for Celeritas
           RUN apt-get update && apt-get install -y --no-install-recommends \
               libqt6core6 libqt6gui6 libqt6widgets6 libqt6opengl6 \
-              git ca-certificates nlohmann-json3-dev \
+              git ca-certificates wget nlohmann-json3-dev \
               && rm -rf /var/lib/apt/lists/*
+
+          # Celeritas requires CMake >= 3.24, newer than the base image provides
+          RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.29.6/cmake-3.29.6-linux-x86_64.tar.gz && \
+              tar -xzf cmake-3.29.6-linux-x86_64.tar.gz -C /opt && \
+              rm cmake-3.29.6-linux-x86_64.tar.gz
+          ENV PATH=/opt/cmake-3.29.6-linux-x86_64/bin:$PATH
 
           # Build Celeritas (CPU-only) against the Geant4 provided by the base
           # image. CELERITAS_CORE_GEO=Geant4 uses native Geant4 navigation so
