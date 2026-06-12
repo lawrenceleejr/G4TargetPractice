@@ -15,6 +15,7 @@ in the repository.
 | `gdml/water_phantom_tumor.gdml` | Water tank as above with a r = 1.5 cm soft-tissue tumor sphere at 10 cm depth |
 | `gdml/dt_target_mucf.gdml` | Liquid D–T cell (0.18 g/cm³, 50:50, 20 K) in a 2 mm steel vessel, in vacuum; entrance face at z = 0 |
 | `gdml/graphite_target.gdml` | 10×10×60 cm graphite pion-production target in vacuum, entrance face at z = 0 |
+| `gdml/muon_capture_channel.gdml` | 2×2×30 cm graphite rod + 5 m vacuum decay channel + monitor plane (use with `/detector/setGlobalField`) |
 
 ## Macro overview
 
@@ -112,6 +113,7 @@ cycle), each fusion releasing a 14.1 MeV neutron and a 3.5 MeV alpha.
 | Macro | Stage | Beam / source |
 |---|---|---|
 | `protons_graphite_muonprod.mac` | 1. Production | 1.3 GeV protons on graphite; π±/μ± yields per proton from the per-event counters |
+| `protons_capture_channel.mac` | 1b. Capture + decay channel | 1.3 GeV protons on a thin rod inside a 5 T solenoid field; pions spiral down a 5 m decay channel and deliver muons to a monitor plane |
 | `muons_dt_mucf_stopping.mac` | 2. Muon stopping | 22 ± 1.5 MeV `mu-` through the steel window, stopping at ~7 cm depth in the D–T |
 | `muons_dt_energy_scan.mac` | 2b. Beam design | Comb of 14–34 MeV `mu-` energies in one run; plot `finalZ` vs `E` to map which energies cross the window and stop inside the D–T |
 | `neutrons_dt_14MeV.mac` | 3a. Fusion neutrons | isotropic 14.1 MeV neutrons from the stopping region (neutronics/shielding) |
@@ -146,6 +148,34 @@ Run `muons_dt_energy_scan.mac` to map the window precisely for any
 edited geometry; the stopping-region length is dominated by the beam
 momentum spread (≈ 1.8 cm per MeV at these energies), with muon range
 straggling adding ~0.5 cm.
+
+**Understanding the muon production.** Muons are tertiary: protons make
+pions in the target, and the muons come from `pi+ -> mu+ nu` (26 ns
+lifetime, cτ = 7.8 m, so decay mostly happens in flight along the
+channel) while most π⁻ that stop in material are nuclear-captured
+instead of decaying. `protons_graphite_muonprod.mac` quantifies the
+first step — π±/μ± yields per proton on target straight from the
+per-event counters (`nPionPlus`, `nMuonMinus`, …). The capture-channel
+macro adds the transport: a uniform solenoid field
+(`/detector/setGlobalField 0 0 5 tesla`) confines pions with
+p⊥ ≲ 0.3·B·r into helices so they survive to decay, and the monitor
+plane 5 m downstream tags the delivered muons. Useful step-level
+selections (mm/MeV units; the `abs(step_kinE-trk_birthKE)<1e-6` trick
+selects each track's first step, i.e. one entry per particle):
+
+```cpp
+// pi+ production spectrum at birth
+tree->Draw("trk_birthKE", "step_PDG==211 && abs(step_kinE-trk_birthKE)<1e-6");
+// muon flux and spectrum at the monitor plane
+tree->Draw("step_kinE", "abs(step_PDG)==13 && step_postZ>5300 && step_postZ<5310");
+// pi -> mu decay vertices along the channel
+tree->Draw("trk_birthPosZ", "abs(step_PDG)==13 && abs(step_kinE-trk_birthKE)<1e-6");
+```
+
+Rerun with the field set to zero to measure the capture gain. (In
+Celeritas-enabled builds, set `CELER_DISABLE=1` when a field is on —
+the offload assumes zero field for e±/γ; muons and pions are
+unaffected.)
 
 **Multi-parameter scans.** `scans/mucf_scan.sh` (shipped in the Docker
 images at `/app/scans/mucf_scan.sh`) scans beam energy, D:T atomic

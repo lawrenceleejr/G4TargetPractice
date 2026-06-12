@@ -1,5 +1,6 @@
 #include "G4UImessenger.hh"
 #include "G4UIcmdWithAString.hh"
+#include "G4UIcmdWith3VectorAndUnit.hh"
 
 class DetectorConstruction;
 
@@ -14,4 +15,5 @@ private:
     DetectorConstruction* fDetector;
 
     G4UIcmdWithAString* fReadGDMLCmd;
+    G4UIcmdWith3VectorAndUnit* fGlobalFieldCmd;
 };

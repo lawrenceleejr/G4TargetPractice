@@ -47,7 +47,7 @@ This mounts your local `myrun/` directory as `/run/` inside the container, sets 
 /run/beamOn 1000
 ```
 
-The `/detector/readGDML` command takes a path relative to the working directory inside the container (i.e. relative to where you mounted your files). Geant4 standard `/gun/` commands are used to configure the particle gun — any particle in the Geant4 particle table is supported.
+The `/detector/readGDML` command takes a path relative to the working directory inside the container (i.e. relative to where you mounted your files). Geant4 standard `/gun/` commands are used to configure the particle gun — any particle in the Geant4 particle table is supported. A uniform magnetic field over the whole geometry (e.g. a capture solenoid) can be set after `/run/initialize` with `/detector/setGlobalField 0 0 5 tesla` (a zero vector disables it; with Celeritas-enabled builds set `CELER_DISABLE=1` when using a field).
 
 ### Supported particles
 
