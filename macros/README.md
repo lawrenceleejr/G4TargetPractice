@@ -113,6 +113,7 @@ cycle), each fusion releasing a 14.1 MeV neutron and a 3.5 MeV alpha.
 |---|---|---|
 | `protons_graphite_muonprod.mac` | 1. Production | 1.3 GeV protons on graphite; π±/μ± yields per proton from the per-event counters |
 | `muons_dt_mucf_stopping.mac` | 2. Muon stopping | 22 ± 1.5 MeV `mu-` through the steel window, stopping at ~7 cm depth in the D–T |
+| `muons_dt_energy_scan.mac` | 2b. Beam design | Comb of 14–34 MeV `mu-` energies in one run; plot `finalZ` vs `E` to map which energies cross the window and stop inside the D–T |
 | `neutrons_dt_14MeV.mac` | 3a. Fusion neutrons | isotropic 14.1 MeV neutrons from the stopping region (neutronics/shielding) |
 | `alphas_dt_3p5MeV.mac` | 3b. Fusion alphas | isotropic 3.5 MeV alphas from the stopping region (local heating; sticking context) |
 
@@ -133,6 +134,18 @@ approach used by Acceleron Fusion), and Celeritas has a native μCF
 executor under development (muonic atom → molecule → DD/DT/TT cycle),
 which this repository's `WITH_CELERITAS` build option is well placed to
 adopt once released.
+
+**Matching the beam to the cell.** For the default geometry (2 mm
+stainless window ≈ 1.6 g/cm², D–T rear face at ≈ 5.2 g/cm²) the
+acceptance window is roughly **16–31 MeV kinetic energy (≈ 60–90
+MeV/c)**: below it muons stop in the window, above it they punch
+through the cell. This is decay-channel muon territory — 29.8 MeV/c
+"surface" muons (4.1 MeV, and μ⁺ only) would stop in the first
+~0.2 mm of steel, so a μ⁻ beam for μCF is necessarily a decay beam.
+Run `muons_dt_energy_scan.mac` to map the window precisely for any
+edited geometry; the stopping-region length is dominated by the beam
+momentum spread (≈ 1.8 cm per MeV at these energies), with muon range
+straggling adding ~0.5 cm.
 
 ## How to run a macro
 
