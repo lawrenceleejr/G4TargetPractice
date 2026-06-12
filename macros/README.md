@@ -147,6 +147,24 @@ edited geometry; the stopping-region length is dominated by the beam
 momentum spread (≈ 1.8 cm per MeV at these energies), with muon range
 straggling adding ~0.5 cm.
 
+**Multi-parameter scans.** `scans/mucf_scan.sh` (shipped in the Docker
+images at `/app/scans/mucf_scan.sh`) scans beam energy, D:T atomic
+ratio, density (relative to liquid-hydrogen atom density) and window
+thickness in one go — it generates a D–T cell GDML and a macro per
+point, runs `g4sim`, and writes one ROOT file per point plus a
+`summary.csv` with the fraction of muons stopped inside the D–T and
+the mean stopping depth. On any machine with Docker:
+
+```bash
+docker run --rm -v "$PWD":/work -w /work \
+  -e ENERGIES="14 16 18 20 22 24 26 28 30 32 34" -e DFRACS="0.3 0.5 0.7" \
+  --entrypoint bash ghcr.io/lawrenceleejr/g4targetpractice:main \
+  /app/scans/mucf_scan.sh
+```
+
+Results land in `./scan_results/`. Other knobs: `PHI` (density),
+`WINDOW_MM` (steel wall thickness), `NEVENTS`, `PARTICLE`.
+
 ## How to run a macro
 
 From the build directory run the simulation executable with the `-m` flag:

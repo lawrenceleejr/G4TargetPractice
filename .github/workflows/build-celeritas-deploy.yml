@@ -83,6 +83,9 @@ jobs:
           RUN if [ -f /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 ]; then strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5; fi
           RUN if [ -f /lib/x86_64-linux-gnu/libQt6Core.so.6 ]; then strip --remove-section=.note.ABI-tag /lib/x86_64-linux-gnu/libQt6Core.so.6; fi
 
+          # Parameter-scan helper scripts (run with --entrypoint bash)
+          COPY scans/ /app/scans/
+
           # Set the entrypoint to the executable
           ENTRYPOINT ["/app/build/g4sim"]
           EOF

@@ -89,6 +89,9 @@ jobs:
           # Copy and build
           COPY g4sim/ /app/g4sim/
           RUN mkdir -p /app/build && cd /app/build && cmake /app/g4sim/ && cmake --build .
+
+          # Parameter-scan helper scripts (run with --entrypoint bash)
+          COPY scans/ /app/scans/
           RUN if [ -f /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 ]; then strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5; fi
           RUN if [ -f /lib/x86_64-linux-gnu/libQt6Core.so.6 ]; then strip --remove-section=.note.ABI-tag /lib/x86_64-linux-gnu/libQt6Core.so.6; fi
 

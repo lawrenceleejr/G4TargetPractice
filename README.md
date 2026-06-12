@@ -84,6 +84,8 @@ G4TargetPractice/
 │   ├── dt_target_mucf.gdml          # Liquid D-T cell (muon-catalyzed fusion)
 │   └── graphite_target.gdml         # Pion/muon production target
 ├── macros/                  # Example macros (HEP + medical physics), see macros/README.md
+├── scans/                   # Parameter-scan scripts (baked into the Docker images)
+│   └── mucf_scan.sh         # Muon energy / D:T ratio / density / window scan
 ├── run/                     # Example user run directory
 │   ├── run.mac              # Example macro file
 │   └── MAIA_260211.gdml     # Example GDML geometry
