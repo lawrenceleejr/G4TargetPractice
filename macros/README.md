@@ -9,6 +9,7 @@ in the repository.
 | File | Description |
 |---|---|
 | `gdml/silicon_slab_1mm.gdml` | 10×10 cm silicon slab, 1 mm thick, in a 10 cm air box |
+| `gdml/silicon_3layer_300um.gdml` | Three 4×4 cm silicon sheets, each 300 µm thick, separated by 300 µm air gaps |
 | `gdml/liquid_argon_1m3.gdml` | 1 m³ liquid-argon cube in a 2 m³ air box |
 
 ## Macro overview
@@ -21,6 +22,27 @@ in the repository.
 | `electrons_silicon_gauss.mac` | `e-` | Gaussian – mean 1 GeV, σ = 200 MeV |
 | `electrons_silicon_exp.mac` | `e-` | Exponential – E₀ = 1 GeV, sampled 100 MeV–5 GeV |
 | `electrons_silicon_arb.mac` | `e-` | Arbitrary histogram (user-defined weights) |
+
+### Beta decay through the three-layer silicon stack
+
+| Macro | Particle | Energy distribution |
+|---|---|---|
+| `beta_silicon_3layer.mac` | `e-` | Beta spectrum (Y-90, 2.28 MeV endpoint, allowed shape) |
+
+This example fires beta-decay electrons at `gdml/silicon_3layer_300um.gdml`
+(three 300 µm Si sheets, 300 µm gaps) and is set up to answer *what fraction of
+the betas punch all the way through the stack*. The continuous beta spectrum is
+reproduced with the `arb` energy mode (a weighted histogram of `e-` energies
+sampling `N(E) ∝ p·E_tot·(E₀−E)²`).
+
+After running, compute the through-fraction with the bundled ROOT macro:
+
+```bash
+root -l -b -q 'macros/transmission_fraction.C("output.root")'
+```
+
+A primary is counted as "through" when it reaches the back face of the third
+sheet (z > +0.750 mm), recorded per event as `finalZ` in the output tree.
 
 ### Neutrino beams on the liquid-argon target
 

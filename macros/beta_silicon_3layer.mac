@@ -1,0 +1,75 @@
+# =============================================================================
+# beta_silicon_3layer.mac
+#
+# Fire beta-decay electrons at three 300 um silicon sheets and measure what
+# fraction punch all the way through the stack.
+#
+# Detector: gdml/silicon_3layer_300um.gdml
+#   - World : 60 x 60 x 40 mm (G4_AIR)
+#   - Target: three 40 x 40 mm silicon sheets, each 300 um thick,
+#             separated by 300 um air gaps, centred at the origin.
+#             Back face of the third sheet is at z = +0.750 mm.
+#
+# Beam: a beta spectrum.
+#   The generator fires e- (the beta particle).  Geant4's particle gun shoots
+#   one fixed energy per event, so the continuous beta spectrum is reproduced
+#   with the "arb" energy mode: a weighted histogram of discrete e- energies.
+#
+#   The weights below sample the allowed beta-decay shape
+#
+#       N(E) dE  proportional to  p * E_tot * (E0 - E)^2 dE
+#
+#   with E       = electron kinetic energy
+#        E_tot   = E + m_e,   m_e = 0.511 MeV
+#        p       = sqrt(E_tot^2 - m_e^2)
+#        E0      = 2.28 MeV   <-- beta endpoint of Y-90 (the Sr-90/Y-90
+#                                  source is a very common lab beta emitter;
+#                                  the energetic Y-90 branch is the one that
+#                                  can penetrate silicon)
+#
+#   (Fermi-function Coulomb corrections are neglected; this is the standard
+#   "allowed shape" approximation, fine for a transmission study.)
+#
+#   To model a different isotope, recompute the weights with that endpoint E0
+#   (e.g. Cs-137 ~0.51 MeV, Tl-204 ~0.76 MeV, P-32 ~1.71 MeV, Y-90 ~2.28 MeV).
+#
+# Geometry of the beam:
+#   - Particle : e-
+#   - Position : on-axis, 5 mm upstream of the stack (z = -5 mm)
+#   - Direction: +z, normal incidence (a collimated source).
+#                Use "/gun/direction 0 0 0" instead for an isotropic 4pi source.
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/silicon_3layer_300um.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    e-
+/gun/energyMode  arb
+/gun/position    0 0 -5 mm
+/gun/direction   0 0 1
+
+# --- Beta spectrum: Y-90 (endpoint 2.28 MeV), allowed shape ---
+# Syntax: /gun/addEnergyBin <energy> <unit> <relativeWeight>
+# Weights need not be normalised; the generator normalises internally.
+/gun/clearEnergyBins
+/gun/addEnergyBin  0.10 MeV 0.97
+/gun/addEnergyBin  0.25 MeV 1.77
+/gun/addEnergyBin  0.45 MeV 2.62
+/gun/addEnergyBin  0.65 MeV 3.22
+/gun/addEnergyBin  0.85 MeV 3.51
+/gun/addEnergyBin  1.05 MeV 3.48
+/gun/addEnergyBin  1.25 MeV 3.15
+/gun/addEnergyBin  1.45 MeV 2.56
+/gun/addEnergyBin  1.65 MeV 1.80
+/gun/addEnergyBin  1.85 MeV 1.01
+/gun/addEnergyBin  2.05 MeV 0.34
+/gun/addEnergyBin  2.20 MeV 0.05
+
+# --- Run ---
+# 10k events gives ~0.5% binomial error on the through-fraction.
+/run/printProgress 1000
+/run/beamOn 10000

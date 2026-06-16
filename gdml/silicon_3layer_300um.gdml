@@ -1,0 +1,77 @@
+<?xml version="1.0"?>
+<!--
+  silicon_3layer_300um.gdml
+
+  Three silicon sheets, each 300 um thick, separated by 300 um air gaps,
+  centred on the origin and facing the +z beam axis.
+
+  Geometry along z (beam axis), all lengths in mm:
+    - Sheet thickness ............ 0.300 mm  (300 um)
+    - Gap between sheets ......... 0.300 mm  (300 um)
+    - Layer pitch ................ 0.600 mm  (thickness + gap)
+    - Stack centred at z = 0
+
+    Layer  z-centre   front face   back face
+    L1     -0.600     -0.750       -0.450
+    L2      0.000     -0.150       +0.150
+    L3     +0.600     +0.450       +0.750   (back of the stack)
+
+  A primary that exits the back face of layer 3 (z > +0.750 mm) has
+  traversed all three silicon sheets.
+
+  The transverse size (40 x 40 mm) is large compared with the few-hundred-um
+  lateral spread of MeV-scale electrons over a ~1.5 mm path, so essentially
+  no particle escapes out the sides before ranging out or punching through.
+
+  Each sheet's logical-volume name ends in "_sens" so DetectorConstruction
+  adds it to the "target" region (the project's sensitive-volume convention).
+-->
+<gdml>
+  <solids>
+    <!-- World: 60 x 60 x 40 mm air box (room upstream and downstream) -->
+    <box name="WorldBox"   x="60" y="60" z="40"  lunit="mm"/>
+    <!-- One 40 x 40 mm silicon sheet, 0.3 mm thick (z) -->
+    <box name="SiSheet"    x="40" y="40" z="0.3" lunit="mm"/>
+  </solids>
+
+  <structure>
+    <volume name="SiLayer1_sens">
+      <materialref ref="G4_Si"/>
+      <solidref ref="SiSheet"/>
+    </volume>
+
+    <volume name="SiLayer2_sens">
+      <materialref ref="G4_Si"/>
+      <solidref ref="SiSheet"/>
+    </volume>
+
+    <volume name="SiLayer3_sens">
+      <materialref ref="G4_Si"/>
+      <solidref ref="SiSheet"/>
+    </volume>
+
+    <volume name="World">
+      <materialref ref="G4_AIR"/>
+      <solidref ref="WorldBox"/>
+
+      <physvol>
+        <volumeref ref="SiLayer1_sens"/>
+        <position x="0" y="0" z="-0.6" unit="mm"/>
+      </physvol>
+
+      <physvol>
+        <volumeref ref="SiLayer2_sens"/>
+        <position x="0" y="0" z="0" unit="mm"/>
+      </physvol>
+
+      <physvol>
+        <volumeref ref="SiLayer3_sens"/>
+        <position x="0" y="0" z="0.6" unit="mm"/>
+      </physvol>
+    </volume>
+  </structure>
+
+  <setup name="Default" version="1.0">
+    <world ref="World"/>
+  </setup>
+</gdml>
