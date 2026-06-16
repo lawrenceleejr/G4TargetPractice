@@ -55,7 +55,7 @@
 # --- Beta spectrum: Y-90 (endpoint 2.28 MeV), allowed shape ---
 # Syntax: /gun/addEnergyBin <energy> <unit> <relativeWeight>
 # Weights need not be normalised; the generator normalises internally.
-/gun/clearEnergyBins
+# (The histogram starts empty, so no /gun/clearEnergyBins is needed here.)
 /gun/addEnergyBin  0.10 MeV 0.97
 /gun/addEnergyBin  0.25 MeV 1.77
 /gun/addEnergyBin  0.45 MeV 2.62

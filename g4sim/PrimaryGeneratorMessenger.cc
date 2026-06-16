@@ -63,6 +63,9 @@ PrimaryGeneratorMessenger::PrimaryGeneratorMessenger(PrimaryGenerator* gun)
 
     fClearEnergyBinsCmd = new G4UIcmdWithAString("/gun/clearEnergyBins", this);
     fClearEnergyBinsCmd->SetGuidance("Clear all bins defined for the arb energy mode");
+    // The command takes no meaningful argument; make it omittable so the
+    // documented no-argument form "/gun/clearEnergyBins" is accepted.
+    fClearEnergyBinsCmd->SetParameterName("unused", true);
     fClearEnergyBinsCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
 }
 
