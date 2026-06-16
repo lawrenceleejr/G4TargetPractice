@@ -35,12 +35,15 @@ the betas punch all the way through the stack*. The continuous beta spectrum is
 reproduced with the `arb` energy mode (a weighted histogram of `e-` energies
 sampling `N(E) ∝ p·E_tot·(E₀−E)²`).
 
-After running, compute the through-fraction with the bundled ROOT macro:
+After running, compute the through-fraction with the bundled Python script:
 
 ```bash
-root -l -b -q 'macros/transmission_fraction.C("output.root")'
+python3 macros/transmission_fraction.py output.root
 ```
 
+It uses `uproot` if installed (`pip install uproot awkward numpy`), otherwise
+falls back to PyROOT (already present in the Docker image, e.g.
+`docker run ... ghcr.io/lawrenceleejr/g4targetpractice:main python3 macros/transmission_fraction.py output.root`).
 A primary is counted as "through" when it reaches the back face of the third
 sheet (z > +0.750 mm), recorded per event as `finalZ` in the output tree.
 
