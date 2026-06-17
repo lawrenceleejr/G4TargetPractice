@@ -83,6 +83,7 @@ int main(int argc, char** argv) {
 
      auto primary = new PrimaryGenerator(runAction);
      runManager->SetUserAction(primary);
+     runAction->SetGenerator(primary);   // lets RunAction auto-detect neutrino primaries
 
      runManager->SetUserAction(new SteppingAction(eventAction, runAction));
 

@@ -23,9 +23,9 @@
 #   - Direction: along +z
 #
 # Analysis hints (in ROOT, positions in mm, edep in MeV):
-#   depth dose:   tree->Draw("step_preZ>>h(200,0,400)", "step_edep")
-#   tumor steps:  sqrt(step_preX*step_preX+step_preY*step_preY+
-#                      (step_preZ-100)*(step_preZ-100)) < 15
+#   depth dose:   tree->Draw("step_z>>h(200,0,400)", "step_edep")
+#   tumor steps:  sqrt(step_x*step_x+step_y*step_y+
+#                      (step_z-100)*(step_z-100)) < 15
 # =============================================================================
 
 # --- Load geometry ---

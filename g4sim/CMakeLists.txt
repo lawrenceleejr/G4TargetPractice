@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.15)
 project(g4sim)
 
+# Geant4 11.x requires C++17; pin it (the ntuple code uses structured bindings).
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # --------------------
 # Find ROOT
 # --------------------
@@ -33,6 +37,7 @@ set(SOURCES
     PrimaryGenerator.cc
     PrimaryGeneratorMessenger.cc
     RunAction.cc
+    RunActionMessenger.cc
     EventAction.cc
     SteppingAction.cc
     main.cc

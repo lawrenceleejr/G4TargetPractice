@@ -28,9 +28,10 @@
 #   - Position : upstream on the beam axis (z = -20 cm)
 #   - Direction: along +z
 #
-# Stopping-distribution extraction (in ROOT, z in mm; last step of the
-# primary muon track):
-#   tree->Draw("step_postZ>>h(240,-20,220)", "step_trackID==1 && step_kinE<0.01")
+# Stopping-distribution extraction (in ROOT, z in mm): the primary muon is
+# track 1, so its exact stop point is trk_endZ for trk_id==1 (equivalently
+# the event scalar primaryEndZ):
+#   tree->Draw("trk_endZ>>h(240,-20,220)", "trk_id==1")
 # =============================================================================
 
 # --- Load geometry ---

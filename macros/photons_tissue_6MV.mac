@@ -22,7 +22,7 @@
 #   - Direction: along +z
 #
 # Depth-dose extraction (in ROOT, z in mm, edep in MeV):
-#   tree->Draw("step_preZ>>h(140,0,140)", "step_edep")
+#   tree->Draw("step_z>>h(140,0,140)", "step_edep")
 # =============================================================================
 
 # --- Load geometry ---

@@ -133,6 +133,12 @@ G4double PrimaryGenerator::SampleArbitrary() const
     return fEnergyBins.back().first;
 }
 
+G4int PrimaryGenerator::GetParticlePDG() const
+{
+    auto* particle = G4ParticleTable::GetParticleTable()->FindParticle(fParticleName);
+    return particle ? particle->GetPDGEncoding() : 0;
+}
+
 G4double PrimaryGenerator::SampleEnergy() const
 {
     switch (fEnergyMode) {

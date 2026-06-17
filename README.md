@@ -56,7 +56,7 @@ Any particle available in the Geant4 particle table can be used, including:
 
 ### Output
 
-Each run produces an `output.root` file in the working directory containing a ROOT TTree (`tree`) with per-event kinematic and hit information for the primary particle and secondaries.
+Each run produces an `output.root` file in the working directory containing a ROOT TTree (`tree`) with one entry per event, organised as three clear collections: **event scalars** (`primaryPDG`, `primaryE`, `primaryStart*`/`primaryEnd*`, `totalEdep`, `nSteps`, `nTracks`), **per-track vectors** `trk_*` (one row per particle: PDG, parent, start/end position and energy, creator process, summed edep and length), and **per-step vectors** `step_*` (position, kinetic energy, energy deposit, length, time, process). When the primary is a neutrino an optional `nu_*` block records the interaction (CC/NC, process, vertex, struck nucleus, outgoing lepton, Q²/W/x/y) — see `/analysis/neutrinoMode` and `macros/README.md` for the full branch reference.
 
 ---
 

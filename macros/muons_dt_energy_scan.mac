@@ -5,7 +5,7 @@
 # the 2 mm stainless entrance window AND Bragg-peak stop inside the D-T
 # volume. Fires a comb of discrete mu- energies (equal weights) in a
 # single run; the per-event beam energy is stored in the E branch and
-# the primary's endpoint in finalX/Y/Z (finalE ~ 0 tags a genuine stop),
+# the primary's endpoint in primaryEndX/Y/Z (primaryEndE ~ 0 tags a genuine stop),
 # so stopping depth vs beam energy comes from one output.root.
 #
 # Range-budget estimate for this geometry (window 1.6 g/cm2, D-T rear at
@@ -23,11 +23,11 @@
 #
 # Analysis (in ROOT; E in MeV, positions in mm):
 #   // endpoint depth vs beam energy
-#   tree->Draw("finalZ:E>>h(11,13,35,240,-20,220)", "", "colz");
-#   // stopping efficiency vs energy: stopped (finalE~0) inside the D-T
-#   tree->Draw("E>>hAll(11,13,35)");
-#   tree->Draw("E>>hStop(11,13,35)",
-#              "finalE<0.1 && finalZ>0 && finalZ<200 && abs(finalX)<50 && abs(finalY)<50");
+#   tree->Draw("primaryEndZ:primaryE>>h(11,13,35,240,-20,220)", "", "colz");
+#   // stopping efficiency vs energy: stopped (primaryEndE~0) inside the D-T
+#   tree->Draw("primaryE>>hAll(11,13,35)");
+#   tree->Draw("primaryE>>hStop(11,13,35)",
+#              "primaryEndE<0.1 && primaryEndZ>0 && primaryEndZ<200 && abs(primaryEndX)<50 && abs(primaryEndY)<50");
 #   hStop->Divide(hAll);  hStop->Draw();
 # =============================================================================
 

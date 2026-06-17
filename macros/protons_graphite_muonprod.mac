@@ -7,9 +7,12 @@
 # beamline. 1.3 GeV matches the SNS proton energy after the PPU upgrade
 # (the muCF/VNS concept shares the beam with the Second Target Station).
 #
-# The per-event secondary counters in output.root give the yields per
-# proton on target: nPionPlus, nPionMinus, nPionZero, nMuonPlus,
-# nMuonMinus (plus step-level info for production positions).
+# The per-track table in output.root gives the yields per proton on target;
+# count tracks by PDG (in ROOT):
+#   pi+: tree->Draw("Sum$(trk_pdg==211)")    pi-: Sum$(trk_pdg==-211)
+#   pi0: Sum$(trk_pdg==111)                  mu+: Sum$(trk_pdg==-13)
+#   mu-: Sum$(trk_pdg==13)
+# trk_startX/Y/Z give the production positions.
 #
 # Detector: gdml/graphite_target.gdml
 #   - World:  100×100×200 cm vacuum

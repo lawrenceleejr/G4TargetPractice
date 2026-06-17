@@ -18,7 +18,7 @@
   Monitor: 60 x 60 x 1 cm vacuum plane, 5 m downstream of the rod
            (z = 530 to 531 cm). Being vacuum it is non-perturbing, but
            its boundaries split tracks into steps, so particles
-           crossing it are selectable via 5300 < step_postZ < 5310 mm.
+           crossing it are selectable via 5300 < step_z < 5310 mm.
 -->
 <gdml>
   <solids>

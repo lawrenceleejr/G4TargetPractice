@@ -55,10 +55,10 @@ void mucf_summary(const char* fn)
     TTree* t = (TTree*)f.Get("tree");
     if (!t || t->GetEntries() == 0) { printf("SCANROW,nan,nan,nan\n"); return; }
     double tot = t->GetEntries();
-    // stopped (finalE ~ 0) inside the D-T volume: 0 < z < 200 mm, |x|,|y| < 50 mm
-    TString sel = "finalE<0.1 && finalZ>0 && finalZ<200 && abs(finalX)<50 && abs(finalY)<50";
+    // stopped (primaryEndE ~ 0) inside the D-T volume: 0 < z < 200 mm, |x|,|y| < 50 mm
+    TString sel = "primaryEndE<0.1 && primaryEndZ>0 && primaryEndZ<200 && abs(primaryEndX)<50 && abs(primaryEndY)<50";
     double stop = t->GetEntries(sel);
-    t->Draw("finalZ>>hh(200,0,200)", sel, "goff");
+    t->Draw("primaryEndZ>>hh(200,0,200)", sel, "goff");
     TH1* h = (TH1*)gDirectory->Get("hh");
     printf("SCANROW,%g,%g,%g\n", tot, stop / tot, (h && stop > 0) ? h->GetMean() : -1.0);
 }

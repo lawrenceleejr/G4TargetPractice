@@ -1,11 +1,11 @@
 # Build directories
 build/
-<<<<<<< HEAD
 Build/
 BUILD/
+build-*/
 cmake-build-*/
 
-# CMake files
+# CMake generated files
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
@@ -14,7 +14,10 @@ Makefile
 *.cmake
 !CMakeLists.txt
 
-# Compiled files
+# Compiled binaries / objects
+# NOTE: do NOT add a bare "g4sim" pattern here — it would shadow the g4sim/
+# source directory. The built executable lives under build/ (already ignored).
+neutrino
 *.o
 *.a
 *.so
@@ -23,20 +26,13 @@ Makefile
 *.exe
 *.out
 
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-*.user
-*.suo
-*.vcxproj
-*.vcxproj.filters
-*.sln
+# Geant4 data/source directories (downloaded inside container)
+geant4-data/
+geant4-source/
+geant4-build/
+geant4-install/
 
-# Geant4 output files
+# Geant4 / ROOT output files
 *.root
 *.rndm
 *.wrl
@@ -47,12 +43,27 @@ G4*.dat
 # Log files
 *.log
 *.err
-*.out
 
-# Temporary files
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+\#*\#
+.#*
+*.user
+*.suo
+*.vcxproj
+*.vcxproj.filters
+*.sln
+.directory
+
+# Temporary / backup files
 *.tmp
 *.bak
 *.orig
+Dockerfile.bak
 
 # Documentation
 doc/html/
@@ -70,16 +81,10 @@ __pycache__/
 venv/
 env/
 
-# macOS
+# macOS / Windows metadata
 .DS_Store
 .AppleDouble
 .LSOverride
-
-# Linux
-*~
-.directory
-
-# Windows
 Thumbs.db
 ehthumbs.db
 Desktop.ini
@@ -94,45 +99,3 @@ $RECYCLE.BIN/
 # Core dumps
 core
 core.*
-=======
-build-*/
-
-# CMake generated files
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-*.cmake
-
-# Compiled binaries
-g4sim
-neutrino
-
-# ROOT output files
-*.root
-
-# Geant4 data/source directories (downloaded inside container)
-geant4-data/
-geant4-source/
-geant4-build/
-geant4-install/
-
-# Editor backup files
-*~
-\#*\#
-.#*
-*.swp
-*.swo
-
-# macOS metadata
-.DS_Store
-
-# Python cache
-__pycache__/
-*.pyc
-
-# Docker artifacts
-Dockerfile.bak
-
-# Output GDML exports (if generated at runtime)
->>>>>>> main

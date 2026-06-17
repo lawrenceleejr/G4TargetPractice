@@ -31,6 +31,9 @@
 # --- Physics initialise ---
 /run/initialize
 
+# --- Emit the nu_* neutrino-interaction branches ---
+/analysis/neutrinoMode on
+
 # --- Beam ---
 /gun/particle    nu_mu
 /gun/energyMode  arb

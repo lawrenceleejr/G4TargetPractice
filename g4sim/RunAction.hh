@@ -5,141 +5,80 @@
 #include "TFile.h"
 #include "TTree.h"
 #include "globals.hh"
-#include "G4ThreeVector.hh"  // Add this                                                                                                                                                                                             
 #include <vector>
 #include <string>
-#include "EventAction.hh"
 
 class EventAction;
+class PrimaryGenerator;
+class RunActionMessenger;
+
 class RunAction : public G4UserRunAction {
 public:
+    // Neutrino-interaction output mode. kAuto enables the nu_* branches when
+    // the primary particle is a neutrino; kOn/kOff force the choice.
+    enum class NuMode { kOff, kOn, kAuto };
+
     RunAction();
     ~RunAction() override;
 
-  void FillEvent(EventAction* evt);
-  void BeginOfRunAction(const G4Run*) override;
-  void EndOfRunAction(const G4Run*) override;
+    void FillEvent(EventAction* evt);
+    void BeginOfRunAction(const G4Run*) override;
+    void EndOfRunAction(const G4Run*) override;
 
-      TTree* GetTree() { return fTree; }
+    TTree* GetTree() { return fTree; }
 
-    // Variables for ROOT branches (non-static)                                                                                                                                                                                      
-  double E, x, y, z,vertexX,vertexY,vertexZ, vertexT;
-  double finalE, finalX, finalY, finalZ;
-  Double_t px, py, pz;
-  Double_t theta, phi, finalPhi,finalPhiDeg;
+    // Configuration (messenger / main)
+    void SetNeutrinoMode(NuMode mode) { fNuMode = mode; }
+    void SetGenerator(PrimaryGenerator* gen) { fGenerator = gen; }
+    bool NeutrinoBranchesEnabled() const { return fNeutrinoBranches; }
 
-  Double_t totalEdep;
-  Int_t nSteps;
-  Int_t nSecondaries;
-  double costh;
+    // ============================================================
+    // Branch variables (written by EventAction at end of event)
+    // ============================================================
 
-  double finalPx, finalPy, finalPz;
-  double finalCosth;
+    // --- Event scalars ---
+    int eventID = 0;
+    int primaryPDG = 0;
+    int nSteps = 0;
+    int nTracks = 0;
+    double primaryE = 0;
+    double primaryStartX = 0, primaryStartY = 0, primaryStartZ = 0;
+    double primaryStartPx = 0, primaryStartPy = 0, primaryStartPz = 0;
+    double primaryEndE = 0;
+    double primaryEndX = 0, primaryEndY = 0, primaryEndZ = 0;
+    double primaryEndPx = 0, primaryEndPy = 0, primaryEndPz = 0;
+    double totalEdep = 0;
 
-  std::vector<std::string> stepProcessNames;
-  std::vector<std::string> stepcreatorProcessNames;
-  //  std::vector<std::string> secNames;
-  std::vector<double> secEnergies;
+    // --- Per-track vectors (one entry per track) ---
+    std::vector<int> trk_id, trk_parentID, trk_pdg;
+    std::vector<double> trk_startX, trk_startY, trk_startZ, trk_startE;
+    std::vector<double> trk_endX, trk_endY, trk_endZ, trk_endE;
+    std::vector<double> trk_edep, trk_length;
+    std::vector<std::string> trk_creatorProcess;
 
-  std::vector<double> secStartX;
-  std::vector<double> secStartY;
-  std::vector<double> secStartZ;
+    // --- Per-step vectors (one entry per step) ---
+    std::vector<int> step_trackID, step_pdg;
+    std::vector<double> step_x, step_y, step_z;
+    std::vector<double> step_kinE, step_edep, step_length, step_time;
+    std::vector<std::string> step_process;
 
-  std::vector<double> secEndX;
-  std::vector<double> secEndY;
-  std::vector<double> secEndZ;
-  std::string interactionType;
-
-  // Secondary info                                                                                                                                                                                                                  
-
-    int targetZ = -1;
-    int targetA = -1;
-    int targetPDG = -1;   // optional                                                                                                                                                                                                
-
-int nGamma;
-int nElectron;
-int nPositron;
-double secTotalE;
-double secMeanE;
-double secTrackLength;
-
-
-int nBackward;
-
-// Process counters (optional but recommended)                                                                                                                                                                                       
-  int nCompton =0 ;
-  int nPairProd=0;
-  int nIonisation=0;
-  int nBremsstrahlung=0;
-  int nDecay=0;
-  int nProtonSec=0;
-  int nNeutron=0;
-  int nPionPlus=0;
-  int nPionMinus=0;
-  int nMuonPlus=0;
-  int nMuonMinus=0;
-  int nTauPlus=0;
-  int nTauMinus=0;
-  int nPionZero=0;
-  int nPhotoElectric   = 0;
-  int nAnnihilation    = 0;
-  int nKaonPlus = 0;
-  int nKaonMinus=0;
-  int nKaonZero=0;
-  int nKaonZeroL=0;
-  int nKaonZeroS=0;
-
-
-int eventID;
-int primaryPDG;
-
-std::string nuInteractionProcess;
-
-bool isCC;
-bool isNC;
-
-int outgoingLeptonPDG;
-double outgoingLeptonE;
-double outgoingLeptonPx;
-double outgoingLeptonPy;
-double outgoingLeptonPz;
-
-double q0;
-double Q2;
-double W;
-double xBj;
-double yBj;
-std::vector<double> step_time;
-std::vector<double> step_stepLength;
-
-std::vector<double> step_preMomX;
-std::vector<double> step_preMomY;
-std::vector<double> step_preMomZ;
-
-std::vector<double> step_postMomX;
-std::vector<double> step_postMomY;
-std::vector<double> step_postMomZ;
-
-  // Step-level info                                                                                                                                                                                                                 
-  std::vector<int> step_trackID, step_parentID, step_PDG;
-    std::vector<double> step_preX, step_preY, step_preZ;
-    std::vector<double> step_postX, step_postY, step_postZ;
-    std::vector<double> step_kinE, step_edep;
-    std::vector<std::string> step_proc;
-   std::vector<std::string> step_creatorproc;
-  std::vector<double> trk_birthPosX;
-  std::vector<double> trk_birthPosY;
-  std::vector<double> trk_birthPosZ;
-  std::vector<double> trk_birthKE;
+    // --- Neutrino-interaction block (booked only in neutrino mode) ---
+    bool nu_isCC = false, nu_isNC = false;
+    std::string nu_interactionProcess;
+    double nu_vertexX = 0, nu_vertexY = 0, nu_vertexZ = 0, nu_vertexT = 0;
+    int nu_targetZ = -1, nu_targetA = -1;
+    int nu_outLeptonPDG = 0;
+    double nu_outLeptonE = 0, nu_outLeptonPx = 0, nu_outLeptonPy = 0, nu_outLeptonPz = 0;
+    double nu_Q2 = 0, nu_W = 0, nu_x = 0, nu_y = 0, nu_q0 = 0;
 
 private:
- EventAction* fEventAction;
-  TFile* fFile;
-  TTree* fTree;
+    TFile* fFile = nullptr;
+    TTree* fTree = nullptr;
+
+    NuMode fNuMode = NuMode::kAuto;
+    bool fNeutrinoBranches = false;   // resolved in BeginOfRunAction
+    PrimaryGenerator* fGenerator = nullptr;
+    RunActionMessenger* fMessenger = nullptr;
 };
 
 #endif
-
-
-
-

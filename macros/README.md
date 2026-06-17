@@ -47,7 +47,7 @@ step-level branches of `output.root` (positions are in mm, energy deposits
 in MeV), e.g. in ROOT:
 
 ```cpp
-tree->Draw("step_preZ>>h(200,0,400)", "step_edep");
+tree->Draw("step_z>>h(200,0,400)", "step_edep");
 ```
 
 | Macro | Particle | Beam | Physics illustrated |
@@ -86,11 +86,11 @@ so the energy deposited inside the tumor can be selected directly from the
 step-level branches, e.g. total tumor energy deposit per event:
 
 ```cpp
-tree->Draw("Sum$(step_edep*(sqrt(step_preX*step_preX+step_preY*step_preY+(step_preZ-100)*(step_preZ-100))<15))>>hTumor");
+tree->Draw("Sum$(step_edep*(sqrt(step_x*step_x+step_y*step_y+(step_z-100)*(step_z-100))<15))>>hTumor");
 ```
 
-The per-step process names (`step_proc`) and creator processes
-(`step_creatorproc`) let you separate capture products
+The per-step process names (`step_process`) and the per-track creator
+process (`trk_creatorProcess`) let you separate capture products
 (`muMinusCaptureAtRest`) from decay products (`Decay`) when comparing
 `mu-` and `mu+` runs. Beam energies set the stopping depth — scan
 `/gun/energy` by a few MeV to sweep the peak through the tumor. Muons are
@@ -112,10 +112,10 @@ cycle), each fusion releasing a 14.1 MeV neutron and a 3.5 MeV alpha.
 
 | Macro | Stage | Beam / source |
 |---|---|---|
-| `protons_graphite_muonprod.mac` | 1. Production | 1.3 GeV protons on graphite; π±/μ± yields per proton from the per-event counters |
+| `protons_graphite_muonprod.mac` | 1. Production | 1.3 GeV protons on graphite; π±/μ± yields per proton from the per-track table (e.g. `Sum$(trk_pdg==211)`) |
 | `protons_capture_channel.mac` | 1b. Capture + decay channel | 1.3 GeV protons on a thin rod inside a 5 T solenoid field; pions spiral down a 5 m decay channel and deliver muons to a monitor plane |
 | `muons_dt_mucf_stopping.mac` | 2. Muon stopping | 22 ± 1.5 MeV `mu-` through the steel window, stopping at ~7 cm depth in the D–T |
-| `muons_dt_energy_scan.mac` | 2b. Beam design | Comb of 14–34 MeV `mu-` energies in one run; plot `finalZ` vs `E` to map which energies cross the window and stop inside the D–T |
+| `muons_dt_energy_scan.mac` | 2b. Beam design | Comb of 14–34 MeV `mu-` energies in one run; plot `primaryEndZ` vs `primaryE` to map which energies cross the window and stop inside the D–T |
 | `neutrons_dt_14MeV.mac` | 3a. Fusion neutrons | isotropic 14.1 MeV neutrons from the stopping region (neutronics/shielding) |
 | `alphas_dt_3p5MeV.mac` | 3b. Fusion alphas | isotropic 3.5 MeV alphas from the stopping region (local heating; sticking context) |
 
@@ -154,22 +154,22 @@ pions in the target, and the muons come from `pi+ -> mu+ nu` (26 ns
 lifetime, cτ = 7.8 m, so decay mostly happens in flight along the
 channel) while most π⁻ that stop in material are nuclear-captured
 instead of decaying. `protons_graphite_muonprod.mac` quantifies the
-first step — π±/μ± yields per proton on target straight from the
-per-event counters (`nPionPlus`, `nMuonMinus`, …). The capture-channel
-macro adds the transport: a uniform solenoid field
+first step — π±/μ± yields per proton on target by counting tracks in the
+per-track table (e.g. `Sum$(trk_pdg==211)`). The capture-channel macro
+adds the transport: a uniform solenoid field
 (`/detector/setGlobalField 0 0 5 tesla`) confines pions with
 p⊥ ≲ 0.3·B·r into helices so they survive to decay, and the monitor
-plane 5 m downstream tags the delivered muons. Useful step-level
-selections (mm/MeV units; the `abs(step_kinE-trk_birthKE)<1e-6` trick
-selects each track's first step, i.e. one entry per particle):
+plane 5 m downstream tags the delivered muons. The per-track table
+(`trk_*`) already has one row per particle, so selections are direct
+(mm/MeV units):
 
 ```cpp
 // pi+ production spectrum at birth
-tree->Draw("trk_birthKE", "step_PDG==211 && abs(step_kinE-trk_birthKE)<1e-6");
+tree->Draw("trk_startE", "trk_pdg==211");
 // muon flux and spectrum at the monitor plane
-tree->Draw("step_kinE", "abs(step_PDG)==13 && step_postZ>5300 && step_postZ<5310");
+tree->Draw("step_kinE", "abs(step_pdg)==13 && step_z>5300 && step_z<5310");
 // pi -> mu decay vertices along the channel
-tree->Draw("trk_birthPosZ", "abs(step_PDG)==13 && abs(step_kinE-trk_birthKE)<1e-6");
+tree->Draw("trk_startZ", "abs(trk_pdg)==13");
 ```
 
 Rerun with the field set to zero to measure the capture gain. (In
@@ -247,3 +247,81 @@ particle source:
 ```
 
 Weights are normalised automatically; they represent relative probabilities.
+
+## Output ntuple
+
+Each run writes `output.root` containing a TTree `tree` with one entry per
+event, organised as three clear collections (positions in mm, energies in
+MeV, momenta in MeV/c). Momentum components are stored directly; angles are
+derived trivially in analysis (e.g. `atan2(primaryStartPy, primaryStartPx)`).
+
+**Event scalars** (one value per event):
+
+| Branch | Meaning |
+|---|---|
+| `eventID` | event number |
+| `primaryPDG` | PDG code of the primary particle |
+| `primaryE` | primary initial kinetic energy |
+| `primaryStartX/Y/Z` | primary start position |
+| `primaryStartPx/Py/Pz` | primary initial momentum |
+| `primaryEndE` | primary final kinetic energy (≈0 ⇒ it stopped) |
+| `primaryEndX/Y/Z` | primary end (e.g. Bragg-stop) position |
+| `primaryEndPx/Py/Pz` | primary final momentum |
+| `totalEdep` | total energy deposited in the event |
+| `nSteps` | number of recorded steps |
+| `nTracks` | number of tracks |
+
+**Per-track vectors `trk_*`** (one entry per track — primaries and
+secondaries; a track's start position is its production vertex, and
+`trk_parentID` links the decay/interaction tree):
+
+| Branch | Meaning |
+|---|---|
+| `trk_id`, `trk_parentID`, `trk_pdg` | track id, parent id, PDG code |
+| `trk_startX/Y/Z`, `trk_startE` | production vertex position and kinetic energy |
+| `trk_endX/Y/Z`, `trk_endE` | end position and final kinetic energy |
+| `trk_creatorProcess` | process that created the track (`Primary` for primaries) |
+| `trk_edep`, `trk_length` | summed energy deposit and path length over the track |
+
+The track table replaces fixed per-particle counters — count by PDG, e.g.
+`tree->Draw("Sum$(trk_pdg==13)")` for μ⁻ per event.
+
+**Per-step vectors `step_*`** (one entry per step of every track; the
+pre-step position is where the step's energy deposit is registered):
+
+| Branch | Meaning |
+|---|---|
+| `step_trackID`, `step_pdg` | owning track id and PDG code |
+| `step_x/y/z` | pre-step position |
+| `step_kinE` | pre-step kinetic energy |
+| `step_edep`, `step_length`, `step_time` | energy deposit, step length, global time |
+| `step_process` | process limiting the step |
+
+## Neutrino mode
+
+When the primary is a neutrino the ntuple additionally emits a clean
+`nu_*` block identifying and categorising the interaction. It is controlled
+by `/analysis/neutrinoMode` (issue before `/run/beamOn`):
+
+| Value | Effect |
+|---|---|
+| `auto` (default) | enable `nu_*` when the primary is a neutrino (`nu_e/nu_mu/nu_tau`) |
+| `on` | always emit `nu_*` |
+| `off` | never emit `nu_*` |
+
+`nu_*` branches: `nu_isCC`, `nu_isNC` (charged- vs neutral-current, from the
+outgoing lepton), `nu_interactionProcess` (the Geant4 process that caused the
+interaction — the categorization), `nu_vertexX/Y/Z/T` (interaction vertex),
+`nu_targetZ`/`nu_targetA` (struck nucleus), `nu_outLeptonPDG/E/Px/Py/Pz`
+(outgoing lepton), and the derived kinematics `nu_Q2`, `nu_W`, `nu_x`
+(Bjorken x), `nu_y`, `nu_q0`. The neutrino macros (`neutrinos_lar_*.mac`,
+`electron_neutrinos_lar_mono.mac`) enable it explicitly. Example analysis:
+
+```cpp
+// charged-current fraction
+tree->Draw("nu_isCC");
+// which process caused each interaction
+tree->Draw("nu_interactionProcess");
+// Q^2 of charged-current events
+tree->Draw("nu_Q2", "nu_isCC");
+```

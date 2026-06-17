@@ -45,6 +45,10 @@ public:
     void AddEnergyBin(G4double energy, G4double weight);
     void ClearEnergyBins() { fEnergyBins.clear(); }
 
+    /// PDG code of the currently configured primary particle (0 if unknown).
+    /// Used by RunAction to auto-enable neutrino-mode output branches.
+    G4int GetParticlePDG() const;
+
 private:
     G4double SampleEnergy() const;
     G4double SampleExponential() const;
