@@ -6,7 +6,7 @@
 set -e
 case "$1" in
   display|analyze|info)
-    exec g4tp "$@"
+    exec python3 -m g4tp "$@"
     ;;
   *)
     exec /app/build/g4sim "$@"
