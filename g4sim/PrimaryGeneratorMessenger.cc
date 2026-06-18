@@ -61,7 +61,7 @@ PrimaryGeneratorMessenger::PrimaryGeneratorMessenger(PrimaryGenerator* gun)
         "Example: /gun/addEnergyBin 500 MeV 2.0");
     fAddEnergyBinCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
 
-    fClearEnergyBinsCmd = new G4UIcmdWithAString("/gun/clearEnergyBins", this);
+    fClearEnergyBinsCmd = new G4UIcmdWithoutParameter("/gun/clearEnergyBins", this);
     fClearEnergyBinsCmd->SetGuidance("Clear all bins defined for the arb energy mode");
     fClearEnergyBinsCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
 }

@@ -3,6 +3,7 @@
 #include "G4UIcmdWithAString.hh"
 #include "G4UIcmdWithADoubleAndUnit.hh"
 #include "G4UIcmdWith3Vector.hh"
+#include "G4UIcmdWithoutParameter.hh"
 #include "PrimaryGenerator.hh"
 
 class PrimaryGeneratorMessenger : public G4UImessenger {
@@ -28,5 +29,5 @@ private:
 
     // Arbitrary-histogram commands
     G4UIcmdWithAString*        fAddEnergyBinCmd;  // "energy unit weight"
-    G4UIcmdWithAString*        fClearEnergyBinsCmd;
+    G4UIcmdWithoutParameter*   fClearEnergyBinsCmd;
 };

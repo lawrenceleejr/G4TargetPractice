@@ -33,6 +33,11 @@ jobs:
           echo $LD_LIBRARY_PATH
           ./build/g4sim g4sim/run_ci.mac
           pwd; ls -lrt
+
+      - name: Run an arb-mode macro (beta spectrum into the Si tracker)
+        run: |
+          ./build/g4sim macros/betas_silicon_sr90.mac
+          test -f output.root
       
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
