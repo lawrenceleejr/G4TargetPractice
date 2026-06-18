@@ -58,6 +58,14 @@ def hex_rgba(h, a=1.0):
 
 MM = 0.001  # mm -> Blender meters
 
+# Track-tube radius and vertex-marker size are fractions of the scene's bounding
+# radius (computed in g4tp/scene.py), so they look right at any geometry scale --
+# millimetres (silicon tracker) or metres (calorimeter). Deliberately no absolute
+# floor: a floor stops small scenes from scaling down (the old max(...,0.5mm) made
+# 1mm-diameter tubes look fat inside the 1.5mm silicon stack).
+TRACK_RADIUS_FRAC = 0.004    # tube radius      = 0.4% of scene radius
+VERTEX_EDGE_FRAC = 0.0032    # vertex cube edge = 0.32% of scene radius
+
 
 def add_geometry(coll, geometry):
     gm = mat("geo", (0.4, 0.55, 0.7, 0.18))
@@ -170,10 +178,11 @@ def main():
               f"re-run with about --time-scale {suggest:.3g}. The default suits "
               f"ns-scale spreads (decays/showers), not a sub-ns transit.")
 
-    bev = 0.0
-    # bevel radius ~ 0.4% of scene radius for a visible tube
-    if scenes:
-        bev = max(scenes[0]["radius"] * MM * 0.004, 0.0005)
+    # Track width and vertex size scale with the scene's bounding radius (no
+    # absolute floor), so both shrink/grow with the geometry.
+    radius_m = (scenes[0]["radius"] * MM) if scenes else MM
+    bev = radius_m * TRACK_RADIUS_FRAC
+    vtx_size = radius_m * VERTEX_EDGE_FRAC
 
     for s in scenes:
         ev = new_collection(f"Event_{s['event_id']:02d}")
@@ -186,10 +195,6 @@ def main():
                 sub = new_collection(t["n"], tracks_coll)
                 by_type[t["n"]] = sub
             add_track(sub, t, t0, bev, fps, max_frame)
-        # vertex markers: small cubes, well under the track-tube diameter so they
-        # read as interaction points rather than blocks (was bev*4 ~ 2x the tube
-        # diameter, which dwarfed thin detectors like the silicon tracker).
-        vtx_size = bev * 0.8 if bev else 0.0004
         for i, v in enumerate(s["vertices"]):
             bpy.ops.mesh.primitive_cube_add(size=vtx_size,
                                             location=(v[0] * MM, v[1] * MM, v[2] * MM))
