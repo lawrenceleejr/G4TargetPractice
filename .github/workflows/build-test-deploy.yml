@@ -95,8 +95,16 @@ jobs:
           RUN if [ -f /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 ]; then strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5; fi
           RUN if [ -f /lib/x86_64-linux-gnu/libQt6Core.so.6 ]; then strip --remove-section=.note.ABI-tag /lib/x86_64-linux-gnu/libQt6Core.so.6; fi
 
-          # Set the entrypoint to the executable
-          ENTRYPOINT ["/app/build/g4sim"]
+          # g4tp tooling: analysis + event display (uproot/numpy/matplotlib, no ROOT)
+          RUN python3 -m pip install --no-cache-dir uproot numpy matplotlib || pip3 install --no-cache-dir uproot numpy matplotlib
+          COPY g4tp/ /app/g4tp-src/g4tp/
+          COPY pyproject.toml /app/g4tp-src/
+          RUN python3 -m pip install --no-cache-dir /app/g4tp-src || pip3 install --no-cache-dir /app/g4tp-src
+          COPY g4sim/entrypoint.sh /app/entrypoint.sh
+          RUN chmod +x /app/entrypoint.sh
+
+          # Dispatcher entrypoint: 'display|analyze|info' -> g4tp, else -> g4sim
+          ENTRYPOINT ["/app/entrypoint.sh"]
           EOF
       
       - name: Build and push Docker image
