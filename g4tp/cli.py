@@ -145,7 +145,11 @@ def _display(args):
         print("[g4tp] HTML:", out)
     if args.blend:
         from . import render_blender
-        out = render_blender.render_blend(scenes[: args.blend_events], f"{args.prefix}.blend",
+        sel = scenes[: args.blend_events]
+        if len(scenes) > len(sel):
+            print(f"[g4tp] note: {len(scenes)} events selected but only {len(sel)} written to the "
+                  f".blend (--blend-events {args.blend_events}). Raise --blend-events to include all.")
+        out = render_blender.render_blend(sel, f"{args.prefix}.blend",
                                           outdir=str(outdir), blender_image=args.blender_image,
                                           fps=args.anim_fps, time_scale=args.time_scale,
                                           max_seconds=args.max_seconds, log_time=args.log_time)
