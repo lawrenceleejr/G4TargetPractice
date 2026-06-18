@@ -68,10 +68,15 @@ def load_events(path, tree="tree", entry_start=None, entry_stop=None):
     present = set(k.split(";")[0] for k in t.keys())
 
     def read(names):
-        names = [n for n in names if n in present]
-        if not names:
-            return {}
-        return t.arrays(names, library="np", entry_start=entry_start, entry_stop=entry_stop)
+        # Read each branch separately: a single multi-branch np conversion fails
+        # on jagged/string branches (it tries to build one structured array).
+        out = {}
+        for n in names:
+            if n not in present:
+                continue
+            arr = t[n].array(library="np", entry_start=entry_start, entry_stop=entry_stop)
+            out[n] = arr
+        return out
 
     sc = read(SCALAR_BRANCHES)
     trk = read(TRK_BRANCHES)
