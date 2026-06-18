@@ -42,9 +42,14 @@ def main(argv=None):
     d.set_defaults(html=True, png=True, blend=False)
     d.add_argument("--blender-image", default="linuxserver/blender:4.2.0")
     d.add_argument("--blend-events", type=int, default=10)
-    d.add_argument("--time-scale", type=float, default=0.5, help="animation seconds per ns")
+    d.add_argument("--time-scale", type=float, default=0.5,
+                   help="(deprecated) timeline is now normalized to --max-seconds")
     d.add_argument("--anim-fps", type=int, default=30)
-    d.add_argument("--max-seconds", type=float, default=30.0)
+    d.add_argument("--max-seconds", type=float, default=12.0,
+                   help="length of the reveal animation in seconds (fixed, not time-scaled)")
+    d.add_argument("--linear-time", dest="log_time", action="store_false",
+                   help="map step time to frames linearly (default: log, emphasizes early behavior)")
+    d.set_defaults(log_time=True)
     d.add_argument("--max-tracks", type=int, default=2000)
     d.add_argument("--no-world", dest="world", action="store_false")
     d.set_defaults(world=False)
@@ -143,7 +148,7 @@ def _display(args):
         out = render_blender.render_blend(scenes[: args.blend_events], f"{args.prefix}.blend",
                                           outdir=str(outdir), blender_image=args.blender_image,
                                           fps=args.anim_fps, time_scale=args.time_scale,
-                                          max_seconds=args.max_seconds)
+                                          max_seconds=args.max_seconds, log_time=args.log_time)
         if out:
             print("[g4tp] BLEND:", out)
     return 0

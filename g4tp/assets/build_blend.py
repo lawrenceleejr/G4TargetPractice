@@ -63,8 +63,8 @@ MM = 0.001  # mm -> Blender meters
 # millimetres (silicon tracker) or metres (calorimeter). Deliberately no absolute
 # floor: a floor stops small scenes from scaling down (the old max(...,0.5mm) made
 # 1mm-diameter tubes look fat inside the 1.5mm silicon stack).
-TRACK_RADIUS_FRAC = 0.004    # tube radius      = 0.4% of scene radius
-VERTEX_EDGE_FRAC = 0.0032    # vertex cube edge = 0.32% of scene radius
+TRACK_RADIUS_FRAC = 0.0004   # tube radius      = 0.04% of scene radius
+VERTEX_EDGE_FRAC = 0.0016    # vertex cube edge = 0.16% of scene radius
 
 
 def add_geometry(coll, geometry):
@@ -90,7 +90,7 @@ def add_geometry(coll, geometry):
         _move_to(o, coll)
 
 
-def add_track(coll, track, t0, scale, fps, max_frame):
+def add_track(coll, track, bev, frame_of):
     pts = track["p"]
     n = len(pts) // 3
     if n < 2:
@@ -104,13 +104,15 @@ def add_track(coll, track, t0, scale, fps, max_frame):
         px, py, pz = pts[3 * i] * MM, pts[3 * i + 1] * MM, pts[3 * i + 2] * MM
         sp.points[i].co = (px, py, pz, 1.0)
         coords.append((px, py, pz))
-    cu.bevel_depth = scale  # set by caller as a small radius
+    cu.bevel_depth = bev  # tube radius (set by caller)
     obj = bpy.data.objects.new(cu.name, cu)
     m = mat(f"p_{track['n']}", hex_rgba(track["c"]), emission=True)
     obj.data.materials.append(m)
     _move_to(obj, coll)
 
-    # time-driven reveal: keyframe bevel_factor_end vs cumulative length fraction
+    # Time-driven reveal: keyframe bevel_factor_end (fraction of the track drawn)
+    # against the timeline frame each step's global time maps to. The track is
+    # invisible (bevel_factor_end=0) before its first point's frame, then grows.
     times = track["t"]
     seglen = [0.0]
     for i in range(1, n):
@@ -118,11 +120,11 @@ def add_track(coll, track, t0, scale, fps, max_frame):
         seglen.append(seglen[-1] + math.dist(a, b))
     total = seglen[-1] or 1.0
     cu.bevel_factor_end = 0.0
+    # Points that map to the same frame (prompt tracks) just overwrite that frame's
+    # keyframe, so the last (largest) drawn fraction wins -- the reveal stays monotonic.
     for i in range(n):
-        frame = int(round((times[i] - t0) * scale_time))
-        frame = max(1, min(frame, max_frame))
         cu.bevel_factor_end = seglen[i] / total
-        cu.keyframe_insert("bevel_factor_end", frame=frame)
+        cu.keyframe_insert("bevel_factor_end", frame=frame_of(times[i]))
     # linear interpolation
     if cu.animation_data and cu.animation_data.action:
         for fc in cu.animation_data.action.fcurves:
@@ -137,18 +139,58 @@ def _move_to(obj, coll):
     coll.objects.link(obj)
 
 
-# global set by main
-scale_time = 1.0
+def _build_frame_mapper(scenes, fps, max_seconds, log_time):
+    """Build time->frame mapping for the reveal animation.
+
+    The animation has a FIXED length (max_seconds), independent of the event's
+    physical time span, so it never collapses to a single frame. Time is mapped
+    logarithmically by default: each decade of (t - t0) gets a comparable share
+    of frames, so the prompt/early behavior is spread across many frames while
+    the long-time tail is compressed -- instead of one slow track stretching the
+    whole timeline and the interesting start happening within frame 1.
+    --linear-time forces a plain real-time ramp instead.
+    """
+    all_times = []
+    for s in scenes:
+        for t in s["tracks"]:
+            if t.get("t"):
+                all_times += list(t["t"])
+    t0 = min(all_times) if all_times else 0.0
+    tmax = max(all_times) if all_times else 1.0
+    span = (tmax - t0) or 1.0
+    max_frame = max(2, int(round(max_seconds * fps)))
+
+    # Characteristic early time tau ~ 5th percentile of positive offsets, so the
+    # earliest real activity is resolved (not swamped by one slow outlier track).
+    offs = sorted(o for o in (x - t0 for x in all_times) if o > 0)
+    if offs:
+        tau = max(offs[min(len(offs) - 1, int(0.05 * len(offs)))], span * 1e-6)
+    else:
+        tau = span
+    log_den = math.log1p(span / tau)
+
+    def frame_of(t):
+        o = t - t0
+        if o <= 0.0:
+            u = 0.0
+        elif log_time and log_den > 0.0:
+            u = math.log1p(o / tau) / log_den
+        else:
+            u = o / span
+        u = 0.0 if u < 0.0 else (1.0 if u > 1.0 else u)
+        return 1 + int(round(u * (max_frame - 1)))
+
+    return frame_of, max_frame, t0, span
 
 
 def main():
-    global scale_time
     args = argv_after_dd()
     scenes_json, out_blend = args[0], args[1]
     fps = int(args[2]) if len(args) > 2 else 30
-    time_scale = float(args[3]) if len(args) > 3 else 0.5  # animation-seconds per ns
-    max_seconds = float(args[4]) if len(args) > 4 else 30.0
-    scale_time = time_scale * fps  # frames per ns
+    # args[3] (legacy time_scale) is ignored: the timeline is now normalized to
+    # max_seconds rather than scaled from real time.
+    max_seconds = float(args[4]) if len(args) > 4 else 12.0
+    log_time = (args[5].lower() != "linear") if len(args) > 5 else True
 
     scenes = json.load(open(scenes_json))
     clear_scene()
@@ -158,25 +200,12 @@ def main():
     if scenes:
         add_geometry(geo_coll, scenes[0]["geometry"])
 
-    # global time origin and span across all events for a shared timeline
-    all_t = []
-    for s in scenes:
-        for t in s["tracks"]:
-            if t.get("t"):
-                all_t += [t["t"][0], t["t"][-1]]
-    t0 = min(all_t) if all_t else 0.0
-    tmax = max(all_t) if all_t else 1.0
-    span_ns = tmax - t0
-    max_frame = int(min(max_seconds, span_ns * time_scale) * fps) or 1
+    frame_of, max_frame, t0, span = _build_frame_mapper(scenes, fps, max_seconds, log_time)
     bpy.context.scene.frame_start = 1
     bpy.context.scene.frame_end = max_frame
-    if max_frame <= 1 and span_ns > 0:
-        suggest = max(1.0, 150.0 / (span_ns * fps))
-        print(f"[g4tp] note: event spans only {span_ns:.3g} ns, so the time-reveal "
-              f"animation collapsed to 1 frame at --time-scale {time_scale} "
-              f"(animation-seconds per ns). For a watchable reveal of this event, "
-              f"re-run with about --time-scale {suggest:.3g}. The default suits "
-              f"ns-scale spreads (decays/showers), not a sub-ns transit.")
+    print(f"[g4tp] timeline: {max_frame} frames ({max_seconds:g}s @ {fps}fps), "
+          f"{'log' if log_time else 'linear'}-time over {span:.3g} ns "
+          f"(t0={t0:.3g} ns); frame 1 is empty, early behavior emphasized.")
 
     # Track width and vertex size scale with the scene's bounding radius (no
     # absolute floor), so both shrink/grow with the geometry.
@@ -194,7 +223,7 @@ def main():
             if sub is None:
                 sub = new_collection(t["n"], tracks_coll)
                 by_type[t["n"]] = sub
-            add_track(sub, t, t0, bev, fps, max_frame)
+            add_track(sub, t, bev, frame_of)
         for i, v in enumerate(s["vertices"]):
             bpy.ops.mesh.primitive_cube_add(size=vtx_size,
                                             location=(v[0] * MM, v[1] * MM, v[2] * MM))

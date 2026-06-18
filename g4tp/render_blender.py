@@ -42,7 +42,8 @@ def _scene_to_dict(sc, max_tracks=4000):
 
 
 def render_blend(scenes, out_path, outdir=".", blender_image=DEFAULT_BLENDER_IMAGE,
-                 local_blender=None, fps=30, time_scale=0.5, max_seconds=30.0):
+                 local_blender=None, fps=30, time_scale=0.5, max_seconds=12.0,
+                 log_time=True):
     if not isinstance(scenes, (list, tuple)):
         scenes = [scenes]
     outdir = Path(outdir).resolve()
@@ -56,20 +57,20 @@ def render_blend(scenes, out_path, outdir=".", blender_image=DEFAULT_BLENDER_IMA
     builder = outdir / "build_blend.py"
     builder.write_text(resources.files("g4tp.assets").joinpath("build_blend.py").read_text())
 
-    args = ["build_blend.py", "--", scenes_json.name, out_path.name,
-            str(fps), str(time_scale), str(max_seconds)]
+    # positional args to build_blend.py: scene.json out.blend fps time_scale max_seconds time_mode
+    mode = "log" if log_time else "linear"
+    pos = [str(fps), str(time_scale), str(max_seconds), mode]
 
     if local_blender or shutil.which("blender"):
         blender = local_blender or "blender"
         cmd = [blender, "--background", "--python", str(builder), "--",
-               str(scenes_json), str(out_path), str(fps), str(time_scale), str(max_seconds)]
+               str(scenes_json), str(out_path), *pos]
         _run(cmd)
         return out_path
     if shutil.which("docker"):
         cmd = ["docker", "run", "--rm", "-v", f"{outdir}:/work", "-w", "/work",
                blender_image, "blender", "--background", "--python", "/work/build_blend.py",
-               "--", "/work/scene.json", f"/work/{out_path.name}",
-               str(fps), str(time_scale), str(max_seconds)]
+               "--", "/work/scene.json", f"/work/{out_path.name}", *pos]
         _run(cmd)
         return out_path
     print("[g4tp] No 'blender' or 'docker' found. Wrote scene.json + build_blend.py to",
