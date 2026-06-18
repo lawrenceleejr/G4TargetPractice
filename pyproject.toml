@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "g4tp"
+version = "0.1.0"
+description = "G4TargetPractice tooling: run, analyze, and visualize Geant4 simulations (no ROOT needed)."
+requires-python = ">=3.9"
+dependencies = ["uproot>=5", "numpy", "matplotlib"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+g4tp = "g4tp.cli:main"
+
+[tool.setuptools]
+packages = ["g4tp"]
+
+[tool.setuptools.package-data]
+g4tp = ["assets/*.js", "assets/*.html", "assets/*.py"]
