@@ -158,9 +158,17 @@ def main():
                 all_t += [t["t"][0], t["t"][-1]]
     t0 = min(all_t) if all_t else 0.0
     tmax = max(all_t) if all_t else 1.0
-    max_frame = int(min(max_seconds, (tmax - t0) * time_scale) * fps) or 1
+    span_ns = tmax - t0
+    max_frame = int(min(max_seconds, span_ns * time_scale) * fps) or 1
     bpy.context.scene.frame_start = 1
     bpy.context.scene.frame_end = max_frame
+    if max_frame <= 1 and span_ns > 0:
+        suggest = max(1.0, 150.0 / (span_ns * fps))
+        print(f"[g4tp] note: event spans only {span_ns:.3g} ns, so the time-reveal "
+              f"animation collapsed to 1 frame at --time-scale {time_scale} "
+              f"(animation-seconds per ns). For a watchable reveal of this event, "
+              f"re-run with about --time-scale {suggest:.3g}. The default suits "
+              f"ns-scale spreads (decays/showers), not a sub-ns transit.")
 
     bev = 0.0
     # bevel radius ~ 0.4% of scene radius for a visible tube
@@ -178,8 +186,12 @@ def main():
                 sub = new_collection(t["n"], tracks_coll)
                 by_type[t["n"]] = sub
             add_track(sub, t, t0, bev, fps, max_frame)
+        # vertex markers: small cubes, well under the track-tube diameter so they
+        # read as interaction points rather than blocks (was bev*4 ~ 2x the tube
+        # diameter, which dwarfed thin detectors like the silicon tracker).
+        vtx_size = bev * 0.8 if bev else 0.0004
         for i, v in enumerate(s["vertices"]):
-            bpy.ops.mesh.primitive_cube_add(size=bev * 4 if bev else 0.002,
+            bpy.ops.mesh.primitive_cube_add(size=vtx_size,
                                             location=(v[0] * MM, v[1] * MM, v[2] * MM))
             o = bpy.context.object
             o.name = f"vtx_{s['event_id']:02d}_{i}"
