@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<!--
+  Three-layer silicon tracker: three 1 mm thick, 10x10 cm silicon planes
+  spaced 2 cm apart along z, in a 20 cm air world. Entrance face of the
+  first layer is at z = 0, so the layers sit at z = 0.5, 20.5, 40.5 mm.
+
+  Aim the beam along +z from negative z (e.g. /gun/position 0 0 -2 cm).
+  Layers are named *_sens so they are picked up as the "target" region.
+-->
+<gdml>
+  <solids>
+    <box name="WorldBox" x="20" y="20" z="20" lunit="cm"/>
+    <box name="SiLayer"  x="10" y="10" z="0.1" lunit="cm"/>
+  </solids>
+
+  <structure>
+    <volume name="SiLayer0_sens">
+      <materialref ref="G4_Si"/>
+      <solidref ref="SiLayer"/>
+    </volume>
+    <volume name="SiLayer1_sens">
+      <materialref ref="G4_Si"/>
+      <solidref ref="SiLayer"/>
+    </volume>
+    <volume name="SiLayer2_sens">
+      <materialref ref="G4_Si"/>
+      <solidref ref="SiLayer"/>
+    </volume>
+
+    <volume name="World">
+      <materialref ref="G4_AIR"/>
+      <solidref ref="WorldBox"/>
+      <physvol>
+        <volumeref ref="SiLayer0_sens"/>
+        <position x="0" y="0" z="0.05" unit="cm"/>
+      </physvol>
+      <physvol>
+        <volumeref ref="SiLayer1_sens"/>
+        <position x="0" y="0" z="2.05" unit="cm"/>
+      </physvol>
+      <physvol>
+        <volumeref ref="SiLayer2_sens"/>
+        <position x="0" y="0" z="4.05" unit="cm"/>
+      </physvol>
+    </volume>
+  </structure>
+
+  <setup name="Default" version="1.0">
+    <world ref="World"/>
+  </setup>
+</gdml>
