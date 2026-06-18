@@ -16,7 +16,7 @@ dev = ["pytest"]
 g4tp = "g4tp.cli:main"
 
 [tool.setuptools]
-packages = ["g4tp"]
+packages = ["g4tp", "g4tp.assets"]
 
 [tool.setuptools.package-data]
 g4tp = ["assets/*.js", "assets/*.html", "assets/*.py"]
