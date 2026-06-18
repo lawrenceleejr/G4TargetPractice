@@ -1,0 +1,41 @@
+# =============================================================================
+# neutrons_bpe_1gev.mac
+#
+# 1 GeV neutron hadronic cascade in a borated-polyethylene (BPE) slab.
+# At 1 GeV, the dominant physics is hadronic: inelastic scattering on C/H/B
+# nuclei kicks out proton recoils, pions, and photons from pi0 decays. A
+# secondary neutron spray thermalises and is partly captured by B-10,
+# producing short-range alphas.
+#
+# Detector: gdml/bpe_slab.gdml
+#   - World: 80x80x120 cm air
+#   - Slab:  60x60x50 cm BPE (5 wt-% B), entrance face at z = 0
+#
+# Source:
+#   - Particle : neutron
+#   - Energy   : 1 GeV (monoenergetic)
+#   - Position : 0 0 -20 cm  (20 cm upstream of slab face)
+#   - Direction: 0 0 1  (pencil beam along z)
+#
+# 50 events: enough variety for an event-display ensemble (cascades,
+# punch-throughs, early-hadronic interactions) without excessive file size.
+# ~63% of neutrons initiate a cascade within 50 cm (~ 1 lambda_I);
+# the remaining ~37% punch through.
+# =============================================================================
+
+# --- Geometry ---
+/detector/readGDML gdml/bpe_slab.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Source ---
+/gun/particle    neutron
+/gun/energyMode  mono
+/gun/energy      1000 MeV
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 10
+/run/beamOn 50
