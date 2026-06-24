@@ -53,7 +53,10 @@ def render_blend(scenes, out_path, outdir=".", blender_image=DEFAULT_BLENDER_IMA
         out_path = outdir / out_path
 
     scenes_json = outdir / "scene.json"
+    print(f"[g4tp] serializing {len(scenes)} event(s) to scene.json ...", flush=True)
     scenes_json.write_text(json.dumps([_scene_to_dict(s) for s in scenes]))
+    print(f"[g4tp] scene.json written ({scenes_json.stat().st_size / 1e6:.1f} MB); "
+          f"launching Blender (headless) ...", flush=True)
     builder = outdir / "build_blend.py"
     builder.write_text(resources.files("g4tp.assets").joinpath("build_blend.py").read_text())
 

@@ -113,6 +113,7 @@ def _display(args):
 
     prims = geometry.parse_gdml(args.gdml, include_world=args.world) if args.gdml else []
 
+    import time
     scenes = []
     if args.root and Path(args.root).exists():
         from . import io
@@ -124,10 +125,15 @@ def _display(args):
             # Read only the requested entries: a single 1 TeV shower event can be
             # hundreds of MB, so loading the whole file to show one event is wasteful.
             lo, hi = min(idxs), max(idxs) + 1
+            print(f"[g4tp] reading entr{'y' if hi - lo == 1 else 'ies'} {lo}:{hi} "
+                  f"of {n_total} from {args.root} ...", flush=True)
+            t0 = time.perf_counter()
             events = io.load_events(args.root, entry_start=lo, entry_stop=hi)
+            print(f"[g4tp] loaded {len(events)} event(s) in {time.perf_counter() - t0:.2f}s; "
+                  f"building scene(s) ...", flush=True)
             for k in idxs:
                 scenes.append(scenemod.build_scene(prims, events[k - lo], max_tracks=args.max_tracks,
-                                                   include_world=args.world))
+                                                   include_world=args.world, verbose=True))
     else:
         # geometry-only
         from .scene import Scene
