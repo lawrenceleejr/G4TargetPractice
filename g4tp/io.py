@@ -62,6 +62,11 @@ def available_branches(path, tree="tree"):
     return [k.split(";")[0] for k in t.keys()]
 
 
+def num_events(path, tree="tree"):
+    """Entry count without materializing any branch (lets callers load a slice)."""
+    return open_tree(path, tree).num_entries
+
+
 def load_events(path, tree="tree", entry_start=None, entry_stop=None):
     """Return a list[Event]. Reads only branches that exist (nu_* optional)."""
     t = open_tree(path, tree)

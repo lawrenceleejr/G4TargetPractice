@@ -41,16 +41,20 @@ class Scene:
     meta: dict = field(default_factory=dict)
 
 
-def _track_polyline(ev, i):
+def _track_polyline(ev, i, step_index):
     tid = int(ev.trk["trk_id"][i])
     start = np.array([ev.trk["trk_startX"][i], ev.trk["trk_startY"][i], ev.trk["trk_startZ"][i]])
     end = np.array([ev.trk["trk_endX"][i], ev.trk["trk_endY"][i], ev.trk["trk_endZ"][i]])
-    # contiguous, time-ordered step points for this track
-    sid = ev.step.get("step_trackID")
-    if sid is not None and len(sid):
-        mask = sid == tid
-        pts = np.column_stack([ev.step["step_x"][mask], ev.step["step_y"][mask], ev.step["step_z"][mask]])
-        tms = ev.step["step_time"][mask]
+    # contiguous, time-ordered step points for this track, looked up via the
+    # prebuilt index (a single sort of step_trackID) rather than re-scanning the
+    # whole step array for every track.
+    if step_index is not None:
+        order, sid_sorted = step_index["order"], step_index["sid_sorted"]
+        lo = np.searchsorted(sid_sorted, tid, side="left")
+        hi = np.searchsorted(sid_sorted, tid, side="right")
+        sel = order[lo:hi]   # original (time-ordered) row indices for this track
+        pts = np.column_stack([step_index["x"][sel], step_index["y"][sel], step_index["z"][sel]])
+        tms = step_index["t"][sel]
     else:
         pts = np.empty((0, 3))
         tms = np.empty((0,))
@@ -60,6 +64,43 @@ def _track_polyline(ev, i):
     times = np.concatenate([[t0], tms, [t1]])
     # drop consecutive duplicate points (keep first/last)
     return poly, times
+
+
+def _build_step_index(ev):
+    """Group step rows by track id with ONE stable sort.
+
+    The reveal/polyline builder needs, per track, that track's steps in time
+    order. Doing `step_trackID == tid` per track is O(nTracks * nSteps) -- the
+    reason a high-energy shower (1 TeV e-: ~1e5-1e6 tracks AND steps) hangs.
+    A stable argsort lets each track grab its block via two searchsorted calls;
+    stability keeps the per-track rows in their original (time) order.
+    """
+    sid = ev.step.get("step_trackID")
+    if sid is None or not len(sid):
+        return None
+    sid = np.asarray(sid)
+    order = np.argsort(sid, kind="stable")
+    return {"order": order, "sid_sorted": sid[order],
+            "x": np.asarray(ev.step["step_x"]), "y": np.asarray(ev.step["step_y"]),
+            "z": np.asarray(ev.step["step_z"]), "t": np.asarray(ev.step["step_time"])}
+
+
+def _select_track_rows(ev, n, max_tracks):
+    """Choose which track rows to keep BEFORE building polylines.
+
+    Keep every primary plus the longest secondaries, ranked by the stored
+    trk_length branch (no geometry needed). Capping here -- not after building a
+    polyline for all n tracks -- is what keeps a shower tractable.
+    """
+    if n <= max_tracks:
+        return range(n)
+    parent = np.asarray(ev.trk.get("trk_parentID", np.zeros(n)))
+    length = np.asarray(ev.trk.get("trk_length", np.zeros(n)), dtype=float)
+    prim = np.nonzero(parent == 0)[0]
+    sec = np.nonzero(parent != 0)[0]
+    sec = sec[np.argsort(length[sec])[::-1]]            # longest first
+    budget = max(0, max_tracks - len(prim))
+    return np.concatenate([prim, sec[:budget]]).tolist()
 
 
 def _vertex_kind(creator):
@@ -75,8 +116,12 @@ def build_scene(primitives, ev, max_tracks=2000, include_world=False):
     tracks = []
     vertices = []
     n = len(ev.trk.get("trk_id", []))
-    for i in range(n):
-        poly, times = _track_polyline(ev, i)
+    # Pick the kept rows first, then index the steps once -- so cost scales with
+    # the number of tracks we actually draw, not the (possibly enormous) total.
+    keep = _select_track_rows(ev, n, max_tracks)
+    step_index = _build_step_index(ev)
+    for i in keep:
+        poly, times = _track_polyline(ev, i, step_index)
         if poly.shape[0] < 2:
             continue
         pdg = int(ev.trk["trk_pdg"][i])
@@ -97,13 +142,6 @@ def build_scene(primitives, ev, max_tracks=2000, include_world=False):
         vertices.append(Vertex(
             pos=np.array([ev.nu["nu_vertexX"], ev.nu["nu_vertexY"], ev.nu["nu_vertexZ"]]),
             kind="interaction", pdg=int(ev.scalars.get("primaryPDG", 0))))
-
-    # cap tracks: keep primaries + longest secondaries
-    if len(tracks) > max_tracks:
-        prim = [t for t in tracks if t.parent_id == 0]
-        sec = sorted([t for t in tracks if t.parent_id != 0],
-                     key=lambda t: _length(t.polyline), reverse=True)
-        tracks = prim + sec[: max(0, max_tracks - len(prim))]
 
     sc = Scene(primitives=primitives, tracks=tracks, vertices=vertices,
                event_id=int(ev.scalars.get("eventID", ev.index)),
@@ -151,10 +189,6 @@ def _meta(ev, tracks):
         m["nu"] = {k: ev.nu[k] for k in ("nu_isCC", "nu_isNC", "nu_interactionProcess",
                                          "nu_Q2", "nu_W") if k in ev.nu}
     return m
-
-
-def _length(poly):
-    return float(np.sum(np.linalg.norm(np.diff(poly, axis=0), axis=1)))
 
 
 def _decode_str(arr, i):

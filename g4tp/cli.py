@@ -116,13 +116,17 @@ def _display(args):
     scenes = []
     if args.root and Path(args.root).exists():
         from . import io
-        events = io.load_events(args.root)
-        if not events:
+        n_total = io.num_events(args.root)
+        if n_total == 0:
             print("[g4tp] no events in", args.root)
-        idxs = list(_event_range(args, len(events)))
-        for k in idxs:
-            if 0 <= k < len(events):
-                scenes.append(scenemod.build_scene(prims, events[k], max_tracks=args.max_tracks,
+        idxs = [k for k in _event_range(args, n_total) if 0 <= k < n_total]
+        if idxs:
+            # Read only the requested entries: a single 1 TeV shower event can be
+            # hundreds of MB, so loading the whole file to show one event is wasteful.
+            lo, hi = min(idxs), max(idxs) + 1
+            events = io.load_events(args.root, entry_start=lo, entry_stop=hi)
+            for k in idxs:
+                scenes.append(scenemod.build_scene(prims, events[k - lo], max_tracks=args.max_tracks,
                                                    include_world=args.world))
     else:
         # geometry-only
