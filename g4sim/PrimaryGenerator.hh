@@ -34,6 +34,10 @@ public:
     /// Fix the beam direction; pass (0,0,0) to re-enable isotropic 4π mode.
     void SetDirection(const G4ThreeVector& dir);
 
+    /// Gaussian angular divergence (sigma of the polar angle) about the fixed
+    /// direction. 0 (default) = perfect pencil beam. Ignored in isotropic mode.
+    void SetAngleSigma(G4double sigma) { fAngleSigma = sigma; }
+
     void SetEnergyMode(const G4String& mode);
     void SetGaussSigma(G4double sigma) { fGaussSigma = sigma; }
     void SetEnergyMin(G4double emin)   { fEnergyMin  = emin; }
@@ -62,6 +66,7 @@ private:
     G4ThreeVector fPosition;
     G4ThreeVector fDirection;
     G4bool        fUseFixedDirection;
+    G4double      fAngleSigma;   ///< Gaussian polar-angle spread about fDirection (rad).
 
     EnergyMode fEnergyMode;
     G4double   fGaussSigma;

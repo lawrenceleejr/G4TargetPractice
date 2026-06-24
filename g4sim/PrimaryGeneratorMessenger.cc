@@ -32,6 +32,13 @@ PrimaryGeneratorMessenger::PrimaryGeneratorMessenger(PrimaryGenerator* gun)
                                "Use (0,0,0) to restore isotropic 4pi mode.");
     fDirectionCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
 
+    fAngleSigmaCmd = new G4UIcmdWithADoubleAndUnit("/gun/angleSigma", this);
+    fAngleSigmaCmd->SetGuidance("Gaussian angular spread (sigma) about the fixed "
+                                "beam direction. 0 = pencil beam. Needs /gun/direction set.\n"
+                                "Example: /gun/angleSigma 10 deg");
+    fAngleSigmaCmd->SetDefaultUnit("deg");
+    fAngleSigmaCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+
     // ---- Energy distribution mode ----
     fEnergyModeCmd = new G4UIcmdWithAString("/gun/energyMode", this);
     fEnergyModeCmd->SetGuidance("Energy sampling mode: mono | gauss | exp | arb");
@@ -90,6 +97,9 @@ void PrimaryGeneratorMessenger::SetNewValue(G4UIcommand* command, G4String newVa
     }
     else if (command == fDirectionCmd) {
         fGun->SetDirection(fDirectionCmd->GetNew3VectorValue(newValue));
+    }
+    else if (command == fAngleSigmaCmd) {
+        fGun->SetAngleSigma(fAngleSigmaCmd->GetNewDoubleValue(newValue));
     }
     else if (command == fEnergyModeCmd) {
         fGun->SetEnergyMode(newValue);

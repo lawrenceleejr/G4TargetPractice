@@ -33,6 +33,7 @@ PrimaryGenerator::PrimaryGenerator(RunAction* runAction)
     fPosition          = G4ThreeVector(0, 0, 0);
     fDirection         = G4ThreeVector(0, 0, 1);
     fUseFixedDirection = false;          // isotropic 4π by default
+    fAngleSigma        = 0.0;            // perfect pencil beam by default
 
     fEnergyMode = EnergyMode::kMono;
     fGaussSigma = 0.1 * CLHEP::GeV;
@@ -181,6 +182,20 @@ void PrimaryGenerator::GeneratePrimaries(G4Event* event)
     G4ThreeVector dir;
     if (fUseFixedDirection) {
         dir = fDirection;
+        if (fAngleSigma > 0.0) {
+            // Smear about the nominal direction to model an angularly divergent
+            // beam: draw a polar angle theta ~ Gauss(0, fAngleSigma) and a
+            // uniform azimuth phi, build that vector about +z, then rotate the
+            // whole cone so its axis points along fDirection. The opening angle
+            // |theta| is folded-normal with sigma = fAngleSigma.
+            const G4double theta = CLHEP::RandGauss::shoot(0.0, fAngleSigma);
+            const G4double phi   = CLHEP::twopi * G4UniformRand();
+            G4ThreeVector smeared(std::sin(theta) * std::cos(phi),
+                                  std::sin(theta) * std::sin(phi),
+                                  std::cos(theta));
+            smeared.rotateUz(fDirection);   // map local +z axis onto fDirection
+            dir = smeared.unit();
+        }
     } else {
         // Isotropic 4π
         const G4double costh = 2.0 * G4UniformRand() - 1.0;

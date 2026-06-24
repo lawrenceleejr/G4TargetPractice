@@ -20,6 +20,7 @@ private:
     G4UIcmdWithADoubleAndUnit* fEnergyCmd;
     G4UIcmdWith3Vector*        fPositionCmd;  // parsed with optional unit in SetNewValue
     G4UIcmdWith3Vector*        fDirectionCmd;
+    G4UIcmdWithADoubleAndUnit* fAngleSigmaCmd;
 
     // Energy distribution mode
     G4UIcmdWithAString*        fEnergyModeCmd;
