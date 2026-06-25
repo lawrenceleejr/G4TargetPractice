@@ -43,6 +43,7 @@ def _profile(path, axis="z", nbins=140, step_size="256 MB", verbose=True):
         return t[name].array(library="np") if name in present else None
 
     z0arr, pzarr, E0arr = scalar_array(p0key), scalar_array(pzkey), scalar_array("primaryE")
+    tEarr = scalar_array("totalEdep")
     n = int(t.num_entries)
     z0 = float(np.median(z0arr)) if z0arr is not None and len(z0arr) else 0.0
     sign = -1.0 if (pzarr is not None and len(pzarr) and np.median(pzarr) < 0) else 1.0
@@ -50,6 +51,20 @@ def _profile(path, axis="z", nbins=140, step_size="256 MB", verbose=True):
         E0 = float(np.median(E0arr[E0arr > 0]))
     else:
         E0 = 1.0
+
+    # Energy leakage from the scalar branches alone (no step data needed):
+    # totalEdep is summed over every step of every track in the world, so
+    # primaryE - totalEdep is the kinetic energy that escaped the world boundary
+    # plus invisible energy (neutrons/neutrinos/nuclear breakup). Per event.
+    if E0arr is not None and tEarr is not None:
+        good = E0arr > 0
+        pe = E0arr[good].astype(float)
+        td = tEarr[good].astype(float)
+        leak_frac = 1.0 - td / pe                  # fraction of beam energy not deposited
+        leak_MeV = pe - td
+    else:
+        leak_frac = np.array([])
+        leak_MeV = np.array([])
 
     if verbose:
         print(f"[g4tp] {Path(path).name}: {n} events, beam {axis}{'+' if sign > 0 else '-'} "
@@ -124,6 +139,13 @@ def _profile(path, axis="z", nbins=140, step_size="256 MB", verbose=True):
         "absorbed_fraction": float(absorbed[-1]),
         "peak_depth_cm": float(centers[int(np.argmax(dEdz))]),
         "d90_cm": depth_at(0.90), "d95_cm": depth_at(0.95), "d99_cm": depth_at(0.99),
+        # leakage (whole-event energy balance, independent of the profile window)
+        "leak_frac": leak_frac,                                       # per-event array
+        "mean_leak_frac": float(np.mean(leak_frac)) if len(leak_frac) else float("nan"),
+        "std_leak_frac": float(np.std(leak_frac)) if len(leak_frac) else float("nan"),
+        "mean_leak_MeV": float(np.mean(leak_MeV)) if len(leak_MeV) else float("nan"),
+        "mean_contained_MeV": float(np.mean(E0arr[E0arr > 0].astype(float) - leak_MeV))
+        if len(leak_MeV) else float("nan"),
     }
     if verbose:
         print(f"[g4tp] {Path(path).name}: done in {time.perf_counter() - t0:.1f}s", flush=True)
@@ -157,6 +179,24 @@ def compare(path_a, path_b, labels=("A", "B"), outdir="g4tp_compare", axis="z"):
         lines.append("")
         lines.append(f"{la} needs {rel:+.1f}% {'more' if rel>0 else 'less'} depth than "
                      f"{lb} to absorb 95% of the shower.")
+
+    # Energy leakage out of the geometry (whole-event energy balance).
+    have_leak = len(sa["leak_frac"]) and len(sb["leak_frac"])
+    if have_leak:
+        lines += ["", "Energy leakage (primaryE - totalEdep = escaping + invisible):"]
+        for lab, s in ((la, sa), (lb, sb)):
+            lines.append(
+                f"  [{lab}] leaks {100*s['mean_leak_frac']:.2f} +/- "
+                f"{100*s['std_leak_frac']:.2f}% of the beam "
+                f"({s['mean_leak_MeV']/1000:.3f} GeV/event escapes; "
+                f"contains {100*(1-s['mean_leak_frac']):.2f}%)")
+        dla, dlb = sa["mean_leak_frac"], sb["mean_leak_frac"]
+        diff_pp = 100 * (dla - dlb)
+        rel = (100 * (dla - dlb) / dlb) if dlb else float("nan")
+        better = lb if dla > dlb else la
+        lines.append(
+            f"  -> {la} leaks {diff_pp:+.2f} percentage points vs {lb} "
+            f"({rel:+.1f}% relative); {better} contains the shower better.")
     report = "\n".join(lines)
     (outdir / "summary.txt").write_text(report + "\n")
     print(report)
@@ -185,5 +225,24 @@ def compare(path_a, path_b, labels=("A", "B"), outdir="g4tp_compare", axis="z"):
     ax.legend(); ax.grid(alpha=0.3); fig.tight_layout()
     fig.savefig(outdir / "containment.png", dpi=140); plt.close(fig)
 
-    print(f"\n[g4tp] wrote {outdir}/shower_profile.png, {outdir}/containment.png, summary.txt")
+    wrote = ["shower_profile.png", "containment.png"]
+
+    # Plot 3: per-event energy leakage distribution
+    if have_leak:
+        fa, fb = 100 * sa["leak_frac"], 100 * sb["leak_frac"]
+        lo, hi = 0.0, float(max(fa.max(), fb.max())) * 1.05 + 1e-6
+        bins = np.linspace(lo, hi, 31)
+        fig, ax = plt.subplots(figsize=(6, 4))
+        for f, s, lab, c in ((fa, sa, la, "C0"), (fb, sb, lb, "C1")):
+            ax.hist(f, bins=bins, histtype="step", lw=2, color=c,
+                    label=f"{lab} (mean {100*s['mean_leak_frac']:.2f}%)")
+            ax.axvline(100 * s["mean_leak_frac"], color=c, ls="--", alpha=0.7)
+        ax.set_xlabel("energy leaked out of geometry [% of beam]")
+        ax.set_ylabel("events")
+        ax.set_title("Per-event leakage (primaryE - totalEdep)")
+        ax.legend(); ax.grid(alpha=0.3); fig.tight_layout()
+        fig.savefig(outdir / "leakage.png", dpi=140); plt.close(fig)
+        wrote.append("leakage.png")
+
+    print(f"\n[g4tp] wrote " + ", ".join(f"{outdir}/{w}" for w in wrote) + ", summary.txt")
     return outdir
