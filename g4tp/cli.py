@@ -75,6 +75,8 @@ def main(argv=None):
     # info
     i = sub.add_parser("info", help="inspect a .root or .gdml file")
     i.add_argument("file")
+
+    args = p.parse_args(argv)
     if args.cmd == "run":
         return _run(args)
     if args.cmd == "display":
