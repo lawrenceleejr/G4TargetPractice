@@ -1,0 +1,28 @@
+# =============================================================================
+# shower_nozzles_du.mac
+#
+# Shower-stopping test: 50 GeV electrons into the DEPLETED-URANIUM nozzle.
+# Pair this with shower_nozzles_tungsten.mac (identical beam, tungsten nozzle)
+# and overlay the two with:  g4tp compare du.root w.root --labels DU,W
+#
+# Beam geometry: the electron starts just downstream of the right nozzle's
+# thick end (entrance face at z = +595 cm, dense core annulus r = 1.78..43 cm)
+# and travels in -z, offset 15 cm in x so it plows straight into the core --
+# guaranteeing the EM shower develops inside the dense material rather than
+# escaping down the central beampipe bore. The core is continuous for ~370 cm
+# along -z, so a 50 GeV shower (~15 cm long) is fully contained; the DU-vs-W
+# difference shows up in HOW FAST the energy is absorbed (profile + depth to
+# 95% containment), not in total leakage.
+# =============================================================================
+
+/detector/readGDML gdml/nozzles_depleted_uranium.gdml
+/run/initialize
+
+/gun/particle    e-
+/gun/energyMode  mono
+/gun/energy      50 GeV
+/gun/position    15 0 650 cm
+/gun/direction   0 0 -1
+
+/run/printProgress 20
+/run/beamOn 100

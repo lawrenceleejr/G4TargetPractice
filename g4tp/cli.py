@@ -57,6 +57,14 @@ def main(argv=None):
     d.add_argument("-o", "--outdir", default="g4tp_display")
     d.add_argument("--prefix", default="event")
 
+    # compare
+    c = sub.add_parser("compare", help="overlay shower stopping of two runs (e.g. DU vs W)")
+    c.add_argument("root_a")
+    c.add_argument("root_b")
+    c.add_argument("--labels", default="A,B", help="comma-separated legend labels, e.g. DU,W")
+    c.add_argument("--axis", default="z", choices=["x", "y", "z"], help="beam/depth axis")
+    c.add_argument("-o", "--outdir", default="g4tp_compare")
+
     # analyze
     a = sub.add_parser("analyze", help="summary report + plots")
     a.add_argument("root", nargs="?", default="output.root")
@@ -67,8 +75,6 @@ def main(argv=None):
     # info
     i = sub.add_parser("info", help="inspect a .root or .gdml file")
     i.add_argument("file")
-
-    args = p.parse_args(argv)
     if args.cmd == "run":
         return _run(args)
     if args.cmd == "display":
@@ -77,6 +83,11 @@ def main(argv=None):
         from . import analyze
         analyze.summarize(args.root, outdir=args.outdir, make_plots=args.plots,
                           depth_axis=args.depth_axis)
+        return 0
+    if args.cmd == "compare":
+        from . import compare as cmp
+        labels = tuple((args.labels.split(",") + ["A", "B"])[:2])
+        cmp.compare(args.root_a, args.root_b, labels=labels, outdir=args.outdir, axis=args.axis)
         return 0
     if args.cmd == "info":
         return _info(args)

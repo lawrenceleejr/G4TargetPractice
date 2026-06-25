@@ -1,0 +1,151 @@
+<?xml version="1.0"?>
+<!--
+  MAIA shielding nozzles, standalone, with the ORIGINAL tungsten alloy.
+
+  This is the apples-to-apples comparison partner for
+  gdml/nozzles_depleted_uranium.gdml: byte-for-byte identical geometry, the
+  only difference is the dense shells use the MAIA Tungsten_Alloy
+  (95% W / 3.5% Ni / 1.5% Cu, rho = 18 g/cm3) instead of depleted uranium.
+  The borated-poly liner (BCH2) is unchanged in both.
+
+  See nozzles_depleted_uranium.gdml for the geometry description. World and
+  placements are identical so the same macro/beam can be run against either.
+-->
+<gdml>
+  <materials>
+    <element name="H_elm" formula="H" Z="1" N="1">
+      <atom unit="g/mole" value="1.00794"/>
+    </element>
+    <element name="C_elm" formula="C" Z="6" N="12">
+      <atom unit="g/mole" value="12.0107"/>
+    </element>
+    <element name="B_elm" formula="B" Z="5" N="10">
+      <atom unit="g/mole" value="10.811"/>
+    </element>
+
+    <!-- Tungsten alloy, verbatim from MAIA (elements + mixture) -->
+    <element name="W_elm" formula="W" Z="74" N="184">
+      <atom unit="g/mole" value="183.84"/>
+    </element>
+    <element name="NI_elm" formula="NI" Z="28" N="58">
+      <atom unit="g/mole" value="58.6934"/>
+    </element>
+    <element name="CU_elm" formula="CU" Z="29" N="64">
+      <atom unit="g/mole" value="63.546"/>
+    </element>
+    <material name="Tungsten_Alloy">
+      <D unit="g/cm3" value="18"/>
+      <fraction n="0.0149999996647" ref="CU_elm"/>
+      <fraction n="0.035000000149"  ref="NI_elm"/>
+      <fraction n="0.949999988079"  ref="W_elm"/>
+    </material>
+
+    <material name="BCH2">
+      <D unit="g/cm3" value="0.93"/>
+      <fraction n="0.25" ref="B_elm"/>
+      <fraction n="0.25" ref="C_elm"/>
+      <fraction n="0.5"  ref="H_elm"/>
+    </material>
+  </materials>
+
+  <solids>
+    <box name="WorldBox" x="200" y="200" z="1400" lunit="cm"/>
+
+    <polycone name="NozzleW_right_shape" startphi="0" deltaphi="360" aunit="deg" lunit="cm">
+      <zplane z="6"         rmin="1"            rmax="1"/>
+      <zplane z="15"        rmin="0.6"          rmax="2.58694"/>
+      <zplane z="100"       rmin="0.3"          rmax="17.57473619"/>
+      <zplane z="100"       rmin="0.3"          rmax="13.47473619"/>
+      <zplane z="204.48824" rmin="0.6124092832" rmax="13.47473619"/>
+      <zplane z="595"       rmin="1.78"         rmax="43"/>
+    </polycone>
+    <polycone name="NozzleW_left_shape" startphi="0" deltaphi="360" aunit="deg" lunit="cm">
+      <zplane z="-595"       rmin="1.78"         rmax="43"/>
+      <zplane z="-204.48824" rmin="0.6124092832" rmax="13.47473619"/>
+      <zplane z="-100"       rmin="0.3"          rmax="13.47473619"/>
+      <zplane z="-100"       rmin="0.3"          rmax="17.57473619"/>
+      <zplane z="-15"        rmin="0.6"          rmax="2.58694"/>
+      <zplane z="-6"         rmin="1"            rmax="1"/>
+    </polycone>
+
+    <polycone name="NozzleBCH_right_shape" startphi="0" deltaphi="360" aunit="deg" lunit="cm">
+      <zplane z="100"       rmin="13.48473619" rmax="13.57473619"/>
+      <zplane z="204.48824" rmin="13.48473619" rmax="21.3958448184"/>
+      <zplane z="595"       rmin="43.01"       rmax="51"/>
+    </polycone>
+    <polycone name="NozzleBCH_left_shape" startphi="0" deltaphi="360" aunit="deg" lunit="cm">
+      <zplane z="-595"       rmin="43.01"       rmax="51"/>
+      <zplane z="-204.48824" rmin="13.48473619" rmax="21.3958448184"/>
+      <zplane z="-100"       rmin="13.48473619" rmax="13.57473619"/>
+    </polycone>
+
+    <polycone name="NozzleWCludding_right_shape" startphi="0" deltaphi="360" aunit="deg" lunit="cm">
+      <zplane z="100" rmin="13.57473619" rmax="17.57473619"/>
+      <zplane z="595" rmin="51"          rmax="55"/>
+    </polycone>
+    <polycone name="NozzleWCludding_left_shape" startphi="0" deltaphi="360" aunit="deg" lunit="cm">
+      <zplane z="-595" rmin="51"          rmax="55"/>
+      <zplane z="-100" rmin="13.57473619" rmax="17.57473619"/>
+    </polycone>
+  </solids>
+
+  <structure>
+    <volume name="NozzleW_right">
+      <materialref ref="Tungsten_Alloy"/>
+      <solidref ref="NozzleW_right_shape"/>
+    </volume>
+    <volume name="NozzleW_left">
+      <materialref ref="Tungsten_Alloy"/>
+      <solidref ref="NozzleW_left_shape"/>
+    </volume>
+    <volume name="NozzleBCH_right">
+      <materialref ref="BCH2"/>
+      <solidref ref="NozzleBCH_right_shape"/>
+    </volume>
+    <volume name="NozzleBCH_left">
+      <materialref ref="BCH2"/>
+      <solidref ref="NozzleBCH_left_shape"/>
+    </volume>
+    <volume name="NozzleWCludding_right">
+      <materialref ref="Tungsten_Alloy"/>
+      <solidref ref="NozzleWCludding_right_shape"/>
+    </volume>
+    <volume name="NozzleWCludding_left">
+      <materialref ref="Tungsten_Alloy"/>
+      <solidref ref="NozzleWCludding_left_shape"/>
+    </volume>
+
+    <volume name="World">
+      <materialref ref="G4_AIR"/>
+      <solidref ref="WorldBox"/>
+      <physvol name="NozzleW_right_1">
+        <volumeref ref="NozzleW_right"/>
+        <position name="p1" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+      <physvol name="NozzleW_left_2">
+        <volumeref ref="NozzleW_left"/>
+        <position name="p2" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+      <physvol name="NozzleBCH_right_3">
+        <volumeref ref="NozzleBCH_right"/>
+        <position name="p3" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+      <physvol name="NozzleBCH_left_4">
+        <volumeref ref="NozzleBCH_left"/>
+        <position name="p4" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+      <physvol name="NozzleWCludding_right_5">
+        <volumeref ref="NozzleWCludding_right"/>
+        <position name="p5" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+      <physvol name="NozzleWCludding_left_6">
+        <volumeref ref="NozzleWCludding_left"/>
+        <position name="p6" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+    </volume>
+  </structure>
+
+  <setup name="Default" version="1.0">
+    <world ref="World"/>
+  </setup>
+</gdml>
