@@ -155,14 +155,30 @@ def _solid_primitive(solidtype, el):
 
 
 def _bbox_of_solid(solidtype, el):
-    """Coarse half-extents (mm) for an unsupported solid, or None."""
+    """Coarse bounds for an unsupported solid: (params_mm, center_offset_mm) or None.
+
+    The offset matters for z-plane solids: a polycone spanning z=6..595 cm is
+    NOT centered on its placement point, so a centered bbox would sit in the
+    wrong place entirely.
+    """
     s = _len_scale(el)
     try:
-        if solidtype in ("cone", "polycone"):
+        if solidtype in ("polycone", "polyhedra", "genericPolycone"):
+            zs, rs = [], []
+            for c in el:
+                if _strip_ns(c.tag) == "zplane":
+                    zs.append(_f(c, "z") * s)
+                    rs.append(max(_f(c, "rmax"), _f(c, "rmin")) * s)
+            if zs:
+                r = max(rs)
+                zlo, zhi = min(zs), max(zs)
+                return ({"sx": 2 * r, "sy": 2 * r, "sz": zhi - zlo},
+                        (0.0, 0.0, 0.5 * (zlo + zhi)))
+        if solidtype == "cone":
             r = max(_f(el, "rmax1"), _f(el, "rmax2"), _f(el, "rmax")) * s
-            return {"sx": 2 * r, "sy": 2 * r, "sz": _f(el, "z", 2 * r) * s or 2 * r}
-        if solidtype in ("polyhedra",):
-            return None
+            z = _f(el, "z") * s
+            if r > 0:
+                return {"sx": 2 * r, "sy": 2 * r, "sz": z if z > 0 else 2 * r}, (0.0, 0.0, 0.0)
     except Exception:
         return None
     return None
@@ -180,21 +196,6 @@ def parse_gdml(path, include_world=False, max_bytes=DEFAULT_MAX_BYTES):
     prims = []
     warned = set()
 
-    def emit(volname, vol, transform):
-        sref = vol.get("solidref")
-        if sref and sref in g.solids and not vol.get("assembly"):
-            stype, sel = g.solids[sref]
-            ptype, params = _solid_primitive(stype, sel)
-            if ptype is None:
-                if stype not in warned:
-                    warnings.warn(f"Unsupported solid '{stype}' ({sref}); using bbox fallback.")
-                    warned.add(stype)
-                bb = _bbox_of_solid(stype, sel)
-                if bb:
-                    prims.append(Primitive("bbox", bb, transform, vol.get("materialref", ""), volname))
-            else:
-                prims.append(Primitive(ptype, params, transform, vol.get("materialref", ""), volname))
-
     def recurse(volname, transform, depth):
         if depth > 12 or volname not in g.volumes:
             return
@@ -202,7 +203,6 @@ def parse_gdml(path, include_world=False, max_bytes=DEFAULT_MAX_BYTES):
         is_world = volname == g.world
         if not is_world or include_world:
             if not vol.get("assembly"):
-                pr = Primitive(None, None, None)  # placeholder for is_world flag
                 # emit this volume's own solid
                 sref = vol.get("solidref")
                 if sref in g.solids:
@@ -217,7 +217,9 @@ def parse_gdml(path, include_world=False, max_bytes=DEFAULT_MAX_BYTES):
                             warned.add(stype)
                         bb = _bbox_of_solid(stype, sel)
                         if bb:
-                            prims.append(Primitive("bbox", bb, transform,
+                            params, off = bb
+                            prims.append(Primitive("bbox", params,
+                                                   transform @ _translation(*off),
                                                    vol.get("materialref", ""), volname, is_world))
         if bbox_only and not is_world:
             return  # don't recurse deeply in huge files
