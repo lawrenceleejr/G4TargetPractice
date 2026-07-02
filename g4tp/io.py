@@ -67,6 +67,40 @@ def num_events(path, tree="tree"):
     return open_tree(path, tree).num_entries
 
 
+# Positions/lengths in the ntuple are Geant4 internal units: mm (energies MeV,
+# times ns). Plot-facing code converts to cm with this.
+MM_PER_CM = 10.0
+
+
+def read_scalars(path, names, tree="tree"):
+    """Read per-event scalar branches (one value per event -- tiny even for a
+    20 GB file) into a dict of numpy arrays. Missing branches are omitted."""
+    t = open_tree(path, tree)
+    present = set(k.split(";")[0] for k in t.keys())
+    return {n: t[n].array(library="np") for n in names if n in present}
+
+
+def iterate_flat(path, branches, tree="tree", step_size="256 MB"):
+    """Stream jagged branches in batches, yielding (n_events, {name: flat array}).
+
+    Reads ONLY `branches`; peak memory is bounded by step_size regardless of
+    file size. This is how anything that scans step_*/trk_* data over a whole
+    run should read it -- load_events() materializes every branch as Python
+    objects and is only for event displays of a few entries.
+    """
+    import awkward as ak
+    t = open_tree(path, tree)
+    present = set(k.split(";")[0] for k in t.keys())
+    missing = [b for b in branches if b not in present]
+    if missing:
+        raise ValueError(
+            f"{path}: missing branch(es): {', '.join(missing)} "
+            f"(available: {', '.join(sorted(present)[:12])}...)")
+    for batch in t.iterate(list(branches), step_size=step_size, library="ak"):
+        out = {b: np.asarray(ak.flatten(batch[b]), dtype=float) for b in branches}
+        yield len(batch), out
+
+
 def load_events(path, tree="tree", entry_start=None, entry_stop=None):
     """Return a list[Event]. Reads only branches that exist (nu_* optional)."""
     t = open_tree(path, tree)
