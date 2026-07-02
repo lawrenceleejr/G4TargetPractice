@@ -9,6 +9,6 @@ Pure-Python (uproot/numpy/matplotlib); no ROOT required. Provides:
   - run:       run the simulation via Docker (or a local g4sim)
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from . import io, geometry, scene, particles  # noqa: F401

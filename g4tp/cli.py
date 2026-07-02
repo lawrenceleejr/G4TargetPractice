@@ -1,17 +1,61 @@
-"""g4tp command-line interface: run / display / analyze / info."""
+"""g4tp command-line interface: run / display / analyze / compare / info."""
 import argparse
 import sys
 from pathlib import Path
+
+from . import __version__
+
+_EXAMPLES = {
+    "run": """\
+examples:
+  g4tp run --mac macros/protons_water_bragg.mac
+  g4tp run --gdml water_phantom_30cm.gdml --particle proton --energy "150 MeV" -n 500
+  g4tp run --gdml my.gdml --field "0 0 5 tesla" --display""",
+    "display": """\
+examples:
+  g4tp display output.root --gdml my_detector.gdml     # WebGL html + PNG stills
+  g4tp display output.root --events 0:10               # first ten events
+  g4tp display output.root --blend --blend-events 5    # animated Blender scene
+  g4tp display --gdml my_detector.gdml                 # geometry only, no events""",
+    "analyze": """\
+examples:
+  g4tp analyze output.root                             # summary.txt + plots
+  g4tp analyze output.root -o results --depth-axis x   # beam along x""",
+    "compare": """\
+examples:
+  g4tp compare du.root w.root --labels DU,W            # shower profile + containment + leakage
+  g4tp compare a.root b.root -o cmp --axis x""",
+    "info": """\
+examples:
+  g4tp info output.root                                # events, branches, nu block
+  g4tp info gdml/water_phantom_30cm.gdml               # solids + bounding box""",
+}
+
+
+def _sub(sub, name, help_):
+    return sub.add_parser(name, help=help_, epilog=_EXAMPLES.get(name),
+                          formatter_class=argparse.RawDescriptionHelpFormatter)
+
+
+def _require_files(*paths):
+    for p in paths:
+        if p and not Path(p).exists():
+            raise FileNotFoundError(f"no such file: {p}")
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(
         prog="g4tp",
-        description="G4TargetPractice tooling: run sims, analyze output.root, make event displays (no ROOT needed).")
+        description="G4TargetPractice tooling: run sims, analyze output.root, "
+                    "make event displays (no ROOT needed).",
+        epilog="run 'g4tp <command> --help' for command-specific examples")
+    p.add_argument("--version", action="version", version=f"g4tp {__version__}")
+    p.add_argument("--debug", action="store_true",
+                   help="show full tracebacks instead of short error messages")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     # run
-    r = sub.add_parser("run", help="run a simulation (Docker or local g4sim)")
+    r = _sub(sub, "run", "run a simulation (Docker or local g4sim)")
     r.add_argument("--mac", help="existing macro; if omitted, one is generated from the flags below")
     r.add_argument("--gdml", help="geometry file (required if no --mac references one)")
     r.add_argument("--particle", default="e-")
@@ -28,7 +72,7 @@ def main(argv=None):
     r.add_argument("--dry-run", action="store_true")
 
     # display
-    d = sub.add_parser("display", help="event display: WebGL HTML, PNG stills, and/or Blender")
+    d = _sub(sub, "display", "event display: WebGL HTML, PNG stills, and/or Blender")
     d.add_argument("root", nargs="?", help="output.root (optional; geometry-only allowed)")
     d.add_argument("--gdml", help="overlay this geometry")
     d.add_argument("--event", type=int, default=0)
@@ -58,7 +102,7 @@ def main(argv=None):
     d.add_argument("--prefix", default="event")
 
     # compare
-    c = sub.add_parser("compare", help="overlay shower stopping of two runs (e.g. DU vs W)")
+    c = _sub(sub, "compare", "overlay shower stopping + leakage of two runs (e.g. DU vs W)")
     c.add_argument("root_a")
     c.add_argument("root_b")
     c.add_argument("--labels", default="A,B", help="comma-separated legend labels, e.g. DU,W")
@@ -66,32 +110,58 @@ def main(argv=None):
     c.add_argument("-o", "--outdir", default="g4tp_compare")
 
     # analyze
-    a = sub.add_parser("analyze", help="summary report + plots")
+    a = _sub(sub, "analyze", "summary report + plots")
     a.add_argument("root", nargs="?", default="output.root")
     a.add_argument("-o", "--outdir", default="g4tp_analysis")
     a.add_argument("--no-plots", dest="plots", action="store_false")
     a.add_argument("--depth-axis", default="z", choices=["x", "y", "z"])
 
     # info
-    i = sub.add_parser("info", help="inspect a .root or .gdml file")
+    i = _sub(sub, "info", "inspect a .root or .gdml file")
     i.add_argument("file")
 
+    if argv is None:
+        argv = sys.argv[1:]
+    if not argv:
+        p.print_help()
+        return 0
     args = p.parse_args(argv)
+    try:
+        return _dispatch(args)
+    except KeyboardInterrupt:
+        print("\n[g4tp] interrupted", file=sys.stderr)
+        return 130
+    except Exception as e:  # noqa: BLE001 - CLI boundary: short message beats a traceback
+        if args.debug:
+            raise
+        kind = "" if isinstance(e, (FileNotFoundError, ValueError)) else f"{type(e).__name__}: "
+        print(f"g4tp error: {kind}{e}\n(re-run with --debug for the full traceback)",
+              file=sys.stderr)
+        return 1
+
+
+def _dispatch(args):
     if args.cmd == "run":
         return _run(args)
     if args.cmd == "display":
+        if args.root:
+            _require_files(args.root)
+        _require_files(args.gdml)
         return _display(args)
     if args.cmd == "analyze":
+        _require_files(args.root)
         from . import analyze
         analyze.summarize(args.root, outdir=args.outdir, make_plots=args.plots,
                           depth_axis=args.depth_axis)
         return 0
     if args.cmd == "compare":
+        _require_files(args.root_a, args.root_b)
         from . import compare as cmp
         labels = tuple((args.labels.split(",") + ["A", "B"])[:2])
         cmp.compare(args.root_a, args.root_b, labels=labels, outdir=args.outdir, axis=args.axis)
         return 0
     if args.cmd == "info":
+        _require_files(args.file)
         return _info(args)
     return 1
 
@@ -106,8 +176,9 @@ def _run(args):
         ns = argparse.Namespace(root=str(Path(args.outdir) / "output.root"), gdml=args.gdml,
                                 event=0, events=None, html=True, png=True, blend=False,
                                 blender_image="linuxserver/blender:4.2.0", blend_events=10,
-                                time_scale=0.5, anim_fps=30, max_seconds=30.0, max_tracks=2000,
-                                world=False, outdir="g4tp_display", prefix="event")
+                                time_scale=0.5, anim_fps=30, max_seconds=12.0, log_time=True,
+                                max_tracks=2000, world=False, outdir="g4tp_display",
+                                prefix="event")
         _display(ns)
     return 0
 
@@ -195,10 +266,11 @@ def _info(args):
     else:
         from . import io
         brs = io.available_branches(f)
-        events = io.load_events(f)
-        print(f"ROOT {f}: {len(events)} event(s), {len(brs)} branches")
+        n = io.num_events(f)
+        print(f"ROOT {f}: {n} event(s), {len(brs)} branches")
         print("  nu_* block:", "present" if any(b.startswith("nu_") for b in brs) else "absent")
-        if events:
+        if n:
+            events = io.load_events(f, entry_start=0, entry_stop=1)
             e = events[0]
             print(f"  event0: nTracks={e.scalars.get('nTracks')} nSteps={e.scalars.get('nSteps')} "
                   f"primaryPDG={e.scalars.get('primaryPDG')}")
