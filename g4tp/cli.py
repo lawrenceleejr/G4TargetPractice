@@ -142,6 +142,7 @@ def main(argv=None):
 
 def _dispatch(args):
     if args.cmd == "run":
+        _require_files(args.mac, args.gdml)
         return _run(args)
     if args.cmd == "display":
         if args.root:

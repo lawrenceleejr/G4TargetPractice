@@ -120,7 +120,7 @@ jobs:
           # g4tp tooling: analysis + event display (uproot/numpy/matplotlib, no ROOT)
           RUN python3 -m pip install --no-cache-dir uproot numpy matplotlib || pip3 install --no-cache-dir uproot numpy matplotlib
           COPY g4tp/ /app/g4tp-src/g4tp/
-          COPY pyproject.toml /app/g4tp-src/
+          COPY pyproject.toml README.md /app/g4tp-src/
           RUN python3 -m pip install --no-cache-dir /app/g4tp-src || pip3 install --no-cache-dir /app/g4tp-src
           COPY g4sim/entrypoint.sh /app/entrypoint.sh
           RUN chmod +x /app/entrypoint.sh

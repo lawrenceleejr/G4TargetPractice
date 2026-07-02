@@ -9,6 +9,11 @@ in the repository.
 | File | Description |
 |---|---|
 | `gdml/silicon_slab_1mm.gdml` | 10×10 cm silicon slab, 1 mm thick, in a 10 cm air box |
+| `gdml/silicon_3layer.gdml` | Three 300 µm silicon planes (a mini tracker telescope) in air |
+| `gdml/bpe_slab.gdml` | 60×60×50 cm borated-polyethylene slab (5 wt% B), a standard neutron shield |
+| `gdml/MAIA_v0.gdml` | MAIA muon-collider detector concept (full geometry) |
+| `gdml/nozzles_tungsten.gdml` | Standalone MAIA shielding nozzles, tungsten-alloy shells + BCH2 liner |
+| `gdml/nozzles_depleted_uranium.gdml` | Same nozzles with the dense shells in depleted uranium |
 | `gdml/liquid_argon_1m3.gdml` | 1 m³ liquid-argon cube in a 2 m³ air box |
 | `gdml/water_phantom_30cm.gdml` | 30×30 cm water tank, 40 cm deep, entrance face at z = 0 |
 | `gdml/tissue_phantom_layered.gdml` | Layered soft-tissue/bone/lung phantom (chest-wall analogue), entrance face at z = 0 |
@@ -27,6 +32,7 @@ in the repository.
 | `electrons_silicon_gauss.mac` | `e-` | Gaussian – mean 1 GeV, σ = 200 MeV |
 | `electrons_silicon_exp.mac` | `e-` | Exponential – E₀ = 1 GeV, sampled 100 MeV–5 GeV |
 | `electrons_silicon_arb.mac` | `e-` | Arbitrary histogram (user-defined weights) |
+| `betas_silicon_sr90.mac` | `e-` | Sr-90/Y-90 beta spectrum (arb histogram, 0.05–2.28 MeV) on the 3-layer tracker |
 
 ### Neutrino beams on the liquid-argon target
 
@@ -63,6 +69,23 @@ All beams are pencil beams along +z starting at z = -20 cm. Note that if
 you run with a Celeritas-enabled build (see the main README), offloaded
 `e-`/`e+`/`gamma` tracks do not appear in the step-level output — for dose
 studies use the standard image or set `CELER_DISABLE=1`.
+
+### Shielding & collider-detector studies
+
+| Macro | Particle | Beam | What it shows |
+|---|---|---|---|
+| `neutrons_bpe_1gev.mac` | `neutron` | 1 GeV mono | Hadronic cascade + moderation in borated polyethylene |
+| `electrons_maia_1tev.mac` | `e-` | 1 TeV mono, 10° Gaussian spread | TeV EM shower into the MAIA detector from upstream (−z beam) |
+| `shower_nozzles_tungsten.mac` | `e-` | 50 GeV mono | Shower containment in the tungsten MAIA nozzle (baseline) |
+| `shower_nozzles_du.mac` | `e-` | 50 GeV mono | Same beam into the depleted-uranium nozzle variant |
+
+The two `shower_nozzles_*` macros are a matched pair (identical beam and
+geometry, only the dense-shell material differs). Run both, then compare
+stopping power, containment depth, and energy leakage with:
+
+```bash
+g4tp compare du_output.root w_output.root --labels DU,W
+```
 
 ### Muon-therapy studies with a tumor target
 

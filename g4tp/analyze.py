@@ -191,6 +191,8 @@ def summarize(path, outdir="g4tp_analysis", make_plots=True, depth_axis="z"):
 
     if make_plots:
         _plots(path, primE, edep, outdir, depth_axis)
+    wrote = sorted(p.name for p in outdir.iterdir())
+    print(f"\n[g4tp] wrote {outdir}/: " + ", ".join(wrote))
     return outdir
 
 
