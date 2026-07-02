@@ -45,17 +45,25 @@ class Event:
         return bool(self.nu)
 
 
+import os
 from functools import lru_cache
 
 
-@lru_cache(maxsize=8)
 def open_tree(path, tree="tree"):
     """Open (and cache) the TTree. One CLI invocation touches the same file from
     several helpers (num_events, read_scalars, iterate_flat, load_events);
     caching the handle means one TFile/metadata parse per file, not one per
-    helper -- on a multi-GB file each redundant open costs real time."""
+    helper -- on a multi-GB file each redundant open costs real time. The cache
+    key includes mtime+size, so a file rewritten mid-session (e.g. re-running a
+    sim from a notebook) is re-opened, never served stale."""
+    st = os.stat(str(path))
+    return _open_tree_cached(str(path), tree, st.st_mtime_ns, st.st_size)
+
+
+@lru_cache(maxsize=8)
+def _open_tree_cached(path, tree, _mtime_ns, _size):
     import uproot
-    f = uproot.open(str(path))
+    f = uproot.open(path)
     if tree not in f:
         # take the first TTree-like object
         keys = [k.split(";")[0] for k in f.keys()]
