@@ -2,14 +2,17 @@
 
 Units mirror RunAction.cc exactly: positions/lengths in mm, energies in MeV,
 times in ns (Geant4 internal units -- g4sim writes raw values, no conversion).
-Every branch g4sim writes is present (scalars + trk_* + step_*; nu_* optional)
-so io/scene/analyze/compare/display all exercise the real schema without
-needing Geant4 or Docker.
+Every branch g4sim writes is present (io.SCALAR/TRK/STEP_BRANCHES, plus the
+full nu_* block when requested) so io/scene/analyze/compare/display exercise
+the real schema without needing Geant4 or Docker; test_io.py asserts the
+fixture stays complete against io.py's branch lists.
 """
 import numpy as np
 import awkward as ak
 import uproot
 import pytest
+
+from g4tp.io import MM_PER_CM
 
 
 def write_synthetic(path, n_events=30, e0_mev=50000.0, x0_cm=3.0,
@@ -24,8 +27,8 @@ def write_synthetic(path, n_events=30, e0_mev=50000.0, x0_cm=3.0,
     energy bookkeeping is self-consistent.
     """
     rng = np.random.default_rng(seed)
-    z0_mm = z0_cm * 10.0
-    x0_mm = x0_cm * 10.0
+    z0_mm = z0_cm * MM_PER_CM
+    x0_mm = x0_cm * MM_PER_CM
 
     leak = np.clip(rng.gamma(4.0, mean_leak / 4.0, n_events), 0.0, 0.95)
     total_edep = e0_mev * (1.0 - leak)
@@ -58,7 +61,7 @@ def write_synthetic(path, n_events=30, e0_mev=50000.0, x0_cm=3.0,
     for iev in range(n_events):
         nt = tracks_per_event
         tid = np.arange(1, nt + 1)
-        parent = np.concatenate([[0], rng.integers(1, np.maximum(2, tid[:-1] + 1))])
+        parent = np.concatenate([[0], rng.integers(1, tid[:-1] + 1)])
         tpdg = np.concatenate([[11], rng.choice(pdgs, nt - 1)])
         depth0 = np.concatenate([[0.0], rng.gamma(3.0, x0_mm, nt - 1)])   # mm
         tlen = rng.gamma(2.0, x0_mm, nt)
@@ -97,13 +100,26 @@ def write_synthetic(path, n_events=30, e0_mev=50000.0, x0_cm=3.0,
         data[f"step_{k}"] = ak.Array(v)
     if with_nu:
         rng2 = np.random.default_rng(seed + 1)
-        data["nu_isCC"] = rng2.random(n_events) < 0.7
-        data["nu_isNC"] = ~data["nu_isCC"]
-        data["nu_vertexX"] = np.zeros(n_events)
-        data["nu_vertexY"] = np.zeros(n_events)
-        data["nu_vertexZ"] = np.full(n_events, z0_mm)
-        data["nu_Q2"] = rng2.gamma(2.0, 1000.0, n_events)
-        data["nu_W"] = rng2.gamma(2.0, 800.0, n_events)
+        is_cc = rng2.random(n_events) < 0.7
+        data.update({
+            "nu_isCC": is_cc, "nu_isNC": ~is_cc,
+            "nu_interactionProcess": ak.Array(
+                ["neutrinoInelastic" if c else "NC" for c in is_cc]),
+            "nu_vertexX": np.zeros(n_events), "nu_vertexY": np.zeros(n_events),
+            "nu_vertexZ": np.full(n_events, z0_mm),
+            "nu_vertexT": rng2.gamma(2.0, 1.0, n_events),
+            "nu_targetZ": np.full(n_events, 18, np.int32),
+            "nu_targetA": np.full(n_events, 40, np.int32),
+            "nu_outLeptonPDG": np.where(is_cc, 13, 0).astype(np.int32),
+            "nu_outLeptonE": rng2.gamma(2.0, 500.0, n_events),
+            "nu_outLeptonPx": rng2.normal(0, 100, n_events),
+            "nu_outLeptonPy": rng2.normal(0, 100, n_events),
+            "nu_outLeptonPz": rng2.gamma(2.0, 400.0, n_events),
+            "nu_Q2": rng2.gamma(2.0, 1000.0, n_events),
+            "nu_W": rng2.gamma(2.0, 800.0, n_events),
+            "nu_x": rng2.random(n_events), "nu_y": rng2.random(n_events),
+            "nu_q0": rng2.gamma(2.0, 300.0, n_events),
+        })
 
     with uproot.recreate(path) as f:
         f["tree"] = data
@@ -115,6 +131,13 @@ def synth_root(tmp_path_factory):
     """Standard synthetic run: 50 GeV e-, -z beam from z=650 cm, 2% leakage."""
     p = tmp_path_factory.mktemp("data") / "synth.root"
     return write_synthetic(p, seed=1)
+
+
+@pytest.fixture(scope="session")
+def synth_event(synth_root):
+    """First event of synth_root, loaded once for scene/render tests."""
+    from g4tp import io
+    return io.load_events(synth_root, entry_start=0, entry_stop=1)[0]
 
 
 @pytest.fixture(scope="session")

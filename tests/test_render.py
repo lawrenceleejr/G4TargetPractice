@@ -1,13 +1,8 @@
-from g4tp import io, scene, render_web, render_png
+from g4tp import scene, render_web, render_png
 
 
-def _scene(path):
-    ev = io.load_events(path, entry_start=0, entry_stop=1)[0]
-    return scene.build_scene([], ev)
-
-
-def test_render_html(synth_root, tmp_path):
-    sc = _scene(synth_root)
+def test_render_html(synth_event, tmp_path):
+    sc = scene.build_scene([], synth_event)
     out = render_web.render_html([sc], tmp_path / "event.html")
     html = out.read_text()
     assert len(html) > 1000
@@ -15,8 +10,8 @@ def test_render_html(synth_root, tmp_path):
     assert '"event_id"' in html and '"tracks"' in html
 
 
-def test_render_png(synth_root, tmp_path):
-    sc = _scene(synth_root)
+def test_render_png(synth_event, tmp_path):
+    sc = scene.build_scene([], synth_event)
     paths = render_png.render_png(sc, tmp_path / "event")
     assert len(paths) == 4                             # xy, xz, yz, iso
     for p in paths:

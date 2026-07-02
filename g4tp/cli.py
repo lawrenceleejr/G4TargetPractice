@@ -31,19 +31,23 @@ examples:
   g4tp info gdml/water_phantom_30cm.gdml               # solids + bounding box""",
 }
 
-
-def _sub(sub, name, help_):
-    return sub.add_parser(name, help=help_, epilog=_EXAMPLES.get(name),
-                          formatter_class=argparse.RawDescriptionHelpFormatter)
-
-
-def _require_files(*paths):
-    for p in paths:
-        if p and not Path(p).exists():
-            raise FileNotFoundError(f"no such file: {p}")
+# Error types that mean "bad input", shown as one friendly line. Anything else
+# is a g4tp bug and gets its full traceback so it can be reported.
+_USER_ERRORS = (FileNotFoundError, IsADirectoryError, NotADirectoryError,
+                PermissionError, ValueError, OSError)
 
 
-def main(argv=None):
+def _build_parser():
+    """Build the CLI parser. Returns (parser, {subcommand: subparser}) so other
+    code paths (e.g. `run --display`) can derive real display defaults instead
+    of hand-copying them."""
+    # --debug is accepted both before and after the subcommand. The subparser
+    # copy uses SUPPRESS so it only writes the attribute when actually given
+    # (otherwise its default would clobber a pre-subcommand --debug).
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--debug", action="store_true", default=argparse.SUPPRESS,
+                        help="show full tracebacks instead of short error messages")
+
     p = argparse.ArgumentParser(
         prog="g4tp",
         description="G4TargetPractice tooling: run sims, analyze output.root, "
@@ -53,9 +57,17 @@ def main(argv=None):
     p.add_argument("--debug", action="store_true",
                    help="show full tracebacks instead of short error messages")
     sub = p.add_subparsers(dest="cmd", required=True)
+    parsers = {}
+
+    def _sub(name, help_):
+        sp = sub.add_parser(name, help=help_, epilog=_EXAMPLES.get(name),
+                            formatter_class=argparse.RawDescriptionHelpFormatter,
+                            parents=[common])
+        parsers[name] = sp
+        return sp
 
     # run
-    r = _sub(sub, "run", "run a simulation (Docker or local g4sim)")
+    r = _sub("run", "run a simulation (Docker or local g4sim)")
     r.add_argument("--mac", help="existing macro; if omitted, one is generated from the flags below")
     r.add_argument("--gdml", help="geometry file (required if no --mac references one)")
     r.add_argument("--particle", default="e-")
@@ -72,7 +84,7 @@ def main(argv=None):
     r.add_argument("--dry-run", action="store_true")
 
     # display
-    d = _sub(sub, "display", "event display: WebGL HTML, PNG stills, and/or Blender")
+    d = _sub("display", "event display: WebGL HTML, PNG stills, and/or Blender")
     d.add_argument("root", nargs="?", help="output.root (optional; geometry-only allowed)")
     d.add_argument("--gdml", help="overlay this geometry")
     d.add_argument("--event", type=int, default=0)
@@ -102,7 +114,7 @@ def main(argv=None):
     d.add_argument("--prefix", default="event")
 
     # compare
-    c = _sub(sub, "compare", "overlay shower stopping + leakage of two runs (e.g. DU vs W)")
+    c = _sub("compare", "overlay shower stopping + leakage of two runs (e.g. DU vs W)")
     c.add_argument("root_a")
     c.add_argument("root_b")
     c.add_argument("--labels", default="A,B", help="comma-separated legend labels, e.g. DU,W")
@@ -110,33 +122,42 @@ def main(argv=None):
     c.add_argument("-o", "--outdir", default="g4tp_compare")
 
     # analyze
-    a = _sub(sub, "analyze", "summary report + plots")
+    a = _sub("analyze", "summary report + plots")
     a.add_argument("root", nargs="?", default="output.root")
     a.add_argument("-o", "--outdir", default="g4tp_analysis")
     a.add_argument("--no-plots", dest="plots", action="store_false")
     a.add_argument("--depth-axis", default="z", choices=["x", "y", "z"])
 
     # info
-    i = _sub(sub, "info", "inspect a .root or .gdml file")
+    i = _sub("info", "inspect a .root or .gdml file")
     i.add_argument("file")
 
+    return p, parsers
+
+
+def _require_files(*paths):
+    for p in paths:
+        if p and not Path(p).exists():
+            raise FileNotFoundError(f"no such file: {p}")
+
+
+def main(argv=None):
+    p, _ = _build_parser()
     if argv is None:
         argv = sys.argv[1:]
     if not argv:
         p.print_help()
-        return 0
+        return 2  # no command given is misuse (scripts must not read it as success)
     args = p.parse_args(argv)
     try:
         return _dispatch(args)
     except KeyboardInterrupt:
         print("\n[g4tp] interrupted", file=sys.stderr)
         return 130
-    except Exception as e:  # noqa: BLE001 - CLI boundary: short message beats a traceback
-        if args.debug:
+    except _USER_ERRORS as e:
+        if getattr(args, "debug", False):
             raise
-        kind = "" if isinstance(e, (FileNotFoundError, ValueError)) else f"{type(e).__name__}: "
-        print(f"g4tp error: {kind}{e}\n(re-run with --debug for the full traceback)",
-              file=sys.stderr)
+        print(f"g4tp error: {e}\n(add --debug for the full traceback)", file=sys.stderr)
         return 1
 
 
@@ -145,8 +166,15 @@ def _dispatch(args):
         _require_files(args.mac, args.gdml)
         return _run(args)
     if args.cmd == "display":
-        if args.root:
-            _require_files(args.root)
+        if args.root and not Path(args.root).exists():
+            if args.gdml:
+                # keep the documented preview workflow working: geometry-only
+                # display before the simulation has produced output.root
+                print(f"[g4tp] note: {args.root} not found; rendering geometry only",
+                      file=sys.stderr)
+                args.root = None
+            else:
+                raise FileNotFoundError(f"no such file: {args.root}")
         _require_files(args.gdml)
         return _display(args)
     if args.cmd == "analyze":
@@ -174,13 +202,14 @@ def _run(args):
                nmode=args.neutrino_mode, field=args.field, image=args.image,
                outdir=args.outdir, local=args.local, dry_run=args.dry_run)
     if args.display and not args.dry_run:
-        ns = argparse.Namespace(root=str(Path(args.outdir) / "output.root"), gdml=args.gdml,
-                                event=0, events=None, html=True, png=True, blend=False,
-                                blender_image="linuxserver/blender:4.2.0", blend_events=10,
-                                time_scale=0.5, anim_fps=30, max_seconds=12.0, log_time=True,
-                                max_tracks=2000, world=False, outdir="g4tp_display",
-                                prefix="event")
-        _display(ns)
+        # Real display-parser defaults (not a hand-copied Namespace), with the
+        # display output next to the run output.
+        _, parsers = _build_parser()
+        dargv = [str(Path(args.outdir) / "output.root"),
+                 "-o", str(Path(args.outdir) / "g4tp_display")]
+        if args.gdml:
+            dargv += ["--gdml", args.gdml]
+        _display(parsers["display"].parse_args(dargv))
     return 0
 
 
@@ -230,7 +259,7 @@ def _display(args):
         print("[g4tp] nothing to display"); return 1
 
     if args.png:
-        for sc in scenes[: max(1, 1 if not args.events else len(scenes))] if not args.events else scenes:
+        for sc in (scenes if args.events else scenes[:1]):
             out = render_png.render_png(sc, outdir / f"{args.prefix}{('' if len(scenes)==1 else '_'+str(sc.event_id))}",
                                         include_world=args.world)
             print("[g4tp] PNG:", *[str(o) for o in out])
@@ -266,13 +295,13 @@ def _info(args):
             print(f"  bbox [mm]: min {bb[0]} max {bb[1]}")
     else:
         from . import io
-        brs = io.available_branches(f)
-        n = io.num_events(f)
+        t = io.open_tree(f)                       # one open serves everything below
+        brs = io.branch_names(t)
+        n = int(t.num_entries)
         print(f"ROOT {f}: {n} event(s), {len(brs)} branches")
         print("  nu_* block:", "present" if any(b.startswith("nu_") for b in brs) else "absent")
         if n:
-            events = io.load_events(f, entry_start=0, entry_stop=1)
-            e = events[0]
+            e = io.load_events(f, entry_start=0, entry_stop=1)[0]
             print(f"  event0: nTracks={e.scalars.get('nTracks')} nSteps={e.scalars.get('nSteps')} "
                   f"primaryPDG={e.scalars.get('primaryPDG')}")
     return 0

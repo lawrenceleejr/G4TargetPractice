@@ -10,8 +10,8 @@ def test_version(capsys):
     assert "g4tp 0." in capsys.readouterr().out
 
 
-def test_no_args_prints_help(capsys):
-    assert cli.main([]) == 0
+def test_no_args_prints_help_and_signals_misuse(capsys):
+    assert cli.main([]) == 2
     assert "usage: g4tp" in capsys.readouterr().out
 
 
@@ -25,6 +25,26 @@ def test_missing_file_is_friendly(capsys):
 def test_debug_reraises():
     with pytest.raises(FileNotFoundError):
         cli.main(["--debug", "analyze", "/definitely/not/here.root"])
+
+
+def test_debug_works_after_subcommand_too():
+    """The error hint says 'add --debug' -- it must work in either position."""
+    with pytest.raises(FileNotFoundError):
+        cli.main(["analyze", "/definitely/not/here.root", "--debug"])
+
+
+def test_display_missing_root_falls_back_to_geometry(repo_root, tmp_path, capsys):
+    """Documented preview workflow: display before the sim has run."""
+    gdml = str(repo_root / "gdml" / "bpe_slab.gdml")
+    assert cli.main(["display", "not_yet_produced.root", "--gdml", gdml,
+                     "--no-png", "-o", str(tmp_path / "pre")]) == 0
+    assert "rendering geometry only" in capsys.readouterr().err
+    assert (tmp_path / "pre" / "event.html").exists()
+
+
+def test_display_missing_root_without_gdml_errors(capsys):
+    assert cli.main(["display", "not_here.root"]) == 1
+    assert "no such file" in capsys.readouterr().err
 
 
 def test_info_root(synth_root, capsys):

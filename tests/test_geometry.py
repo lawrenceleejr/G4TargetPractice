@@ -45,6 +45,41 @@ def test_world_flag(repo_root):
     assert all(not p.is_world for p in without)
 
 
+def test_generic_polycone_rzpoint_bbox(tmp_path):
+    """genericPolycone stores geometry in <rzpoint>, not <zplane>; it must get
+    a bbox fallback, not vanish."""
+    import warnings
+    gdml = """<?xml version="1.0"?>
+<gdml>
+  <solids>
+    <box name="wb" x="2000" y="2000" z="2000" lunit="mm"/>
+    <genericPolycone name="gp" startphi="0" deltaphi="360" aunit="deg" lunit="mm">
+      <rzpoint r="100" z="50"/>
+      <rzpoint r="300" z="400"/>
+      <rzpoint r="50"  z="900"/>
+    </genericPolycone>
+  </solids>
+  <structure>
+    <volume name="inner"><solidref ref="gp"/></volume>
+    <volume name="World"><solidref ref="wb"/>
+      <physvol><volumeref ref="inner"/></physvol>
+    </volume>
+  </structure>
+  <setup name="Default" version="1.0"><world ref="World"/></setup>
+</gdml>"""
+    p = tmp_path / "gp.gdml"
+    p.write_text(gdml)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        prims = geometry.parse_gdml(p)
+    assert len(prims) == 1
+    bb = geometry.bounding_box(prims)
+    lo, hi = bb
+    assert hi[2] - lo[2] == pytest.approx(850.0)     # z spans 50..900
+    assert hi[0] - lo[0] == pytest.approx(600.0)     # r max 300
+    assert 0.5 * (lo[2] + hi[2]) == pytest.approx(475.0)  # offset applied
+
+
 def test_unit_conversion_rotation():
     """Inline GDML: 90 deg rotation about z applied to a placed box."""
     import tempfile, os

@@ -23,7 +23,7 @@ docker run --rm -v $PWD:/run -w /run $IMG compare du.root w.root --labels DU,W
 docker run --rm -v $PWD:/run -w /run $IMG info output.root
 ```
 
-The same image serves the simulation **and** the `g4tp` analysis/display tools (a dispatcher entrypoint routes `display`/`analyze`/`compare`/`info` to `g4tp`, anything else to the simulator — so `... $IMG run.mac` is unchanged). Outputs land in your mounted directory. Open the generated `event.html` in any browser.
+The same image serves the simulation **and** the `g4tp` analysis/display tools (a dispatcher entrypoint routes `*.mac` arguments — and no arguments, for an interactive Geant4 session — to the simulator, everything else to `g4tp`; so `... $IMG run.mac` is unchanged and every `g4tp` command/flag works). Outputs land in your mounted directory. Open the generated `event.html` in any browser.
 
 Prefer working on your laptop? `pip install "git+https://github.com/lawrenceleejr/G4TargetPractice"` gives the same commands without Docker (pure Python, **no ROOT needed**): `g4tp run --gdml my.gdml --particle proton --energy "150 MeV" -n 200 --display`, `g4tp display output.root --gdml my.gdml`, `g4tp analyze output.root`. An animated **Blender** scene of the events is one more step — `g4tp display output.root --gdml my.gdml --blend` (uses a Blender Docker image). Every command prints copy-paste examples with `--help`. See **[Analysis & Event Display](#analysis--event-display)** below.
 

@@ -58,6 +58,24 @@ def test_iterate_flat_missing_branch(synth_root):
         next(iter(io.iterate_flat(synth_root, ["no_such_branch"])))
 
 
+def test_iterate_flat_preserves_dtype(synth_root):
+    """Integer branches must come back integral (no float64 round trip)."""
+    _, cols = next(iter(io.iterate_flat(synth_root, ["trk_pdg"])))
+    assert np.issubdtype(cols["trk_pdg"].dtype, np.integer)
+
+
+def test_synthetic_schema_is_complete(synth_root, synth_nu):
+    """Guard against fixture/schema drift: the synthetic files must carry every
+    branch io.py declares (which mirrors RunAction.cc), so new branches added
+    to the sim + io lists force the fixture to keep up."""
+    brs = set(io.available_branches(synth_root))
+    for b in io.SCALAR_BRANCHES + io.TRK_BRANCHES + io.STEP_BRANCHES:
+        assert b in brs, f"fixture missing {b}"
+    nu_brs = set(io.available_branches(synth_nu))
+    for b in io.NU_BRANCHES:
+        assert b in nu_brs, f"nu fixture missing {b}"
+
+
 def test_empty_file(empty_root):
     assert io.num_events(empty_root) == 0
     assert io.load_events(empty_root) == []

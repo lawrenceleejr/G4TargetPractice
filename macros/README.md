@@ -80,11 +80,14 @@ studies use the standard image or set `CELER_DISABLE=1`.
 | `shower_nozzles_du.mac` | `e-` | 50 GeV mono | Same beam into the depleted-uranium nozzle variant |
 
 The two `shower_nozzles_*` macros are a matched pair (identical beam and
-geometry, only the dense-shell material differs). Run both, then compare
-stopping power, containment depth, and energy leakage with:
+geometry, only the dense-shell material differs). g4sim always writes
+`output.root`, so rename between runs, then compare stopping power,
+containment depth, and energy leakage:
 
 ```bash
-g4tp compare du_output.root w_output.root --labels DU,W
+docker run --rm -v $PWD:/run -w /run $IMG macros/shower_nozzles_du.mac       && mv output.root du.root
+docker run --rm -v $PWD:/run -w /run $IMG macros/shower_nozzles_tungsten.mac && mv output.root w.root
+g4tp compare du.root w.root --labels DU,W
 ```
 
 ### Muon-therapy studies with a tumor target

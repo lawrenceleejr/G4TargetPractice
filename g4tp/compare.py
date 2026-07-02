@@ -33,15 +33,15 @@ def compare(path_a, path_b, labels=("A", "B"), outdir="g4tp_compare", axis="z"):
             f"[{lab}] events={s['n_events']}  E0={s['E0_MeV']/1000:.1f} GeV  "
             f"Edep/evt={s['edep_per_event_MeV']/1000:.2f} GeV "
             f"({100*s['absorbed_fraction']:.1f}% of beam)",
-            f"        shower max at {s['peak_depth_cm']:.2f} cm;  "
-            f"90/95/99% absorbed by {s['d90_cm']:.2f} / {s['d95_cm']:.2f} / {s['d99_cm']:.2f} cm",
+            f"        shower max at {s['peak_depth_cm']:.2f} cm;  90/95/99% of deposited "
+            f"energy within {s['d90_cm']:.2f} / {s['d95_cm']:.2f} / {s['d99_cm']:.2f} cm",
         ]
     # head-to-head: how much less material the second needs for 95%
     if sb["d95_cm"]:
         rel = 100 * (sa["d95_cm"] - sb["d95_cm"]) / sb["d95_cm"]
         lines.append("")
         lines.append(f"{la} needs {rel:+.1f}% {'more' if rel>0 else 'less'} depth than "
-                     f"{lb} to absorb 95% of the shower.")
+                     f"{lb} to contain 95% of the deposited energy.")
 
     # Energy leakage out of the geometry (whole-event energy balance).
     have_leak = len(sa["leak_frac"]) and len(sb["leak_frac"])
@@ -90,10 +90,14 @@ def compare(path_a, path_b, labels=("A", "B"), outdir="g4tp_compare", axis="z"):
 
     wrote = ["shower_profile.png", "containment.png"]
 
-    # Plot 3: per-event energy leakage distribution
+    # Plot 3: per-event energy leakage distribution. Leakage can be negative
+    # (totalEdep > primaryE, e.g. e+ annihilation or exothermic capture adds
+    # energy beyond the primary's kinetic), so span the actual data range.
     if have_leak:
         fa, fb = 100 * sa["leak_frac"], 100 * sb["leak_frac"]
-        lo, hi = 0.0, float(max(fa.max(), fb.max())) * 1.05 + 1e-6
+        lo = min(0.0, float(min(fa.min(), fb.min())))
+        hi = float(max(fa.max(), fb.max()))
+        hi = hi + 0.05 * (hi - lo) + 1e-6
         bins = np.linspace(lo, hi, 31)
         fig, ax = plt.subplots(figsize=(6, 4))
         for f, s, lab, c in ((fa, sa, la, "C0"), (fb, sb, lb, "C1")):

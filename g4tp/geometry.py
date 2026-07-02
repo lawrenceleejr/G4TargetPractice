@@ -163,12 +163,16 @@ def _bbox_of_solid(solidtype, el):
     """
     s = _len_scale(el)
     try:
-        if solidtype in ("polycone", "polyhedra", "genericPolycone"):
+        if solidtype in ("polycone", "polyhedra", "genericPolycone", "genericPolyhedra"):
             zs, rs = [], []
             for c in el:
-                if _strip_ns(c.tag) == "zplane":
+                tag = _strip_ns(c.tag)
+                if tag == "zplane":
                     zs.append(_f(c, "z") * s)
                     rs.append(max(_f(c, "rmax"), _f(c, "rmin")) * s)
+                elif tag == "rzpoint":          # genericPolycone/genericPolyhedra
+                    zs.append(_f(c, "z") * s)
+                    rs.append(_f(c, "r") * s)
             if zs:
                 r = max(rs)
                 zlo, zhi = min(zs), max(zs)
