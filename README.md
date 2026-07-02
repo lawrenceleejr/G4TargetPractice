@@ -13,16 +13,19 @@ docker run --rm -v $PWD:/run -w /run $IMG run.mac
 # 2) Event display — interactive WebGL (.html) + PNG stills, auto-framed
 docker run --rm -v $PWD:/run -w /run $IMG display output.root --gdml my_detector.gdml
 
-# 3) Analyze — summary report + plots (depth-dose, spectra, particle counts)
+# 3) Analyze — summary report + plots (depth-dose, spectra, leakage, particle counts)
 docker run --rm -v $PWD:/run -w /run $IMG analyze output.root
 
-# 4) Inspect a file
+# 4) Compare two runs — shower profile, containment depth, energy leakage
+docker run --rm -v $PWD:/run -w /run $IMG compare du.root w.root --labels DU,W
+
+# 5) Inspect a file
 docker run --rm -v $PWD:/run -w /run $IMG info output.root
 ```
 
-The same image serves the simulation **and** the `g4tp` analysis/display tools (a dispatcher entrypoint routes `display`/`analyze`/`info` to `g4tp`, anything else to the simulator — so `... $IMG run.mac` is unchanged). Outputs land in your mounted directory. Open the generated `event.html` in any browser.
+The same image serves the simulation **and** the `g4tp` analysis/display tools (a dispatcher entrypoint routes `display`/`analyze`/`compare`/`info` to `g4tp`, anything else to the simulator — so `... $IMG run.mac` is unchanged). Outputs land in your mounted directory. Open the generated `event.html` in any browser.
 
-Prefer working on your laptop? `pip install g4tp` gives the same commands without Docker (pure Python, **no ROOT needed**): `g4tp run --gdml my.gdml --particle proton --energy "150 MeV" -n 200 --display`, `g4tp display output.root --gdml my.gdml`, `g4tp analyze output.root`. An animated **Blender** scene of the events is one more step — `g4tp display output.root --gdml my.gdml --blend` (uses a Blender Docker image). See **[Analysis & Event Display](#analysis--event-display)** below.
+Prefer working on your laptop? `pip install "git+https://github.com/lawrenceleejr/G4TargetPractice"` gives the same commands without Docker (pure Python, **no ROOT needed**): `g4tp run --gdml my.gdml --particle proton --energy "150 MeV" -n 200 --display`, `g4tp display output.root --gdml my.gdml`, `g4tp analyze output.root`. An animated **Blender** scene of the events is one more step — `g4tp display output.root --gdml my.gdml --blend` (uses a Blender Docker image). Every command prints copy-paste examples with `--help`. See **[Analysis & Event Display](#analysis--event-display)** below.
 
 ## Quick Start with Docker
 
@@ -90,8 +93,13 @@ The `g4tp` tool (shipped in the Docker image and pip-installable) turns `output.
 |---|---|
 | `g4tp run` | Run a simulation. Bring your own `.mac`, or generate one from flags: `g4tp run --gdml my.gdml --particle proton --energy "150 MeV" -n 200`. `--display` runs then opens an event display; `--field "0 0 5 tesla"` adds a field (auto-sets `CELER_DISABLE=1`). |
 | `g4tp display` | Event display from `output.root` and/or `--gdml`. Emits a self-contained **WebGL HTML** (`event.html`), **PNG stills** (XY/XZ/YZ projections + isometric), and optionally a **Blender** scene (`--blend`). Camera/zoom/limits are automatic. `--event N` / `--events A:B`. |
-| `g4tp analyze` | Summary report (`summary.txt`) + plots: primary spectrum, total Edep, depth-dose, secondary particle counts, and neutrino CC/NC if present. |
+| `g4tp analyze` | Summary report (`summary.txt`) + plots: primary spectrum, total Edep, depth-dose along the beam, energy leakage, secondary particle counts, and neutrino CC/NC if present. |
+| `g4tp compare` | Overlay two runs (e.g. absorber materials): longitudinal shower profile, cumulative containment vs depth (with d90/d95/d99), and per-event **energy leakage** (`primaryE − totalEdep`, the energy escaping the geometry). `g4tp compare du.root w.root --labels DU,W`. |
 | `g4tp info` | Inspect a `.root` (branches, events, nu block) or `.gdml` (solids, bounding box). |
+
+**Units**: the ntuple stores Geant4 internal units — positions/lengths in **mm**, energies in **MeV**, times in **ns**. Analysis plots (depth-dose, shower profiles, containment) convert depths to **cm**; event-display axes stay in mm.
+
+**Large files**: `analyze`, `compare`, and `info` stream the file in batches and read only the branches they need, so multi-GB outputs run in bounded memory; `display` loads only the requested events.
 
 **Blender export** (`g4tp display ... --blend`) builds a `.blend` via a Blender Docker image (`--blender-image`, default `linuxserver/blender:4.2.0`). It writes the first N events (`--blend-events`, default 10) into one scene — geometry shared, one collection per event so you can show an ensemble or a single event — with tracks as curves color-coded by particle type, little cubes at each vertex, and a **time-driven reveal animation**: each track grows at the particle's real speed and secondaries appear at their birth time, so you watch the shower evolve in (slowed) time (`--time-scale` animation-seconds per ns, `--anim-fps`).
 
@@ -115,6 +123,17 @@ G4TargetPractice/
 │   ├── SteppingAction.cc/hh         # Per-step data collection
 │   ├── simple_det.gdml              # Minimal example GDML (kept for reference)
 │   └── run_ci.mac                   # Macro used for CI testing
+├── g4tp/                    # Python tooling: run/display/analyze/compare/info
+│   ├── cli.py               # Command-line interface (the `g4tp` command)
+│   ├── io.py                # uproot readers: whole events + streaming helpers
+│   ├── analyze.py           # Summary + longitudinal profile (streamed)
+│   ├── compare.py           # Two-run comparison: profile/containment/leakage
+│   ├── geometry.py          # GDML -> primitives (mm) for displays
+│   ├── scene.py             # Event -> Scene (tracks/vertices/camera)
+│   ├── render_web.py/_png.py/_blender.py   # WebGL / PNG / Blender emitters
+│   └── run.py               # Docker/local g4sim wrapper + macro generation
+├── tests/                   # pytest suite (pure Python, no Geant4 needed)
+├── pyproject.toml           # pip package for g4tp (console script `g4tp`)
 ├── gdml/                    # Example GDML geometry files
 │   ├── MAIA_v0.gdml         # MAIA detector geometry
 │   ├── silicon_slab_1mm.gdml        # 1 mm silicon slab
@@ -139,6 +158,20 @@ G4TargetPractice/
 ```
 
 ---
+
+## Development & Tests
+
+The `g4tp` Python package has a full test suite that needs **no Geant4, ROOT, or
+Docker** — it synthesizes `output.root` files with uproot and exercises every
+command against them:
+
+```bash
+pip install -e .[dev]
+pytest
+```
+
+CI runs the suite on every push (`g4tp-tests` job), alongside the Geant4 build;
+the Docker image is only published if both pass.
 
 ## Building from Source
 
