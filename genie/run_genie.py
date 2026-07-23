@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """In-container GENIE driver for GDMLTargetPractice.
 
-Reads a `genie_job.json` (written on the host by g4tp's genie backend) and runs
+Reads a `genie_job.json` (written on the host by gdmltp's genie backend) and runs
 the generation pipeline, ending in an `output.root` in the common g4sim schema:
 
-    gevgen  ->  gntpc -f gst  ->  genie2root (g4tp.backends.genie_convert)
+    gevgen  ->  gntpc -f gst  ->  genie2root (gdmltp.backends.genie_convert)
 
 v1 scope (vertex-only): the interaction is generated on the target nucleus that
 the GDML geometry selected (job["target"]), at a point vertex. Geometry-aware
@@ -20,7 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from g4tp.backends.genie import flux_gevgen_args
+from gdmltp.backends.genie import flux_gevgen_args
 
 
 def run(job_path):
@@ -62,8 +62,8 @@ def run(job_path):
                    cwd=workdir, check=True)
 
     print("[run_genie] converting gst -> output.root ...", flush=True)
-    # Import rather than shell out so the exact converter version travels with g4tp.
-    from g4tp.backends import genie_convert
+    # Import rather than shell out so the exact converter version travels with gdmltp.
+    from gdmltp.backends import genie_convert
     genie_convert.convert(gst, str(workdir / out), vtx_units=vtx_units)
     print(f"[run_genie] done -> {workdir / out}", flush=True)
     return 0

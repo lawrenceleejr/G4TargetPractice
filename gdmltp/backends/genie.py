@@ -21,16 +21,32 @@ _PROBE_PDG = {
     "nu_tau": 16, "anti_nu_tau": -16,
 }
 
-# Coarse material-name -> struck-nucleus PDG map for target inference. Users can
-# always override with genie.target; molecular targets (e.g. water) collapse to
-# their dominant heavy nucleus here and should be given explicitly for accuracy.
-_MATERIAL_NUCLEUS = [
-    ("lar", 1000180400), ("argon", 1000180400),
-    ("water", 1000080160),                        # O-16 (free H ignored)
-    ("graphite", 1000060120), ("carbon", 1000060120), ("_c", 1000060120),
-    ("silicon", 1000140280), ("_si", 1000140280),
-    ("iron", 1000260560), ("steel", 1000260560),
-    ("hydrogen", 1000010010),
+# Material-name -> struck-nucleus PDG for target inference. Users can always
+# override with genie.target; molecular targets (e.g. water) collapse to their
+# dominant heavy nucleus here and should be given explicitly for accuracy.
+# Exact (whole-name) matches first, then unambiguous keyword substrings -- short
+# fragments like "_c" are avoided because they false-match concrete/calcium/etc.
+_NUCLEUS_ARGON = 1000180400
+_NUCLEUS_O16 = 1000080160
+_NUCLEUS_C12 = 1000060120
+_NUCLEUS_SI = 1000140280
+_NUCLEUS_FE = 1000260560
+_NUCLEUS_H1 = 1000010010
+
+_MATERIAL_EXACT = {
+    "g4_c": _NUCLEUS_C12, "c": _NUCLEUS_C12,
+    "g4_si": _NUCLEUS_SI, "si": _NUCLEUS_SI,
+    "g4_ar": _NUCLEUS_ARGON, "g4_lar": _NUCLEUS_ARGON, "lar": _NUCLEUS_ARGON,
+    "g4_fe": _NUCLEUS_FE, "fe": _NUCLEUS_FE,
+    "g4_h": _NUCLEUS_H1,
+}
+_MATERIAL_KEYWORDS = [
+    ("argon", _NUCLEUS_ARGON),
+    ("water", _NUCLEUS_O16),
+    ("graphite", _NUCLEUS_C12), ("carbon", _NUCLEUS_C12),
+    ("silicon", _NUCLEUS_SI),
+    ("stainless", _NUCLEUS_FE), ("steel", _NUCLEUS_FE), ("iron", _NUCLEUS_FE),
+    ("hydrogen", _NUCLEUS_H1),
 ]
 
 
@@ -74,8 +90,10 @@ def probe_pdg(particle: str) -> int:
 
 
 def _nucleus_for_material(mat: str):
-    m = (mat or "").lower()
-    for needle, pdg in _MATERIAL_NUCLEUS:
+    m = (mat or "").lower().strip()
+    if m in _MATERIAL_EXACT:
+        return _MATERIAL_EXACT[m]
+    for needle, pdg in _MATERIAL_KEYWORDS:
         if needle in m:
             return pdg
     return None
