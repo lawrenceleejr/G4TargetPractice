@@ -1,0 +1,84 @@
+name: Build Achilles Image
+# Separate, NON-GATING workflow (mirrors the GENIE one): the Achilles base and
+# its run-card grammar are release-sensitive, so this builds independently and
+# never blocks merges (the Python + Geant4 jobs in build-test-deploy.yml do).
+on:
+  push:
+    paths:
+      - "achilles/**"
+      - "gdmltp/**"
+      - "docker/achilles.Dockerfile"
+      - ".github/workflows/build-achilles-deploy.yml"
+  workflow_dispatch:
+    inputs:
+      achilles_base:
+        description: "Achilles base image"
+        required: false
+        default: "ghcr.io/achillesgen/achilles:main"
+
+env:
+  ACHILLES_BASE: ${{ github.event.inputs.achilles_base || 'ghcr.io/achillesgen/achilles:main' }}
+
+jobs:
+  docker-achilles:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-achilles
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build (and push on non-PR) the Achilles image
+        id: build
+        continue-on-error: true
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/achilles.Dockerfile
+          build-args: |
+            ACHILLES_BASE=${{ env.ACHILLES_BASE }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test (best-effort)
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -x
+          IMG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          mkdir -p run && cp gdml/liquid_argon_1m3.gdml run/
+          docker run --rm -v "$PWD/run":/run -w /run "$IMG" \
+            python3 -c "from gdmltp.backends import achilles_convert; print('achilles image OK')"
+          echo "Full generation smoke test is enabled once the base image + run-card template are pinned."
+
+      - name: Note build status
+        if: steps.build.outcome != 'success'
+        run: |
+          echo "::warning::Achilles image build did not succeed. This job is non-gating."
+          echo "Set a valid Achilles base image (workflow_dispatch input achilles_base)."

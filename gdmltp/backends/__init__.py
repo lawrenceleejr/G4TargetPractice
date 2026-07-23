@@ -17,12 +17,15 @@ register(Geant4Backend())
 
 
 def get(name: str) -> Backend:
-    if name == "genie" and name not in _REGISTRY:
+    if name not in _REGISTRY and name in ("genie", "achilles"):
         try:
-            from .genie import GenieBackend
-            register(GenieBackend())
-        except ImportError as exc:  # pragma: no cover - PR2 lands the module
-            raise ValueError(f"genie backend is not available: {exc}")
+            if name == "genie":
+                from .genie import GenieBackend as _B
+            else:
+                from .achilles import AchillesBackend as _B
+            register(_B())
+        except ImportError as exc:  # pragma: no cover
+            raise ValueError(f"{name} backend is not available: {exc}")
     try:
         return _REGISTRY[name]
     except KeyError:

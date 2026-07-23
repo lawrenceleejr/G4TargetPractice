@@ -17,6 +17,10 @@ TRK_BRANCHES = [
     "trk_endX", "trk_endY", "trk_endZ", "trk_endE",
     "trk_edep", "trk_length", "trk_creatorProcess",
 ]
+# Optional per-track momentum at production (MeV/c). Written by the vertex-level
+# generator converters (GENIE/Achilles) so displays can draw momentum rays for
+# tracks that were never transported; g4sim does not (yet) write these.
+TRK_OPTIONAL_BRANCHES = ["trk_px", "trk_py", "trk_pz"]
 STEP_BRANCHES = [
     "step_trackID", "step_pdg", "step_x", "step_y", "step_z",
     "step_kinE", "step_edep", "step_length", "step_time", "step_process",
@@ -141,7 +145,7 @@ def load_events(path, tree="tree", entry_start=None, entry_stop=None):
         return out
 
     sc = read(SCALAR_BRANCHES)
-    trk = read(TRK_BRANCHES)
+    trk = read(TRK_BRANCHES + TRK_OPTIONAL_BRANCHES)
     step = read(STEP_BRANCHES)
     nu = read(NU_BRANCHES)
 

@@ -22,7 +22,8 @@ _SUBMODULES = [
     "cli", "run", "config", "io", "geometry", "scene", "particles", "masses",
     "analyze", "compare", "render_web", "render_png", "render_blender",
     "backends", "backends.base", "backends.geant4", "backends.genie",
-    "backends.genie_convert",
+    "backends.genie_convert", "backends.achilles", "backends.achilles_convert",
+    "beam",
 ]
 for _name in _SUBMODULES:
     try:

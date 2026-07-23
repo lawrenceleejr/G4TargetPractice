@@ -31,6 +31,7 @@ Issues = "https://github.com/lawrenceleejr/G4TargetPractice/issues"
 gdmltp = "gdmltp.cli:main"
 g4tp = "gdmltp.cli:main"                       # deprecated alias, kept for back-compat
 genie2root = "gdmltp.backends.genie_convert:main"
+achilles2root = "gdmltp.backends.achilles_convert:main"
 
 [tool.setuptools]
 packages = ["gdmltp", "gdmltp.assets", "gdmltp.backends", "g4tp"]

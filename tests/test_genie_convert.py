@@ -186,6 +186,43 @@ def test_convert_beam_length_mismatch_errors(synth_gst, tmp_path):
                               beam=[("nu_mu", (0, 0, 0), (1, 0, 0))])
 
 
+# --- momentum branches + display integration -------------------------------- #
+def test_convert_fills_track_momenta(synth_gst, tmp_path):
+    import uproot
+    out = str(tmp_path / "output.root")
+    genie_convert.convert(synth_gst, out)
+    t = uproot.open(out)["tree"]
+    gst = uproot.open(synth_gst)["gst"]
+    pz_conv = t["trk_pz"].array()
+    pz_gst = gst["pzf"].array()
+    assert float(pz_conv[0][0]) == pytest.approx(float(pz_gst[0][0]) * 1000.0, rel=1e-9)
+
+
+def test_converted_events_display_with_momentum_rays(synth_gst, tmp_path):
+    """GENIE output flows through io -> scene with visible momentum rays."""
+    from gdmltp import scene
+    out = str(tmp_path / "output.root")
+    genie_convert.convert(synth_gst, out)
+    ev = io.load_events(out, entry_start=0, entry_stop=1)[0]
+    sc = scene.build_scene([], ev)
+    assert len(sc.tracks) > 0
+    for trk in sc.tracks:
+        assert np.linalg.norm(trk.polyline[-1] - trk.polyline[0]) > 1.0
+
+
+def test_convert_multiple_gst_files_concatenate(synth_gst, tmp_path):
+    import sys
+    sys.path.insert(0, str(tmp_path.parent))
+    from conftest import write_synthetic_gst
+    import uproot
+    second = write_synthetic_gst(tmp_path / "more.gst.root", n_events=4, seed=9)
+    out = str(tmp_path / "cat.root")
+    genie_convert.convert([synth_gst, second], out)
+    assert io.num_events(out) == 25 + 4
+    eid = uproot.open(out)["tree"]["eventID"].array(library="np")
+    assert list(eid) == list(range(29))          # renumbered sequentially
+
+
 # --- flux mapping (driver logic, pure python) ------------------------------ #
 def test_parse_energy_gev():
     assert genie.parse_energy_gev("2.0 GeV") == pytest.approx(2.0)

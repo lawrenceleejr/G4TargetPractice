@@ -18,6 +18,7 @@ just Docker.
 - **Generator (backend)** — pick one:
   - `geant4` — full particle transport (the `g4sim` engine). *Default.*
   - `genie` — neutrino event generation on the GDML target. *Vertex-level (v1).*
+  - `achilles` — theory-driven lepton-nucleus generation ([Achilles](https://github.com/AchillesGen/Achilles)); neutrino **and** `e∓` beams. *Vertex-level (v1).*
   - `fluka` (via flugg) — *planned, not yet available.*
 
 Every backend writes the **same** `output.root` schema, so `analyze`, `display`,
@@ -168,6 +169,7 @@ gdmltp run --generator genie --gdml liquid_argon_1m3.gdml --particle nu_mu --ene
 |---|---|---|
 | `geant4` | `ghcr.io/lawrenceleejr/g4targetpractice` | full transport |
 | `genie` | `ghcr.io/lawrenceleejr/g4targetpractice-genie` | neutrino vertices (v1) |
+| `achilles` | `ghcr.io/lawrenceleejr/g4targetpractice-achilles` | ν / e∓ vertices (v1) |
 
 `gdmltp run` picks the image automatically from the `generator`; override with
 `--image`. (Image repositories keep the `g4targetpractice` name until the GitHub
@@ -186,6 +188,25 @@ final-state particle. Because GENIE does not transport particles, `step_*` and
 Roadmap: geometry-aware vertex sampling in the full GDML volume, and a
 **GENIE → Geant4 hand-off** that transports the final-state particles so a single
 `output.root` carries both the interaction record and the deposited energy.
+
+## The Achilles backend (lepton-nucleus generator)
+
+[Achilles](https://github.com/AchillesGen/Achilles) is a theory-driven
+lepton-nucleus event generator covering **neutrino** and **electron/positron**
+beams, with an intranuclear cascade. The backend renders an Achilles YAML run
+card from the common config (target nucleus inferred from the GDML material,
+e.g. liquid argon → `40Ar`), runs `achilles`, and converts its **NuHepMC**
+(HepMC3) output to the common ntuple with a small pure-Python parser — full
+`nu_*` block (Q²/W/x/y computed from the exact four-vectors), one `trk_*` row
+per final-state particle. Backend knobs: `achilles.{cascade, nuclear_model,
+processes, nucleus, options}`, or a verbatim `achilles.run_card`.
+
+**Same display pipeline for every backend.** Vertex-level generators record no
+transport, so their converters also fill optional per-track momentum branches
+(`trk_px/py/pz`); the event display draws momentum-direction rays (length ∝ √|p|)
+for untransported tracks. `gdmltp display output.root --gdml my.gdml [--blend]`
+therefore works identically on Geant4, GENIE, and Achilles output — including the
+animated Blender export.
 
 ## Output
 
@@ -219,14 +240,15 @@ GDMLTargetPractice/
 ├── g4sim/                   # Geant4 engine (C++): GDML loader, particle gun, ROOT output
 ├── gdmltp/                  # Python package: config frontend, backends, analysis, display
 │   ├── config.py            # common RunConfig (YAML + flags, validated)
-│   ├── backends/            # geant4 / genie behind one Backend interface
-│   │   ├── base.py, geant4.py, genie.py, genie_convert.py
+│   ├── backends/            # geant4 / genie / achilles behind one Backend interface
+│   │   ├── base.py, geant4.py, genie.py, genie_convert.py, achilles.py, achilles_convert.py
 │   ├── run.py               # backend-agnostic orchestrator (docker/local)
 │   ├── cli.py, io.py, analyze.py, compare.py, geometry.py, scene.py, render_*.py
 │   └── masses.py, particles.py
 ├── g4tp/                    # deprecated import shim -> gdmltp
 ├── genie/                   # in-container GENIE driver (run_genie.py)
-├── docker/                  # checked-in Dockerfiles: geant4, geant4-celeritas, genie
+├── achilles/                # in-container Achilles driver (run_achilles.py)
+├── docker/                  # checked-in Dockerfiles: geant4, geant4-celeritas, genie, achilles
 ├── examples/                # example YAML run configs
 ├── gdml/                    # example GDML geometries
 ├── macros/                  # example Geant4 macros + README (branch reference)

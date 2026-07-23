@@ -15,7 +15,15 @@ case "$1" in
     exec /app/build/g4sim "$@"
     ;;
   *.json)
-    exec python3 /app/genie/run_genie.py "$@"
+    # a job spec runs whichever generator driver this image ships
+    if [ -f /app/genie/run_genie.py ]; then
+      exec python3 /app/genie/run_genie.py "$@"
+    elif [ -f /app/achilles/run_achilles.py ]; then
+      exec python3 /app/achilles/run_achilles.py "$@"
+    else
+      echo "This image ships no generator driver for $1" >&2
+      exit 64
+    fi
     ;;
   *)
     exec python3 -m gdmltp "$@"

@@ -72,7 +72,8 @@ def _build_parser():
     r = _sub("run", "run a simulation (Docker or local g4sim)")
     r.add_argument("--config", help="YAML run config (common frontend for any backend); "
                                      "flags below override individual fields")
-    r.add_argument("--generator", default="geant4", choices=["geant4", "genie"],
+    r.add_argument("--generator", default="geant4",
+                   choices=["geant4", "genie", "achilles"],
                    help="physics backend (default: geant4)")
     r.add_argument("--mac", help="existing macro; if omitted, one is generated from the flags below")
     r.add_argument("--gdml", help="geometry file (required if no --mac references one)")

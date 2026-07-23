@@ -84,51 +84,94 @@ def _out_lepton_pdg(t, keys, neu, cc):
     return np.where(cc.astype(bool), charged, neu).astype(np.int64)
 
 
-def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", beam=None):
-    """Read GENIE `gst` at `gst_path`, write schema `output.root` at `out_path`.
+_SCALAR_SPECS = [
+    ("neu", np.int64), ("cc", float), ("nc", float),
+    ("Ev", float), ("pxv", float), ("pyv", float), ("pzv", float),
+    ("El", float), ("pxl", float), ("pyl", float), ("pzl", float),
+    ("Q2", float), ("W", float), ("x", float), ("y", float),
+    ("vtxx", float), ("vtxy", float), ("vtxz", float), ("vtxt", float),
+    ("Z", np.int64), ("A", np.int64),
+]
 
-    `beam` (a beam-file path or a list of (name, pos_mm, mom_mev) entries) replays
-    a host-sampled beam: it overrides each event's vertex and orients the event
-    along the sampled ray (see the per-event beam-replay block below).
-    """
-    with uproot.open(gst_path) as f:
+
+def _flat_fs(t, keys, name, size):
+    if name in keys and size:
+        return np.asarray(ak.flatten(t[name].array()), dtype=float)
+    return np.zeros(size)
+
+
+def _read_gst(path, gst_tree=None):
+    """Read one gst file fully into numpy (per-event scalars + flattened
+    final-state lists + counts), so files can be concatenated and no lazy
+    uproot arrays survive the file handle."""
+    with uproot.open(path) as f:
         tname = gst_tree or ("gst" if any(k.split(";")[0] == "gst" for k in f.keys())
                              else _first_tree(f))
         t = f[tname]
         n = int(t.num_entries)
         keys = {k.split(";")[0] for k in t.keys()}
 
-        neu = _scalar(t, keys, "neu", n, dtype=np.int64)
-        cc = _scalar(t, keys, "cc", n, dtype=float)
-        nc = _scalar(t, keys, "nc", n, dtype=float)
-        Ev = _scalar(t, keys, "Ev", n)
-        pxv = _scalar(t, keys, "pxv", n); pyv = _scalar(t, keys, "pyv", n); pzv = _scalar(t, keys, "pzv", n)
-        El = _scalar(t, keys, "El", n)
-        pxl = _scalar(t, keys, "pxl", n); pyl = _scalar(t, keys, "pyl", n); pzl = _scalar(t, keys, "pzl", n)
-        Q2 = _scalar(t, keys, "Q2", n); W = _scalar(t, keys, "W", n)
-        xbj = _scalar(t, keys, "x", n); ybj = _scalar(t, keys, "y", n)
-        vtxx = _scalar(t, keys, "vtxx", n); vtxy = _scalar(t, keys, "vtxy", n)
-        vtxz = _scalar(t, keys, "vtxz", n); vtxt = _scalar(t, keys, "vtxt", n)
-        Z = _scalar(t, keys, "Z", n, dtype=np.int64)
-        A = _scalar(t, keys, "A", n, dtype=np.int64)
-        eid = _scalar(t, keys, "iev", n, dtype=np.int64) if "iev" in keys \
+        d = {name: _scalar(t, keys, name, n, dtype=dt) for name, dt in _SCALAR_SPECS}
+        d["n"] = n
+        d["eid"] = _scalar(t, keys, "iev", n, dtype=np.int64) if "iev" in keys \
             else np.arange(n, dtype=np.int64)
-        lep_pdg = _out_lepton_pdg(t, keys, neu, cc)
-        procs = _process_names(t, keys, n)
+        d["lep_pdg"] = _out_lepton_pdg(t, keys, d["neu"], d["cc"])
+        d["procs"] = list(_process_names(t, keys, n))
 
-        # Final-state particle list, flattened to numpy in memory before the
-        # file closes (uproot arrays must not be touched after the `with` exits).
         if "pdgf" in keys:
             pdgf = t["pdgf"].array()
-            counts = np.asarray(ak.num(pdgf, axis=1)).astype(np.int64)
-            flat_pdg = np.asarray(ak.flatten(pdgf)).astype(np.int64)
+            d["counts"] = np.asarray(ak.num(pdgf, axis=1)).astype(np.int64)
+            d["flat_pdg"] = np.asarray(ak.flatten(pdgf)).astype(np.int64)
         else:
-            counts = np.zeros(n, np.int64)
-            flat_pdg = np.array([], np.int64)
-        if "Ef" in keys and flat_pdg.size:
-            flat_Ef_mev = np.asarray(ak.flatten(t["Ef"].array()), dtype=float) * GEV_TO_MEV
-        else:
-            flat_Ef_mev = np.zeros(flat_pdg.size)
+            d["counts"] = np.zeros(n, np.int64)
+            d["flat_pdg"] = np.array([], np.int64)
+        size = d["flat_pdg"].size
+        d["flat_Ef_mev"] = _flat_fs(t, keys, "Ef", size) * GEV_TO_MEV
+        d["flat_pxf"] = _flat_fs(t, keys, "pxf", size) * GEV_TO_MEV
+        d["flat_pyf"] = _flat_fs(t, keys, "pyf", size) * GEV_TO_MEV
+        d["flat_pzf"] = _flat_fs(t, keys, "pzf", size) * GEV_TO_MEV
+    return d
+
+
+def _concat_gst(dicts):
+    """Concatenate per-file gst dicts; event ids are renumbered sequentially
+    (per-event replay produces many one-event files, each with iev=0)."""
+    if len(dicts) == 1:
+        return dicts[0]
+    out = {}
+    for name, _dt in _SCALAR_SPECS:
+        out[name] = np.concatenate([d[name] for d in dicts])
+    for name in ("counts", "flat_pdg", "flat_Ef_mev", "flat_pxf", "flat_pyf", "flat_pzf",
+                 "lep_pdg"):
+        out[name] = np.concatenate([d[name] for d in dicts])
+    out["procs"] = [p for d in dicts for p in d["procs"]]
+    out["n"] = int(sum(d["n"] for d in dicts))
+    out["eid"] = np.arange(out["n"], dtype=np.int64)
+    return out
+
+
+def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", beam=None):
+    """Read GENIE `gst` (one path or a list of paths, concatenated in order) and
+    write schema `output.root` at `out_path`.
+
+    `beam` (a beam-file path or a list of (name, pos_mm, mom_mev) entries) replays
+    a host-sampled beam: it overrides each event's vertex and orients the event
+    along the sampled ray (see the per-event beam-replay block below).
+    """
+    paths = [gst_path] if isinstance(gst_path, (str, bytes)) or hasattr(gst_path, "__fspath__") \
+        else list(gst_path)
+    g = _concat_gst([_read_gst(p, gst_tree) for p in paths])
+    n = g["n"]
+    neu = g["neu"]; cc = g["cc"]; nc = g["nc"]
+    Ev = g["Ev"]; pxv = g["pxv"]; pyv = g["pyv"]; pzv = g["pzv"]
+    El = g["El"]; pxl = g["pxl"]; pyl = g["pyl"]; pzl = g["pzl"]
+    Q2 = g["Q2"]; W = g["W"]; xbj = g["x"]; ybj = g["y"]
+    vtxx = g["vtxx"]; vtxy = g["vtxy"]; vtxz = g["vtxz"]; vtxt = g["vtxt"]
+    Z = g["Z"]; A = g["A"]; eid = g["eid"]
+    lep_pdg = g["lep_pdg"]; procs = ak.Array(g["procs"])
+    counts = g["counts"]; flat_pdg = g["flat_pdg"]; flat_Ef_mev = g["flat_Ef_mev"]
+    flat_pf = np.column_stack([g["flat_pxf"], g["flat_pyf"], g["flat_pzf"]]) \
+        if flat_pdg.size else np.empty((0, 3))
 
     len_scale = LEN_TO_MM.get(vtx_units, LEN_TO_MM["cm"])
     vx = vtxx * len_scale; vy = vtxy * len_scale; vz = vtxz * len_scale
@@ -150,6 +193,10 @@ def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", 
         primaryE = np.linalg.norm(bmom, axis=1)
         lep_local = np.column_stack([pxl, pyl, pzl]) * GEV_TO_MEV
         outlep_p = beammod.rotate_uz_rows(lep_local, bmom)
+        # rotate every final-state particle of event i onto ray i
+        if flat_pf.size:
+            axes = np.repeat(bmom, counts, axis=0)
+            flat_pf = beammod.rotate_uz_rows(flat_pf, axes)
         q0 = primaryE - El * GEV_TO_MEV
     else:
         primary_p = np.column_stack([pxv, pyv, pzv]) * GEV_TO_MEV
@@ -196,6 +243,11 @@ def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", 
         "trk_endE": zeros_j,
         "trk_edep": zeros_j, "trk_length": zeros_j,
         "trk_creatorProcess": creator,
+        # optional momentum-at-production (MeV/c): lets displays draw momentum
+        # rays for untransported tracks (see io.TRK_OPTIONAL_BRANCHES)
+        "trk_px": ak.unflatten(flat_pf[:, 0] if flat_pf.size else np.array([]), counts),
+        "trk_py": ak.unflatten(flat_pf[:, 1] if flat_pf.size else np.array([]), counts),
+        "trk_pz": ak.unflatten(flat_pf[:, 2] if flat_pf.size else np.array([]), counts),
         # --- per-step (empty: GENIE does not transport) ---
         "step_trackID": _empty_jagged(n, np.int32),
         "step_pdg": _empty_jagged(n, np.int32),

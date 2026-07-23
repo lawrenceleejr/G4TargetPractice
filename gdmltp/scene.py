@@ -3,6 +3,8 @@
 Feeds all emitters (web/png/blender). Emitters never touch uproot or GDML.
 """
 from dataclasses import dataclass, field
+import math
+
 import numpy as np
 
 from . import particles
@@ -41,7 +43,16 @@ class Scene:
     meta: dict = field(default_factory=dict)
 
 
-def _track_polyline(ev, i, step_index):
+def _track_momentum(ev, i):
+    """Per-track momentum (MeV/c) from the optional trk_px/py/pz branches, or
+    None when absent (g4sim does not write them)."""
+    px = ev.trk.get("trk_px")
+    if px is None:
+        return None
+    return np.array([ev.trk["trk_px"][i], ev.trk["trk_py"][i], ev.trk["trk_pz"][i]], float)
+
+
+def _track_polyline(ev, i, step_index, stub_mm=0.0):
     tid = int(ev.trk["trk_id"][i])
     start = np.array([ev.trk["trk_startX"][i], ev.trk["trk_startY"][i], ev.trk["trk_startZ"][i]])
     end = np.array([ev.trk["trk_endX"][i], ev.trk["trk_endY"][i], ev.trk["trk_endZ"][i]])
@@ -58,6 +69,17 @@ def _track_polyline(ev, i, step_index):
     else:
         pts = np.empty((0, 3))
         tms = np.empty((0,))
+
+    # Vertex-only generators (GENIE/Achilles) record no transport: no steps and
+    # end == start, which would draw an invisible zero-length line. When the
+    # optional momentum branches are present, draw a momentum-direction ray
+    # instead -- display-only; the ntuple keeps the honest degenerate endpoints.
+    if len(pts) == 0 and stub_mm > 0 and np.allclose(start, end):
+        p = _track_momentum(ev, i)
+        pmag = float(np.linalg.norm(p)) if p is not None else 0.0
+        if pmag > 0:
+            end = start + (p / pmag) * stub_mm
+
     poly = np.vstack([start[None, :], pts, end[None, :]])
     t0 = tms[0] if len(tms) else 0.0
     t1 = tms[-1] if len(tms) else 0.0
@@ -103,6 +125,26 @@ def _select_track_rows(ev, n, max_tracks):
     return np.concatenate([prim, sec[:budget]]).tolist()
 
 
+def _stub_scale(primitives, ev, include_world):
+    """Base length (mm) for momentum rays of untransported tracks, plus the
+    event's max |p| for proportional scaling. Zero when the event has steps
+    (transported -- no stubs needed) or no momentum branches are present."""
+    if len(ev.step.get("step_trackID", [])) or ev.trk.get("trk_px") is None:
+        return 0.0, 0.0
+    px = np.asarray(ev.trk.get("trk_px", []), float)
+    py = np.asarray(ev.trk.get("trk_py", []), float)
+    pz = np.asarray(ev.trk.get("trk_pz", []), float)
+    if not len(px):
+        return 0.0, 0.0
+    pmax = float(np.sqrt(px * px + py * py + pz * pz).max())
+    bb = bounding_box(primitives, include_world=include_world)
+    if bb is not None:
+        base = 0.15 * float(np.linalg.norm(bb[1] - bb[0]))
+    else:
+        base = 200.0                       # geometry-less display fallback [mm]
+    return max(base, 1.0), pmax
+
+
 def _vertex_kind(creator):
     c = (creator or "").lower()
     if c in ("primary", ""):
@@ -126,13 +168,22 @@ def build_scene(primitives, ev, max_tracks=2000, include_world=False, verbose=Fa
     # the number of tracks we actually draw, not the (possibly enormous) total.
     keep = _select_track_rows(ev, n, max_tracks)
     step_index = _build_step_index(ev)
+    stub_base, pmax = _stub_scale(primitives, ev, include_world)
     if verbose:
         print(f"[gdmltp]   capped to {len(keep)} track(s) (--max-tracks {max_tracks}); "
               f"indexed steps in {time.perf_counter() - t_start:.2f}s, building polylines...",
               flush=True)
     t_poly = time.perf_counter()
     for i in keep:
-        poly, times = _track_polyline(ev, i, step_index)
+        stub = 0.0
+        if stub_base > 0:
+            p = _track_momentum(ev, i)
+            pmag = float(np.linalg.norm(p)) if p is not None else 0.0
+            if pmag > 0:
+                # momentum-proportional ray length (sqrt softens the range),
+                # floored so soft tracks stay visible
+                stub = stub_base * max(0.25, math.sqrt(pmag / pmax)) if pmax > 0 else stub_base
+        poly, times = _track_polyline(ev, i, step_index, stub_mm=stub)
         if poly.shape[0] < 2:
             continue
         pdg = int(ev.trk["trk_pdg"][i])

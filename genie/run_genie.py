@@ -96,9 +96,8 @@ def _run_beam(job, workdir):
                        cwd=workdir, check=True)
         gst_files.append(str(gst))
 
-    merged = str(workdir / "genie_events.gst.root")
-    subprocess.run(["hadd", "-f", merged] + gst_files, cwd=workdir, check=True)
-    genie_convert.convert(merged, str(workdir / out),
+    # The converter concatenates the per-ray gst files itself (no hadd needed).
+    genie_convert.convert(gst_files, str(workdir / out),
                           vtx_units=job.get("length_units", "cm"),
                           beam=str(workdir / job["beam_file"]))
     print(f"[run_genie] done -> {workdir / out}", flush=True)

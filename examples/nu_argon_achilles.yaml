@@ -1,0 +1,26 @@
+# Achilles backend: a 2 GeV muon-neutrino beam on liquid argon.
+#   gdmltp run --config examples/nu_argon_achilles.yaml   (requires the achilles image)
+#
+# Achilles is a theory-driven lepton-nucleus generator (also does e-/e+ beams,
+# e.g. particle: e-). The target nucleus is inferred from the GDML material
+# (here Ar-40 -> "40Ar"); override with achilles.nucleus.
+generator: achilles
+
+geometry:
+  gdml: gdml/liquid_argon_1m3.gdml
+
+beam:
+  particle: nu_mu
+  energy: { mode: mono, value: "2.0 GeV" }
+  position: "0 0 -50 cm"
+  direction: "0 0 1"
+
+run:
+  events: 1000
+  seed: 12345
+
+achilles:
+  cascade: true              # run the intranuclear cascade
+  # nuclear_model: QESpectral
+  # processes: [[13], [14]]  # final-state leptons (default: CC + NC)
+  # run_card: my_card.yml    # verbatim Achilles run card (escape hatch)

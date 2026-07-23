@@ -192,6 +192,50 @@ def synth_gst(tmp_path_factory):
     return write_synthetic_gst(p, seed=7)
 
 
+def write_synthetic_nuhepmc(path, n_events=6, seed=0, gz=False):
+    """A synthetic NuHepMC (HepMC3 ASCIIv3) file faithful to what the Achilles
+    converter reads: E/U/V/P lines, GEV+MM units, NuHepMC statuses (4 = beam,
+    11 = target, 1 = final state). Alternates CC (mu- out) and NC (nu_mu out)
+    nu_mu events on Ar-40, beam along +z, vertex on the V line."""
+    rng = np.random.default_rng(seed)
+    lines = ["HepMC::Version 3.02.05", "HepMC::Asciiv3-START_EVENT_LISTING"]
+    for i in range(n_events):
+        enu = 2.0 + 0.25 * i                              # GeV
+        cc = (i % 2 == 0)
+        vx, vy, vz = rng.normal(0, 50, 3)                 # mm
+        lines.append(f"E {i} 1 5")
+        lines.append("U GEV MM")
+        lines.append(f"V -1 0 [1,2] @ {vx:.3f} {vy:.3f} {vz:.3f} 0")
+        # beam nu_mu (status 4), target Ar-40 (status 11)
+        lines.append(f"P 1 0 14 0 0 {enu:.6f} {enu:.6f} 0 4")
+        lines.append("P 2 0 1000180400 0 0 0 37.2247 37.2247 11")
+        # outgoing lepton
+        el = 0.6 * enu
+        plz = 0.55 * enu; plx = 0.1 * enu
+        lep = 13 if cc else 14
+        m_l = 0.105658 if cc else 0.0
+        lines.append(f"P 3 -1 {lep} {plx:.6f} 0 {plz:.6f} {el:.6f} {m_l:.6f} 1")
+        # hadronic side: a proton and a pi+
+        lines.append(f"P 4 -1 2212 {-plx:.6f} 0 {0.3*enu:.6f} {0.3*enu+0.938:.6f} 0.938272 1")
+        lines.append(f"P 5 -1 211 0 0.05 {0.1*enu:.6f} {0.1*enu+0.14:.6f} 0.139570 1")
+    lines.append("HepMC::Asciiv3-END_EVENT_LISTING")
+    text = "\n".join(lines) + "\n"
+    if gz:
+        import gzip
+        with gzip.open(path, "wt") as f:
+            f.write(text)
+    else:
+        with open(path, "w") as f:
+            f.write(text)
+    return str(path)
+
+
+@pytest.fixture(scope="session")
+def synth_nuhepmc(tmp_path_factory):
+    p = tmp_path_factory.mktemp("nuhepmc") / "events.hepmc"
+    return write_synthetic_nuhepmc(p, seed=11)
+
+
 @pytest.fixture(scope="session")
 def synth_root(tmp_path_factory):
     """Standard synthetic run: 50 GeV e-, -z beam from z=650 cm, 2% leakage."""

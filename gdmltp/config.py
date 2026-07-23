@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 
-GENERATORS = ("geant4", "genie")
+GENERATORS = ("geant4", "genie", "achilles")
 ENERGY_MODES = ("mono", "gauss", "exp", "arb")
 
 
@@ -148,6 +148,7 @@ class RunConfig:
     run: RunSettings = field(default_factory=RunSettings)
     geant4: dict = field(default_factory=dict)  # field, neutrino_mode, celeritas, physics_list
     genie: dict = field(default_factory=dict)   # tune, cross_sections, target, ...
+    achilles: dict = field(default_factory=dict)  # nuclear_model, cascade, processes, run_card, ...
 
     def validate(self):
         if self.generator not in GENERATORS:
@@ -204,7 +205,8 @@ class RunConfig:
 # --------------------------------------------------------------------------- #
 # YAML front-end
 # --------------------------------------------------------------------------- #
-_TOP_KEYS = {"generator", "geometry", "beam", "projectile", "run", "geant4", "genie", "mac"}
+_TOP_KEYS = {"generator", "geometry", "beam", "projectile", "run",
+             "geant4", "genie", "achilles", "mac"}
 
 
 def _energy_from(raw) -> Energy:
@@ -383,6 +385,7 @@ def from_dict(data: dict) -> RunConfig:
         run=_run_from(data.get("run") or {}),
         geant4=dict(data.get("geant4") or {}),
         genie=dict(data.get("genie") or {}),
+        achilles=dict(data.get("achilles") or {}),
     )
     # YAML 1.1 parses `on`/`off` as booleans, so `neutrino_mode: off` arrives as
     # Python False; map it back to the auto/on/off vocabulary g4sim expects.
