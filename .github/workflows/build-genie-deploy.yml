@@ -14,8 +14,13 @@ on:
         default: "docker.io/hepstore/genie:master"
 
 env:
-  # Default GENIE base; override via workflow_dispatch input.
-  GENIE_BASE: ${{ github.event.inputs.genie_base || 'docker.io/hepstore/genie:master' }}
+  # Base-image resolution: workflow_dispatch input > repo variable > placeholder.
+  # The placeholder is NOT pullable -- this workflow stays honestly red until a
+  # real GENIE base is pinned. Set the repository variable GENIE_BASE_IMAGE
+  # (Settings > Secrets and variables > Actions > Variables) to a pullable
+  # image providing gevgen/gntpc + ROOT, e.g. one built from GENIE's official
+  # Dockerfile and pushed to this org's GHCR.
+  GENIE_BASE: ${{ github.event.inputs.genie_base || vars.GENIE_BASE_IMAGE || 'docker.io/hepstore/genie:master' }}
 
 jobs:
   docker-genie:
