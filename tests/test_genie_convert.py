@@ -145,3 +145,24 @@ def test_genie_prepare_writes_job(repo_root, tmp_path):
 def test_genie_backend_registered():
     from g4tp import backends
     assert backends.get("genie").name == "genie"
+
+
+# --- flux mapping (driver logic, pure python) ------------------------------ #
+def test_parse_energy_gev():
+    assert genie.parse_energy_gev("2.0 GeV") == pytest.approx(2.0)
+    assert genie.parse_energy_gev("500 MeV") == pytest.approx(0.5)
+    assert genie.parse_energy_gev("3") == pytest.approx(3.0)   # bare -> GeV
+
+
+def test_flux_mono_and_exp_exact():
+    a, approx = genie.flux_gevgen_args({"mode": "mono", "value": "2 GeV"})
+    assert a == ["-e", "2"] and approx is False
+    a, approx = genie.flux_gevgen_args(
+        {"mode": "exp", "value": "2 GeV", "min": "200 MeV", "max": "20 GeV"})
+    assert a == ["-e", "0.2,20", "-f", "exp(-x/2)"] and approx is False
+
+
+def test_flux_gauss_is_approximate():
+    a, approx = genie.flux_gevgen_args({"mode": "gauss", "value": "3 GeV", "sigma": "500 MeV"})
+    assert approx is True
+    assert a == ["-e", "3"]

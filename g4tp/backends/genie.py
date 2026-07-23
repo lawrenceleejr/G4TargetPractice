@@ -34,6 +34,36 @@ _MATERIAL_NUCLEUS = [
 ]
 
 
+_UNIT_TO_GEV = {"ev": 1e-9, "kev": 1e-6, "mev": 1e-3, "gev": 1.0, "tev": 1e3}
+
+
+def parse_energy_gev(s) -> float:
+    """'2.0 GeV' -> 2.0 (GeV). A bare number is assumed to be GeV."""
+    parts = str(s).split()
+    val = float(parts[0])
+    if len(parts) > 1:
+        val *= _UNIT_TO_GEV.get(parts[1].lower(), 1.0)
+    return val
+
+
+def flux_gevgen_args(flux: dict):
+    """Map the common energy spec to gevgen -e/-f arguments.
+
+    v1 maps `mono` (single energy) and `exp` (functional spectrum over a range).
+    `gauss`/`arb` are approximated by their nominal energy (a faithful histogram
+    flux driver is a documented follow-up); the second return value flags whether
+    the mapping is approximate so the caller can warn.
+    """
+    mode = flux.get("mode", "mono")
+    if mode == "mono":
+        return ["-e", f"{parse_energy_gev(flux['value']):g}"], False
+    if mode == "exp":
+        e0 = parse_energy_gev(flux["value"])
+        emin = parse_energy_gev(flux["min"]); emax = parse_energy_gev(flux["max"])
+        return ["-e", f"{emin:g},{emax:g}", "-f", f"exp(-x/{e0:g})"], False
+    return ["-e", f"{parse_energy_gev(flux['value']):g}"], True
+
+
 def probe_pdg(particle: str) -> int:
     try:
         return _PROBE_PDG[particle]
