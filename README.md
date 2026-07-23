@@ -175,13 +175,16 @@ gdmltp run --generator genie --gdml liquid_argon_1m3.gdml --particle nu_mu --ene
 `--image`. (Image repositories keep the `g4targetpractice` name until the GitHub
 repository itself is renamed.)
 
-> **Pinning the generator bases:** the GENIE/Achilles image builds start `FROM`
-> a base that must provide the generator itself (gevgen/gntpc, or the `achilles`
-> binary). No official public image is pinned yet, so those two workflows fail
-> (loudly, by design) until you set the repository variables `GENIE_BASE_IMAGE`
-> / `ACHILLES_BASE_IMAGE` — e.g. images built from the generators' own
-> Dockerfiles and pushed to your GHCR — or pass the base via each workflow's
-> manual-dispatch input.
+> **Nobody compiles generators.** GENIE and Achilles are built **from source in
+> CI** into dedicated base images (`docker/genie-base.Dockerfile`: Pythia6 →
+> ROOT-with-Pythia6 → LHAPDF → GENIE; `docker/achilles-base.Dockerfile`),
+> published by the `Build Generator Base Images` workflow as
+> `…-genie-base` / `…-achilles-base`. The fast per-push app images just layer
+> `gdmltp` + the drivers on top. GENIE cross-section splines are generated **on
+> demand** on first use of a probe/target pair and cached in your mounted run
+> directory — so a fresh image runs with zero manual setup. Override the bases
+> with the repo variables `GENIE_BASE_IMAGE` / `ACHILLES_BASE_IMAGE` or each
+> workflow's dispatch inputs (GENIE tag, ROOT version, Achilles ref).
 
 ## The GENIE backend (neutrino generator)
 

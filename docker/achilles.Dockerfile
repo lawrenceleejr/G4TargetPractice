@@ -4,7 +4,7 @@
 # on PATH with its data files) plus its deps (HepMC3, fmt, yaml-cpp). The
 # Achilles repository ships a Dockerfile; build/pin a base from it (or point at
 # a published image) via:  docker build --build-arg ACHILLES_BASE=<image> ...
-ARG ACHILLES_BASE=ghcr.io/achillesgen/achilles:main
+ARG ACHILLES_BASE=ghcr.io/lawrenceleejr/g4targetpractice-achilles-base:latest
 FROM ${ACHILLES_BASE}
 
 WORKDIR /app

@@ -9,7 +9,7 @@
 # Override the base with:  docker build --build-arg GENIE_BASE=<image> ...
 # The exact tag is intentionally a build arg (the CI workflow sets it) so the
 # maintainer can point at the GENIE build/tune they trust.
-ARG GENIE_BASE=docker.io/hepstore/genie:master
+ARG GENIE_BASE=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:latest
 FROM ${GENIE_BASE}
 
 WORKDIR /app

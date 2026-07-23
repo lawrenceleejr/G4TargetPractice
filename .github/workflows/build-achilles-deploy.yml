@@ -10,16 +10,13 @@ on:
       achilles_base:
         description: "Achilles base image"
         required: false
-        default: "ghcr.io/achillesgen/achilles:main"
+        default: "ghcr.io/lawrenceleejr/g4targetpractice-achilles-base:latest"
 
 env:
-  # Base-image resolution: workflow_dispatch input > repo variable > placeholder.
-  # The placeholder is NOT pullable -- this workflow stays honestly red until a
-  # real Achilles base is pinned. Set the repository variable
-  # ACHILLES_BASE_IMAGE to a pullable image providing the `achilles` binary,
-  # e.g. one built from the Dockerfile in the AchillesGen/Achilles repo and
-  # pushed to this org's GHCR.
-  ACHILLES_BASE: ${{ github.event.inputs.achilles_base || vars.ACHILLES_BASE_IMAGE || 'ghcr.io/achillesgen/achilles:main' }}
+  # Base-image resolution: workflow_dispatch input > repo variable > our own
+  # from-source base (built by build-generator-bases.yml so nobody downstream
+  # compiles Achilles themselves). Red until that base workflow has published once.
+  ACHILLES_BASE: ${{ github.event.inputs.achilles_base || vars.ACHILLES_BASE_IMAGE || 'ghcr.io/lawrenceleejr/g4targetpractice-achilles-base:latest' }}
 
 jobs:
   docker-achilles:

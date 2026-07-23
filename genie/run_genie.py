@@ -24,13 +24,33 @@ from pathlib import Path
 from gdmltp.backends.genie import flux_gevgen_args
 
 
-def _xsec_args(job):
+def _xsec_args(job, workdir):
+    """Cross-section splines for gevgen, in priority order: an explicit path in
+    the job, the image's $GENIE_XSEC_FILE, else generate them ON DEMAND with
+    gmkspl into the run directory (cached there, so the mounted volume makes
+    reruns fast). The on-demand path is what lets a freshly built image run with
+    no manual setup at all -- the first run on a new probe/target just takes
+    longer while the splines compute."""
     xsec = job.get("cross_sections", "auto")
     if xsec and xsec != "auto":
         return ["--cross-sections", xsec]
     if os.environ.get("GENIE_XSEC_FILE"):
         return ["--cross-sections", os.environ["GENIE_XSEC_FILE"]]
-    return []
+
+    probe = int(job["probe"])
+    target = int(job["target"])
+    tune = job.get("tune", "G18_10a_00_000")
+    out = Path(workdir) / f"gxspl_{abs(probe)}_{target}_{tune}.xml"
+    if not out.exists():
+        print(f"[run_genie] no spline file found; generating with gmkspl for "
+              f"probe {probe} on {target} (tune {tune}). This is slow the "
+              f"first time; the result is cached in the run directory.",
+              flush=True)
+        cmd = ["gmkspl", "-p", f"{probe},{-probe}", "-t", str(target),
+               "-n", "100", "-e", "100", "--tune", tune, "-o", str(out)]
+        print("[run_genie]", " ".join(cmd), flush=True)
+        subprocess.run(cmd, cwd=workdir, check=True)
+    return ["--cross-sections", str(out)]
 
 
 def run(job_path):
@@ -55,7 +75,7 @@ def run(job_path):
     cmd += fargs
     if job.get("seed") is not None:
         cmd += ["--seed", str(int(job["seed"]))]
-    cmd += _xsec_args(job)
+    cmd += _xsec_args(job, workdir)
 
     print("[run_genie] generating:", " ".join(cmd), flush=True)
     subprocess.run(cmd, cwd=workdir, check=True)
@@ -88,7 +108,7 @@ def _run_beam(job, workdir):
         gst = workdir / f"_beam_{i}.gst.root"
         cmd = ["gevgen", "-n", "1", "-p", str(job["probe"]), "-t", str(job["target"]),
                "--tune", job["tune"], "--event-generator-list", job["event_generator_list"],
-               "-e", f"{e_gev:g}", "-o", str(ghep)] + _xsec_args(job)
+               "-e", f"{e_gev:g}", "-o", str(ghep)] + _xsec_args(job, workdir)
         if seed is not None:
             cmd += ["--seed", str(int(seed) + i)]
         subprocess.run(cmd, cwd=workdir, check=True)

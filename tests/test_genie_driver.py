@@ -32,6 +32,7 @@ def _write_job(tmp_path, **over):
 
 def test_driver_builds_gevgen_and_converts(repo_root, tmp_path, monkeypatch):
     mod = _load_driver(repo_root)
+    monkeypatch.setenv("GENIE_XSEC_FILE", "/opt/splines.xml")   # skip on-demand gmkspl
     calls = []
     monkeypatch.setattr(mod.subprocess, "run",
                         lambda cmd, **kw: calls.append(cmd) or type("R", (), {"returncode": 0})())
@@ -63,6 +64,7 @@ def test_driver_builds_gevgen_and_converts(repo_root, tmp_path, monkeypatch):
 
 def test_driver_exp_flux(repo_root, tmp_path, monkeypatch):
     mod = _load_driver(repo_root)
+    monkeypatch.setenv("GENIE_XSEC_FILE", "/opt/splines.xml")
     calls = []
     monkeypatch.setattr(mod.subprocess, "run",
                         lambda cmd, **kw: calls.append(cmd) or type("R", (), {"returncode": 0})())
@@ -75,3 +77,38 @@ def test_driver_exp_flux(repo_root, tmp_path, monkeypatch):
     gevgen = calls[0]
     assert gevgen[gevgen.index("-e") + 1] == "0.2,20"
     assert gevgen[gevgen.index("-f") + 1] == "exp(-x/2)"
+
+
+def test_driver_generates_splines_on_demand(repo_root, tmp_path, monkeypatch):
+    """With no explicit splines and no $GENIE_XSEC_FILE, the driver runs gmkspl
+    once (nu + antinu on the target), caches the XML in the run dir, and points
+    gevgen at it -- so a fresh image needs zero manual setup."""
+    mod = _load_driver(repo_root)
+    monkeypatch.delenv("GENIE_XSEC_FILE", raising=False)
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        if cmd[0] == "gmkspl":                       # gmkspl writes its output
+            (tmp_path / cmd[cmd.index("-o") + 1].split("/")[-1]).write_text("<xml/>")
+        return type("R", (), {"returncode": 0})()
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    import gdmltp.backends.genie_convert as gc
+    monkeypatch.setattr(gc, "convert", lambda *a, **k: None)
+
+    assert mod.run(str(_write_job(tmp_path))) == 0
+    gmkspl = calls[0]
+    assert gmkspl[0] == "gmkspl"
+    assert gmkspl[gmkspl.index("-p") + 1] == "14,-14"
+    assert gmkspl[gmkspl.index("-t") + 1] == "1000180400"
+    assert "--tune" in gmkspl
+    gevgen = calls[1]
+    assert gevgen[0] == "gevgen"
+    xsec = gevgen[gevgen.index("--cross-sections") + 1]
+    assert "gxspl_14_1000180400" in xsec
+
+    # second run: spline file exists -> no second gmkspl
+    calls.clear()
+    assert mod.run(str(_write_job(tmp_path))) == 0
+    assert calls[0][0] == "gevgen"
