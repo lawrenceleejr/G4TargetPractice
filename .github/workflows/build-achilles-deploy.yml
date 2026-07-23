@@ -1,14 +1,10 @@
 name: Build Achilles Image
-# Separate, NON-GATING workflow (mirrors the GENIE one): the Achilles base and
-# its run-card grammar are release-sensitive, so this builds independently and
-# never blocks merges (the Python + Geant4 jobs in build-test-deploy.yml do).
+# Separate workflow (mirrors the GENIE one): the Achilles base and its run-card
+# grammar are release-sensitive, so it builds independently and is not a
+# required merge check (the Python + Geant4 jobs in build-test-deploy.yml are).
+# Runs on every push; failures are REAL failures, shown red.
 on:
   push:
-    paths:
-      - "achilles/**"
-      - "gdmltp/**"
-      - "docker/achilles.Dockerfile"
-      - ".github/workflows/build-achilles-deploy.yml"
   workflow_dispatch:
     inputs:
       achilles_base:
@@ -52,8 +48,6 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build (and push on non-PR) the Achilles image
-        id: build
-        continue-on-error: true
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -66,19 +60,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Smoke test (best-effort)
-        if: steps.build.outcome == 'success'
-        continue-on-error: true
+      - name: Smoke test
         run: |
           set -x
           IMG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
           mkdir -p run && cp gdml/liquid_argon_1m3.gdml run/
-          docker run --rm -v "$PWD/run":/run -w /run "$IMG" \
-            python3 -c "from gdmltp.backends import achilles_convert; print('achilles image OK')"
-          echo "Full generation smoke test is enabled once the base image + run-card template are pinned."
-
-      - name: Note build status
-        if: steps.build.outcome != 'success'
-        run: |
-          echo "::warning::Achilles image build did not succeed. This job is non-gating."
-          echo "Set a valid Achilles base image (workflow_dispatch input achilles_base)."
+          # the image must expose gdmltp + the converter (a full generation
+          # smoke lands once the base image + run-card template are pinned)
+          docker run --rm -v "$PWD/run":/run -w /run --entrypoint python3 "$IMG" \
+            -c "from gdmltp.backends import achilles_convert; import gdmltp; print('achilles image OK', gdmltp.__version__)"

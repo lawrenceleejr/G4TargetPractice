@@ -87,13 +87,23 @@ int main(int argc, char** argv) {
 
     // UI / macro execution
     G4UImanager* uiManager = G4UImanager::GetUIpointer();
-    
+
+    G4int macroStatus = 0;
     if (argc == 2) {
-        uiManager->ApplyCommand("/control/execute " + std::string(argv[1]));
+        // Propagate macro failure to the exit code: a command error aborts the
+        // batch ("Batch is interrupted"), and silently returning 0 here made
+        // broken macros look like successful runs (in CI and for users).
+        // Commands deliberately guarded with /control/suppressAbortion still
+        // succeed; anything else that fails now fails loudly.
+        macroStatus = uiManager->ApplyCommand("/control/execute " + std::string(argv[1]));
+        if (macroStatus != 0) {
+            G4cerr << "g4sim: macro '" << argv[1] << "' failed (G4 command status "
+                   << macroStatus << ")" << G4endl;
+        }
     }
 
     // Cleanup
     delete runManager;
 
-    return 0;
+    return macroStatus == 0 ? 0 : 1;
 }

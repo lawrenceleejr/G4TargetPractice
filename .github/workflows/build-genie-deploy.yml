@@ -1,16 +1,11 @@
 name: Build GENIE Image
-# Separate, NON-GATING workflow: the GENIE image is heavy and its base/tunes/
-# splines are version-sensitive, so it is built on its own and does not gate
-# merges (the Python + Geant4 jobs in build-test-deploy.yml do). Runs on push
-# and on demand; the smoke test is best-effort and continue-on-error until the
-# base image + baked splines are pinned.
+# Separate workflow: the GENIE image is heavy and its base/tunes/splines are
+# version-sensitive, so it builds on its own and is not a required check for
+# merges (the Python + Geant4 jobs in build-test-deploy.yml are). It runs on
+# every push -- the image ships gdmltp, the driver, and the entrypoint, all of
+# which change often -- and failures are REAL failures, shown red.
 on:
   push:
-    paths:
-      - "genie/**"
-      - "g4tp/**"
-      - "docker/genie.Dockerfile"
-      - ".github/workflows/build-genie-deploy.yml"
   workflow_dispatch:
     inputs:
       genie_base:
@@ -55,8 +50,6 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build (and push on non-PR) the GENIE image
-        id: build
-        continue-on-error: true
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -69,21 +62,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Smoke test (best-effort)
-        if: steps.build.outcome == 'success'
-        continue-on-error: true
+      - name: Smoke test
         run: |
           set -x
           IMG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
           mkdir -p run && cp gdml/liquid_argon_1m3.gdml run/
-          cp examples/nu_argon.yaml run/ || true
-          # Generate the job spec on the host tool, then run the genie driver.
-          docker run --rm -v "$PWD/run":/run -w /run "$IMG" \
-            python3 -c "import json;print('genie image OK')"
-          echo "Full generation smoke test is enabled once splines are baked in."
-
-      - name: Note build status
-        if: steps.build.outcome != 'success'
-        run: |
-          echo "::warning::GENIE image build did not succeed. This job is non-gating."
-          echo "Set a valid GENIE base image (workflow_dispatch input genie_base) and bake splines."
+          # the image must expose gdmltp + the converter (a full generation
+          # smoke lands once the base image + baked splines are pinned)
+          docker run --rm -v "$PWD/run":/run -w /run --entrypoint python3 "$IMG" \
+            -c "from gdmltp.backends import genie_convert; import gdmltp; print('genie image OK', gdmltp.__version__)"
