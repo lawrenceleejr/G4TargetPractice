@@ -105,3 +105,41 @@ def test_unknown_command_exits_2():
     with pytest.raises(SystemExit) as exc:
         cli.main(["frobnicate"])
     assert exc.value.code == 2
+
+
+def test_run_config_yaml_dry_run(repo_root, tmp_path, capsys):
+    """The YAML frontend generates the same macro the flags would."""
+    cfg = tmp_path / "run.yaml"
+    cfg.write_text(
+        "generator: geant4\n"
+        f"geometry: {{gdml: {repo_root / 'gdml' / 'bpe_slab.gdml'}}}\n"
+        "beam:\n  particle: neutron\n"
+        "  energy: {mode: exp, value: '2 GeV', min: '200 MeV', max: '20 GeV'}\n"
+        "run: {events: 9, seed: 7}\n")
+    assert cli.main(["run", "--config", str(cfg), "-o", str(tmp_path), "--dry-run"]) == 0
+    mac = (tmp_path / "g4tp_run.mac").read_text()
+    assert "/gun/particle neutron" in mac
+    assert "/gun/energyMode exp" in mac
+    assert "/gun/energyMin 200 MeV" in mac
+    assert "/random/setSeeds 7 8" in mac
+    assert "/run/beamOn 9" in mac
+    assert "docker run" in capsys.readouterr().out
+
+
+def test_run_config_flag_override(repo_root, tmp_path):
+    cfg = tmp_path / "run.yaml"
+    cfg.write_text(
+        f"geometry: {{gdml: {repo_root / 'gdml' / 'bpe_slab.gdml'}}}\n"
+        "beam: {particle: proton, energy: '150 MeV'}\n")
+    assert cli.main(["run", "--config", str(cfg), "--energy", "200 MeV",
+                     "-o", str(tmp_path), "--dry-run"]) == 0
+    mac = (tmp_path / "g4tp_run.mac").read_text()
+    assert "/gun/particle proton" in mac        # kept from YAML
+    assert "/gun/energy 200 MeV" in mac         # overridden by flag
+
+
+def test_run_config_bad_generator_is_friendly(repo_root, tmp_path, capsys):
+    cfg = tmp_path / "run.yaml"
+    cfg.write_text(f"generator: fluka\ngeometry: {{gdml: {repo_root / 'gdml' / 'bpe_slab.gdml'}}}\n")
+    assert cli.main(["run", "--config", str(cfg), "-o", str(tmp_path), "--dry-run"]) == 1
+    assert "unknown generator" in capsys.readouterr().err

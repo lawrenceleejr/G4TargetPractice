@@ -10,7 +10,9 @@ _EXAMPLES = {
 examples:
   g4tp run --mac macros/protons_water_bragg.mac
   g4tp run --gdml water_phantom_30cm.gdml --particle proton --energy "150 MeV" -n 500
-  g4tp run --gdml my.gdml --field "0 0 5 tesla" --display""",
+  g4tp run --gdml my.gdml --field "0 0 5 tesla" --display
+  g4tp run --config run.yaml                            # YAML frontend (geant4 or genie)
+  g4tp run --config run.yaml --energy "200 MeV"         # flag overrides one YAML field""",
     "display": """\
 examples:
   g4tp display output.root --gdml my_detector.gdml     # WebGL html + PNG stills
@@ -68,6 +70,10 @@ def _build_parser():
 
     # run
     r = _sub("run", "run a simulation (Docker or local g4sim)")
+    r.add_argument("--config", help="YAML run config (common frontend for any backend); "
+                                     "flags below override individual fields")
+    r.add_argument("--generator", default="geant4", choices=["geant4", "genie"],
+                   help="physics backend (default: geant4)")
     r.add_argument("--mac", help="existing macro; if omitted, one is generated from the flags below")
     r.add_argument("--gdml", help="geometry file (required if no --mac references one)")
     r.add_argument("--particle", default="e-")
@@ -77,7 +83,7 @@ def _build_parser():
     r.add_argument("-n", "--n", type=int, default=100)
     r.add_argument("--neutrino-mode", default="auto", choices=["auto", "on", "off"])
     r.add_argument("--field", default=None, help='e.g. "0 0 5 tesla" (auto-sets CELER_DISABLE=1)')
-    r.add_argument("--image", default="ghcr.io/lawrenceleejr/g4targetpractice:main")
+    r.add_argument("--image", default=None, help="container image (default: backend's own)")
     r.add_argument("--local", action="store_true", help="use a g4sim on PATH instead of Docker")
     r.add_argument("-o", "--outdir", default=".")
     r.add_argument("--display", action="store_true", help="open an event display after the run")
@@ -163,7 +169,6 @@ def main(argv=None):
 
 def _dispatch(args):
     if args.cmd == "run":
-        _require_files(args.mac, args.gdml)
         return _run(args)
     if args.cmd == "display":
         if args.root and not Path(args.root).exists():
@@ -196,19 +201,28 @@ def _dispatch(args):
 
 
 def _run(args):
-    from . import run as runmod
-    runmod.run(mac=args.mac, gdml=args.gdml, particle=args.particle, energy=args.energy,
-               position=args.position, direction=args.direction, n=args.n,
-               nmode=args.neutrino_mode, field=args.field, image=args.image,
-               outdir=args.outdir, local=args.local, dry_run=args.dry_run)
+    from . import run as runmod, config
+
+    # Detect which flags were explicitly set (vs. their parser default) so that,
+    # with --config, only overridden flags are overlaid on the YAML.
+    _, parsers = _build_parser()
+    rp = parsers["run"]
+    defaults = {name: rp.get_default(name) for name in config._FLAG_FIELDS}
+    cfg = config.load(args, defaults=defaults)
+
+    # The geometry/macro come from flags or YAML; check the resolved paths exist.
+    _require_files(cfg.gdml, cfg.mac)
+
+    runmod.run_config(cfg, image=args.image, outdir=args.outdir,
+                      local=args.local, dry_run=args.dry_run)
+
     if args.display and not args.dry_run:
         # Real display-parser defaults (not a hand-copied Namespace), with the
         # display output next to the run output.
-        _, parsers = _build_parser()
-        dargv = [str(Path(args.outdir) / "output.root"),
+        dargv = [str(Path(args.outdir) / cfg.run.output),
                  "-o", str(Path(args.outdir) / "g4tp_display")]
-        if args.gdml:
-            dargv += ["--gdml", args.gdml]
+        if cfg.gdml:
+            dargv += ["--gdml", cfg.gdml]
         _display(parsers["display"].parse_args(dargv))
     return 0
 

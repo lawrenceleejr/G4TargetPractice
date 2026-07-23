@@ -1,0 +1,26 @@
+# GENIE backend: a 2 GeV muon-neutrino beam on a liquid-argon target.
+#   g4tp run --config examples/nu_argon.yaml     (requires the genie image)
+generator: genie
+
+geometry:
+  gdml: gdml/liquid_argon_1m3.gdml
+
+beam:
+  particle: nu_mu
+  energy:
+    mode: mono
+    value: "2.0 GeV"
+  position: "0 0 -50 cm"
+  direction: "0 0 1"
+
+run:
+  events: 1000
+  output: output.root
+  seed: 12345
+
+genie:
+  tune: G18_10a_00_000
+  cross_sections: auto        # auto = splines baked into the genie image
+  event_generator_list: Default
+  length_units: cm
+  target: 1000180400          # optional; else inferred from the GDML material

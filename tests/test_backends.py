@@ -1,0 +1,108 @@
+"""Backend registry + Geant4Backend macro rendering and run plan."""
+import pytest
+
+from g4tp import config, backends
+from g4tp.backends import geant4
+
+
+def _cfg(**geant4_block):
+    return config.RunConfig(gdml="gdml/water_phantom_30cm.gdml", geant4=geant4_block)
+
+
+# --- registry -------------------------------------------------------------- #
+def test_registry_returns_geant4():
+    b = backends.get("geant4")
+    assert b.name == "geant4"
+
+
+def test_registry_unknown_raises():
+    with pytest.raises(ValueError, match="unknown generator"):
+        backends.get("fluka")
+
+
+def test_default_image_and_celeritas_variant():
+    b = backends.get("geant4")
+    assert b.image_for(_cfg()) == geant4.DEFAULT_IMAGE
+    assert b.image_for(_cfg(celeritas=True)).endswith("-celeritas")
+
+
+# --- macro rendering ------------------------------------------------------- #
+def test_macro_mono_basics():
+    mac = geant4.build_macro(config.RunConfig(
+        gdml="water.gdml",
+        beam=config.Beam(particle="proton",
+                         energy=config.Energy(mode="mono", value="150 MeV")),
+        run=config.RunSettings(events=500, seed=42)))
+    assert "/detector/readGDML water.gdml" in mac
+    assert "/gun/energyMode mono" in mac
+    assert "/gun/energy 150 MeV" in mac
+    assert "/random/setSeeds 42 43" in mac
+    assert "/run/beamOn 500" in mac
+
+
+def test_macro_gauss_emits_sigma():
+    mac = geant4.build_macro(config.RunConfig(
+        gdml="g.gdml",
+        beam=config.Beam(energy=config.Energy(mode="gauss", value="3 GeV", sigma="500 MeV"))))
+    assert "/gun/energyMode gauss" in mac
+    assert "/gun/gaussSigma 500 MeV" in mac
+
+
+def test_macro_exp_emits_range():
+    mac = geant4.build_macro(config.RunConfig(
+        gdml="g.gdml",
+        beam=config.Beam(energy=config.Energy(mode="exp", value="2 GeV",
+                                              min="200 MeV", max="20 GeV"))))
+    assert "/gun/energyMin 200 MeV" in mac
+    assert "/gun/energyMax 20 GeV" in mac
+
+
+def test_macro_arb_emits_bins():
+    mac = geant4.build_macro(config.RunConfig(
+        gdml="g.gdml",
+        beam=config.Beam(energy=config.Energy(mode="arb", bins=[
+            {"value": "500 MeV", "weight": 2.0}, {"value": "1 GeV", "weight": 1.0}]))))
+    assert "/gun/clearEnergyBins" in mac
+    assert "/gun/addEnergyBin 500 MeV 2.0" in mac
+    assert "/gun/addEnergyBin 1 GeV 1.0" in mac
+    assert "/gun/energy " not in mac          # arb does not set a single energy
+
+
+def test_macro_field_and_angle_sigma():
+    mac = geant4.build_macro(config.RunConfig(
+        gdml="g.gdml",
+        beam=config.Beam(angle_sigma="10 deg"),
+        geant4={"field": "0 0 5 tesla"}))
+    assert "/detector/setGlobalField 0 0 5 tesla" in mac
+    assert "/gun/angleSigma 10 deg" in mac
+    # field set after initialize, before the gun block
+    assert mac.index("/run/initialize") < mac.index("setGlobalField") < mac.index("/gun/particle")
+
+
+# --- prepare (run plan) ---------------------------------------------------- #
+def test_prepare_generates_macro(tmp_path):
+    b = backends.get("geant4")
+    prep = b.prepare(_cfg(), tmp_path)
+    assert prep.argv == [geant4.GENERATED_MACRO]
+    assert (tmp_path / geant4.GENERATED_MACRO).exists()
+    assert prep.env == {}                       # no field -> no CELER_DISABLE
+    assert prep.image == geant4.DEFAULT_IMAGE
+
+
+def test_prepare_field_sets_celer_disable(tmp_path):
+    b = backends.get("geant4")
+    prep = b.prepare(_cfg(field="0 0 5 tesla"), tmp_path)
+    assert prep.env.get("CELER_DISABLE") == "1"
+
+
+def test_prepare_verbatim_mac_is_copied(tmp_path):
+    src = tmp_path / "src"
+    src.mkdir()
+    mac = src / "my.mac"
+    mac.write_text("/run/beamOn 1\n")
+    out = tmp_path / "out"
+    out.mkdir()
+    cfg = config.RunConfig(gdml=None, mac=str(mac))
+    prep = backends.get("geant4").prepare(cfg, out)
+    assert prep.argv == ["my.mac"]
+    assert (out / "my.mac").exists()
