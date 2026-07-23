@@ -186,8 +186,52 @@ final-state particle. Because GENIE does not transport particles, `step_*` and
 `gevgen → gntpc -f gst → genie2root`.
 
 Roadmap: geometry-aware vertex sampling in the full GDML volume, and a
-**GENIE → Geant4 hand-off** that transports the final-state particles so a single
-`output.root` carries both the interaction record and the deposited energy.
+single-pass flux driver for large per-event beam replays.
+
+## Generator → Geant4 transport hand-off
+
+GENIE and Achilles model the **interaction** — the nuclear initial state, the
+hard process, and the intranuclear cascade (what the struck hadrons do inside
+the nucleus) — but stop at the nuclear surface: nothing is transported through
+the detector. Geant4's own neutrino interaction code is, by contrast, physically
+thin (it needs ~10¹² bias factors to interact at all). The right division of
+labor is both: **the generator makes the vertex, Geant4 transports it**.
+
+Set `transport: true` in the backend block:
+
+```yaml
+generator: genie          # or achilles
+geometry: { gdml: gdml/liquid_argon_1m3.gdml }
+beam: { particle: nu_mu, energy: {mode: mono, value: "2 GeV"} }
+run: { events: 1000, seed: 1 }
+genie: { tune: G18_10a_00_000, transport: true }
+```
+
+`gdmltp run` then executes two stages: (1) the generator image produces the
+vertex-level events; (2) the host writes each event's final-state particles to a
+hand-off file, the Geant4 image replays them with `/gun/eventFile` (one
+multi-particle vertex per event, full transport through the GDML detector), and
+the generator's `nu_*` interaction record + neutrino primary are grafted onto
+the transported file. The final `output.root` carries **both** the
+generator-quality interaction physics and the Geant4 `step_*`/`totalEdep`
+transport record — analyze/display/Blender all just work.
+
+## Biasing knobs
+
+- **geant4**: `geant4.neutrino_bias` — Geant4's built-in neutrino cross sections
+  are so small that unbiased runs record nothing; when the primary is a neutrino
+  the generated macro auto-enables the stock `/physics_lists/em/Nu*` biasing
+  (factor 5×10¹², as in the shipped macros). Tune with
+  `{factor, cc_bias, nc_bias, nucleus_bias, detector_name}` or disable with
+  `neutrino_bias: off`. (Guarded with `/control/suppressAbortion` so Geant4
+  builds lacking these commands warn instead of aborting.) Prefer the `genie`
+  or `achilles` backends for real neutrino physics — event generators produce an
+  interaction in every event by construction, so they need no cross-section bias.
+- **genie**: `genie.event_generator_list` restricts the interaction channels
+  (e.g. `CC`, `CCQE`); `genie.tune` selects the model set.
+- **achilles**: `achilles.processes` selects the final-state lepton channels
+  (default: CC + NC); hard cuts and model options pass through
+  `achilles.options`.
 
 ## The Achilles backend (lepton-nucleus generator)
 

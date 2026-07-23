@@ -56,6 +56,13 @@ public:
     /// gun/energy/position/direction sampling above.
     void LoadBeamFile(const G4String& path);
 
+    /// Load a generator hand-off event file: one interaction per event, all of
+    /// its final-state particles fired from a common vertex. Format:
+    ///   E <nParticles> <vx> <vy> <vz>        (mm)
+    ///   <pdg|name> <px> <py> <pz>            (MeV/c, nParticles lines)
+    /// Used to transport GENIE/Achilles final states through the detector.
+    void LoadEventFile(const G4String& path);
+
     /// Set the primary particle by PDG id (handles standard particles and ions).
     void SetParticlePDG(G4int pdg);
 
@@ -98,6 +105,13 @@ private:
         G4ThreeVector         momentum;        ///< MeV/c
     };
     std::vector<BeamEntry> fBeam;   ///< non-empty => beam-file replay mode
+
+    /// One hand-off interaction: a vertex plus its final-state particles.
+    struct HandoffEvent {
+        G4ThreeVector vertex;                                        ///< mm
+        std::vector<std::pair<G4ParticleDefinition*, G4ThreeVector>> particles;  ///< MeV/c
+    };
+    std::vector<HandoffEvent> fEvents;   ///< non-empty => event-file replay mode
 
     RunAction* fRunAction;
 };

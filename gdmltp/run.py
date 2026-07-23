@@ -52,8 +52,77 @@ def _stage_gdml(cfg, outdir):
         shutil.copy(gsrc, outdir / gsrc.name)
 
 
+def _exec_stage(argv, image, env, outdir, local, dry_run, label=""):
+    """Run one container (or local-engine) stage; returns True if executed."""
+    if local:
+        exe = shutil.which("g4sim") or "/app/build/g4sim"
+        cmd = [exe, *argv]
+        run_env = dict(os.environ)
+        run_env.update(env)
+        if dry_run:
+            print(f"[gdmltp] (dry-run{label})", " ".join(cmd), "in", str(outdir))
+            return False
+        subprocess.run(cmd, cwd=outdir, env=run_env, check=True)
+    else:
+        cmd = ["docker", "run", "--rm", "--init", "-v", f"{outdir}:/run", "-w", "/run"]
+        for k, v in env.items():
+            cmd += ["-e", f"{k}={v}"]
+        cmd += [image, *argv]
+        if dry_run:
+            print(f"[gdmltp] (dry-run{label})", " ".join(cmd))
+            return False
+        subprocess.run(cmd, check=True)
+    return True
+
+
+def _wants_transport(cfg):
+    return cfg.generator in ("genie", "achilles") and \
+        bool(getattr(cfg, cfg.generator).get("transport"))
+
+
+def _transport_stage(cfg, outdir, local, dry_run):
+    """Stage 2 of the generator->Geant4 hand-off: replay the vertex-level
+    events through g4sim (fills step_*/totalEdep/trk_end*), then graft the
+    generator's nu_* block + primary identity back on."""
+    from . import handoff
+    from .backends.geant4 import Geant4Backend
+
+    g4 = Geant4Backend()
+    if dry_run:
+        print(f"[gdmltp] (dry-run:transport) would replay the generator events "
+              f"through {g4.image_for(cfg)} via /gun/eventFile and merge the "
+              f"nu_* block into {cfg.run.output}")
+        return
+
+    produced = outdir / cfg.run.output
+    vertex = outdir / handoff.VERTEX_FILE
+    produced.replace(vertex)
+
+    n = handoff.write_event_file(vertex, outdir / handoff.EVENT_FILE)
+    macro = handoff.build_transport_macro(
+        Path(cfg.gdml).name, n, seed=cfg.run.seed, field=cfg.geant4.get("field"))
+    (outdir / handoff.TRANSPORT_MACRO).write_text(macro)
+    print(f"[gdmltp] transport: replaying {n} generator event(s) through Geant4 ...")
+
+    env = {"CELER_DISABLE": "1"} if cfg.geant4.get("field") else {}
+    _exec_stage([handoff.TRANSPORT_MACRO], g4.image_for(cfg), env,
+                outdir, local, dry_run=False, label=":transport")
+
+    transported = outdir / "output.root"
+    handoff.merge_nu_block(transported, vertex, outdir / cfg.run.output)
+    if (outdir / cfg.run.output) != transported and transported.exists():
+        transported.unlink()
+    print(f"[gdmltp] transport done -> {outdir / cfg.run.output} "
+          f"(generator interaction record + Geant4 transport)")
+
+
 def run_config(cfg, image=None, outdir=".", local=False, dry_run=False):
-    """Execute (or dry-run) a run described by a validated RunConfig."""
+    """Execute (or dry-run) a run described by a validated RunConfig.
+
+    With genie.transport / achilles.transport set, this is a two-stage run:
+    the generator produces the vertex-level events, then g4sim transports the
+    final-state particles through the GDML detector and the outputs merge.
+    """
     cfg.validate()
     outdir = Path(outdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
@@ -64,28 +133,17 @@ def run_config(cfg, image=None, outdir=".", local=False, dry_run=False):
     prep = backend.prepare(cfg, outdir, image=image)
 
     if not cfg.mac and (outdir / "gdmltp_run.mac").exists() and cfg.generator == "geant4":
-        print(f"[gdmltp] generated {outdir / 'gdmltp_run.mac'}:\n{(outdir / 'gdmltp_run.mac').read_text()}")
+        print(f"[gdmltp] generated {outdir / 'gdmltp_run.mac'}:\n"
+              f"{(outdir / 'gdmltp_run.mac').read_text()}")
 
-    if local:
-        exe = shutil.which("g4sim") or "/app/build/g4sim"
-        cmd = [exe, *prep.argv]
-        env = dict(os.environ)
-        env.update(prep.env)
-        if dry_run:
-            print("[gdmltp] (dry-run)", " ".join(cmd), "in", str(outdir))
-            return 0
-        subprocess.run(cmd, cwd=outdir, env=env, check=True)
-    else:
-        cmd = ["docker", "run", "--rm", "--init", "-v", f"{outdir}:/run", "-w", "/run"]
-        for k, v in prep.env.items():
-            cmd += ["-e", f"{k}={v}"]
-        cmd += [prep.image, *prep.argv]
-        if dry_run:
-            print("[gdmltp] (dry-run)", " ".join(cmd))
-            return 0
-        subprocess.run(cmd, check=True)
+    executed = _exec_stage(prep.argv, prep.image, prep.env, outdir, local, dry_run)
 
-    _finalize_output(cfg, prep, outdir)
+    if _wants_transport(cfg):
+        _transport_stage(cfg, outdir, local, dry_run)
+        return 0
+
+    if executed:
+        _finalize_output(cfg, prep, outdir)
     return 0
 
 

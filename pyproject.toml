@@ -7,7 +7,7 @@ name = "gdmltp"
 dynamic = ["version"]
 description = "GDMLTargetPractice tooling: define a GDML target + beam, run it in Geant4 or GENIE, then analyze/visualize the output (no ROOT needed)."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Lawrence Lee", email = "llee@utk.edu" }]
 keywords = ["geant4", "genie", "gdml", "simulation", "hep", "uproot", "event-display"]
@@ -18,7 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Physics",
 ]
-dependencies = ["uproot>=5", "awkward>=2", "numpy", "matplotlib", "pyyaml>=5"]
+dependencies = ["uproot>=5.4", "awkward>=2.5", "numpy", "matplotlib", "pyyaml>=5"]
 
 [project.optional-dependencies]
 dev = ["pytest"]

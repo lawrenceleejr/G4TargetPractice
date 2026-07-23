@@ -11,17 +11,12 @@
 
 
 # Set detector name first, BEFORE initializing physics list
-/physics_lists/em/NuDetectorName DefaultRegionForTheWorld
 
 # Activate neutrino physics
-/physics_lists/em/NeutrinoActivation true
 #/physics_lists/em/NuETotXscActivation true
 #/physics_lists/em/NeETotXscActivation true
 
 # Set neutrino bias factors
-/physics_lists/em/NuEleCcBias 5e12
-/physics_lists/em/NuEleNcBias 5e12
-/physics_lists/em/NuNucleusBias 5e12
 
 # ==============================
 # --- Primary particle gun ---

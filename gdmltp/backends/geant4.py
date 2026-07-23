@@ -22,6 +22,56 @@ def _progress(events):
         return 100
 
 
+_NEUTRINO_PDGS = {12, -12, 14, -14, 16, -16}
+DEFAULT_NU_BIAS = 5.0e12          # matches the repo's hand-written neutrino macros
+
+
+def _neutrino_bias_lines(cfg):
+    """Geant4's built-in neutrino processes have cross sections so small that
+    unbiased runs record essentially no interactions; the stock
+    /physics_lists/em/Nu* commands scale them up. Emitted before
+    /run/initialize (as the hand-written macros do), wrapped in
+    /control/suppressAbortion because some Geant4 builds do not register these
+    commands -- a missing command then warns instead of aborting the batch.
+
+    geant4.neutrino_bias: auto (default: on when the primary is a neutrino),
+    on/off, or a mapping {enable, factor, cc_bias, nc_bias, nucleus_bias,
+    detector_name}.
+    """
+    raw = cfg.geant4.get("neutrino_bias", "auto")
+    if isinstance(raw, bool):                     # YAML 1.1: on/off arrive as bools
+        raw = {"enable": "on" if raw else "off"}
+    elif isinstance(raw, str):
+        raw = {"enable": raw}
+    elif not isinstance(raw, dict):
+        raw = {"enable": "auto"}
+
+    enable = raw.get("enable", "auto")
+    if isinstance(enable, bool):
+        enable = "on" if enable else "off"
+    if enable == "off":
+        return []
+    if enable == "auto":
+        pdg = cfg.beam.pdg_code()
+        if pdg not in _NEUTRINO_PDGS:
+            return []
+
+    factor = float(raw.get("factor", DEFAULT_NU_BIAS))
+    cc = float(raw.get("cc_bias", factor))
+    nc = float(raw.get("nc_bias", factor))
+    nuc = float(raw.get("nucleus_bias", factor))
+    det = raw.get("detector_name", "DefaultRegionForTheWorld")
+    return [
+        "/control/suppressAbortion 2",
+        f"/physics_lists/em/NuDetectorName {det}",
+        "/physics_lists/em/NeutrinoActivation true",
+        f"/physics_lists/em/NuEleCcBias {cc:g}",
+        f"/physics_lists/em/NuEleNcBias {nc:g}",
+        f"/physics_lists/em/NuNucleusBias {nuc:g}",
+        "/control/suppressAbortion 0",
+    ]
+
+
 def build_macro(cfg, beam_file=None) -> str:
     """Render `cfg` to Geant4 macro text.
 
@@ -39,8 +89,9 @@ def build_macro(cfg, beam_file=None) -> str:
     gdml_name = Path(cfg.gdml).name if cfg.gdml else ""
     nmode = cfg.geant4.get("neutrino_mode", "auto")
 
-    lines = [
-        f"/detector/readGDML {gdml_name}",
+    lines = [f"/detector/readGDML {gdml_name}"]
+    lines += _neutrino_bias_lines(cfg)       # must precede /run/initialize
+    lines += [
         "/run/initialize",
         f"/analysis/neutrinoMode {nmode}",
     ]

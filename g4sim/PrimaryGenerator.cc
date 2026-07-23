@@ -225,6 +225,61 @@ void PrimaryGenerator::LoadBeamFile(const G4String& path)
            << " primaries from beam file " << path << G4endl;
 }
 
+// ---------------------------------------------------------------------------
+// Hand-off event-file loader:
+//   E <nParticles> <vx> <vy> <vz>        [mm]
+//   <name|pdg> <px> <py> <pz>            [MeV/c]  x nParticles
+// ---------------------------------------------------------------------------
+void PrimaryGenerator::LoadEventFile(const G4String& path)
+{
+    std::ifstream in(path.c_str());
+    if (!in) {
+        G4Exception("PrimaryGenerator::LoadEventFile", "NoEventFile", FatalException,
+                    ("Could not open event file: " + path).c_str());
+        return;
+    }
+    fEvents.clear();
+    std::string line;
+    while (std::getline(in, line)) {
+        std::size_t s = line.find_first_not_of(" \t\r\n");
+        if (s == std::string::npos || line[s] == '#') continue;
+        std::istringstream iss(line);
+        std::string tag;
+        iss >> tag;
+        if (tag != "E") {
+            G4Exception("PrimaryGenerator::LoadEventFile", "BadEventLine", JustWarning,
+                        ("Expected an 'E' header, ignoring: " + line).c_str());
+            continue;
+        }
+        int nPart = 0;
+        G4double vx, vy, vz;
+        if (!(iss >> nPart >> vx >> vy >> vz)) {
+            G4Exception("PrimaryGenerator::LoadEventFile", "BadEventLine", FatalException,
+                        ("Malformed event header: " + line).c_str());
+        }
+        HandoffEvent evt;
+        evt.vertex = G4ThreeVector(vx * mm, vy * mm, vz * mm);
+        for (int k = 0; k < nPart && std::getline(in, line); ++k) {
+            std::istringstream pss(line);
+            std::string token;
+            G4double px, py, pz;
+            if (!(pss >> token >> px >> py >> pz)) {
+                G4Exception("PrimaryGenerator::LoadEventFile", "BadParticleLine",
+                            FatalException, ("Malformed particle line: " + line).c_str());
+            }
+            auto* def = ResolveToken(token);
+            if (!def) {
+                G4Exception("PrimaryGenerator::LoadEventFile", "NoParticle", FatalException,
+                            ("Event-file particle not found: " + token).c_str());
+            }
+            evt.particles.emplace_back(def, G4ThreeVector(px * MeV, py * MeV, pz * MeV));
+        }
+        fEvents.push_back(std::move(evt));
+    }
+    G4cout << "PrimaryGenerator: loaded " << fEvents.size()
+           << " hand-off event(s) from " << path << G4endl;
+}
+
 G4double PrimaryGenerator::SampleEnergy() const
 {
     switch (fEnergyMode) {
@@ -252,6 +307,23 @@ G4double PrimaryGenerator::SampleEnergy() const
 // ---------------------------------------------------------------------------
 void PrimaryGenerator::GeneratePrimaries(G4Event* event)
 {
+    // --- Hand-off replay: all final-state particles of one generator event ---
+    if (!fEvents.empty()) {
+        const std::size_t i = static_cast<std::size_t>(event->GetEventID());
+        if (i >= fEvents.size()) {
+            G4Exception("PrimaryGenerator", "EventsExhausted", JustWarning,
+                        "More events requested than event-file entries; reusing the last.");
+        }
+        const HandoffEvent& evt = fEvents[std::min(i, fEvents.size() - 1)];
+        fParticleGun->SetParticlePosition(evt.vertex);
+        for (const auto& [def, mom] : evt.particles) {
+            fParticleGun->SetParticleDefinition(def);
+            fParticleGun->SetParticleMomentum(mom);
+            fParticleGun->GeneratePrimaryVertex(event);
+        }
+        return;
+    }
+
     // --- Beam-file replay: one host-sampled primary per event ---
     if (!fBeam.empty()) {
         const std::size_t i = static_cast<std::size_t>(event->GetEventID());
