@@ -12,7 +12,7 @@ import awkward as ak
 import uproot
 import pytest
 
-from g4tp.io import MM_PER_CM
+from gdmltp.io import MM_PER_CM
 
 
 def write_synthetic(path, n_events=30, e0_mev=50000.0, x0_cm=3.0,
@@ -202,7 +202,7 @@ def synth_root(tmp_path_factory):
 @pytest.fixture(scope="session")
 def synth_event(synth_root):
     """First event of synth_root, loaded once for scene/render tests."""
-    from g4tp import io
+    from gdmltp import io
     return io.load_events(synth_root, entry_start=0, entry_stop=1)[0]
 
 

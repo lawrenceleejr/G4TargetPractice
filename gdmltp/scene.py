@@ -120,14 +120,14 @@ def build_scene(primitives, ev, max_tracks=2000, include_world=False, verbose=Fa
     n = len(ev.trk.get("trk_id", []))
     nsteps = len(ev.step.get("step_trackID", []))
     if verbose:
-        print(f"[g4tp]   event {int(ev.scalars.get('eventID', ev.index))}: "
+        print(f"[gdmltp]   event {int(ev.scalars.get('eventID', ev.index))}: "
               f"{n} tracks, {nsteps} steps in file", flush=True)
     # Pick the kept rows first, then index the steps once -- so cost scales with
     # the number of tracks we actually draw, not the (possibly enormous) total.
     keep = _select_track_rows(ev, n, max_tracks)
     step_index = _build_step_index(ev)
     if verbose:
-        print(f"[g4tp]   capped to {len(keep)} track(s) (--max-tracks {max_tracks}); "
+        print(f"[gdmltp]   capped to {len(keep)} track(s) (--max-tracks {max_tracks}); "
               f"indexed steps in {time.perf_counter() - t_start:.2f}s, building polylines...",
               flush=True)
     t_poly = time.perf_counter()
@@ -159,7 +159,7 @@ def build_scene(primitives, ev, max_tracks=2000, include_world=False, verbose=Fa
                meta=_meta(ev, tracks))
     _fit(sc, include_world)
     if verbose:
-        print(f"[g4tp]   built {len(tracks)} track(s), {len(vertices)} vertices "
+        print(f"[gdmltp]   built {len(tracks)} track(s), {len(vertices)} vertices "
               f"in {time.perf_counter() - t_start:.2f}s "
               f"(polylines {time.perf_counter() - t_poly:.2f}s)", flush=True)
     return sc

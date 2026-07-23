@@ -8,9 +8,9 @@ import json
 import numpy as np
 import pytest
 
-from g4tp import io, config
-from g4tp.backends import genie, genie_convert
-from g4tp.masses import mass_mev, kinetic_mev
+from gdmltp import io, config
+from gdmltp.backends import genie, genie_convert
+from gdmltp.masses import mass_mev, kinetic_mev
 
 
 # --- masses ---------------------------------------------------------------- #
@@ -122,7 +122,7 @@ def test_infer_target_unknown_errors(repo_root, tmp_path):
 
 
 def test_genie_prepare_writes_job(repo_root, tmp_path):
-    from g4tp import backends
+    from gdmltp import backends
     cfg = config.RunConfig(
         generator="genie", gdml=str(repo_root / "gdml" / "liquid_argon_1m3.gdml"),
         beam=config.Beam(particle="nu_mu",
@@ -143,7 +143,7 @@ def test_genie_prepare_writes_job(repo_root, tmp_path):
 
 
 def test_genie_backend_registered():
-    from g4tp import backends
+    from gdmltp import backends
     assert backends.get("genie").name == "genie"
 
 

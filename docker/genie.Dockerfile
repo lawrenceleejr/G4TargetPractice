@@ -14,14 +14,15 @@ FROM ${GENIE_BASE}
 
 WORKDIR /app
 
-# Python tooling: the gst -> output.root converter and the g4tp analysis suite
+# Python tooling: the gst -> output.root converter and the gdmltp analysis suite
 # (pure Python: uproot/awkward/numpy/matplotlib/pyyaml -- no ROOT needed here).
 RUN python3 -m pip install --no-cache-dir uproot awkward numpy matplotlib pyyaml \
     || pip3 install --no-cache-dir uproot awkward numpy matplotlib pyyaml
-COPY g4tp/ /app/g4tp-src/g4tp/
-COPY pyproject.toml README.md /app/g4tp-src/
-RUN python3 -m pip install --no-cache-dir /app/g4tp-src \
-    || pip3 install --no-cache-dir /app/g4tp-src
+COPY gdmltp/ /app/pysrc/gdmltp/
+COPY g4tp/ /app/pysrc/g4tp/
+COPY pyproject.toml README.md /app/pysrc/
+RUN python3 -m pip install --no-cache-dir /app/pysrc \
+    || pip3 install --no-cache-dir /app/pysrc
 
 # GENIE driver (reads genie_job.json, runs gevgen -> gntpc -> genie2root).
 COPY genie/ /app/genie/
@@ -33,7 +34,7 @@ COPY genie/ /app/genie/
 #   COPY splines/gxspl-shipped.xml /opt/genie-splines/gxspl.xml
 #   ENV GENIE_XSEC_FILE=/opt/genie-splines/gxspl.xml
 
-# Shared argument-shape dispatcher: *.json -> the GENIE driver, else -> g4tp.
+# Shared argument-shape dispatcher: *.json -> the GENIE driver, else -> gdmltp.
 COPY g4sim/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh /app/genie/*.py
 ENTRYPOINT ["/app/entrypoint.sh"]

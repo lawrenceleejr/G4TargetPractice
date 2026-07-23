@@ -11,7 +11,7 @@ from pathlib import Path
 from .base import Backend, Prepared
 
 DEFAULT_IMAGE = "ghcr.io/lawrenceleejr/g4targetpractice:main"
-GENERATED_MACRO = "g4tp_run.mac"
+GENERATED_MACRO = "gdmltp_run.mac"
 
 
 def _progress(events):

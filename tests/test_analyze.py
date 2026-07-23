@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from g4tp import analyze
+from gdmltp import analyze
 
 
 def test_longitudinal_profile_units_and_shape(synth_root):

@@ -69,7 +69,7 @@ def longitudinal_profile(path, axis="z", nbins=140, step_size="256 MB", verbose=
     leak_frac, leak_MeV = leakage(E0arr, tEarr)
 
     if verbose:
-        print(f"[g4tp] {Path(path).name}: {n} events, beam {axis}{'+' if sign > 0 else '-'} "
+        print(f"[gdmltp] {Path(path).name}: {n} events, beam {axis}{'+' if sign > 0 else '-'} "
               f"from {z0:.1f} cm, E0={E0/1000:.1f} GeV; streaming step data ...", flush=True)
 
     # Online histograms on a fixed-width grid anchored at depth 0 (np.bincount):
@@ -99,7 +99,7 @@ def longitudinal_profile(path, axis="z", nbins=140, step_size="256 MB", verbose=
             e_hist[:len(eb)] += eb
             c_hist[:len(cb)] += cb
         if verbose:
-            print(f"[g4tp]   {seen}/{n} events ({time.perf_counter() - t0:.1f}s)", flush=True)
+            print(f"[gdmltp]   {seen}/{n} events ({time.perf_counter() - t0:.1f}s)", flush=True)
 
     if c_hist.sum() == 0:
         raise ValueError(f"{path}: no steps on the +{axis} side of the vertex")
@@ -145,15 +145,15 @@ def longitudinal_profile(path, axis="z", nbins=140, step_size="256 MB", verbose=
         "mean_leak_MeV": float(np.mean(leak_MeV)) if len(leak_MeV) else float("nan"),
     }
     if verbose:
-        print(f"[g4tp] {Path(path).name}: done in {time.perf_counter() - t0:.1f}s", flush=True)
+        print(f"[gdmltp] {Path(path).name}: done in {time.perf_counter() - t0:.1f}s", flush=True)
     return centers, dEdz, absorbed, stats
 
 
-def summarize(path, outdir="g4tp_analysis", make_plots=True, depth_axis="z"):
+def summarize(path, outdir="gdmltp_analysis", make_plots=True, depth_axis="z"):
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
     n = int(io.num_events(path))
-    lines = [f"g4tp analyze: {path}", f"events: {n}"]
+    lines = [f"gdmltp analyze: {path}", f"events: {n}"]
     if n == 0:
         (outdir / "summary.txt").write_text("\n".join(lines) + "\n")
         print("\n".join(lines))
@@ -202,7 +202,7 @@ def summarize(path, outdir="g4tp_analysis", make_plots=True, depth_axis="z"):
     wrote = ["summary.txt"]
     if make_plots:
         wrote += _plots(path, primE, edep, outdir, depth_axis)
-    print(f"\n[g4tp] wrote {outdir}/: " + ", ".join(wrote))
+    print(f"\n[gdmltp] wrote {outdir}/: " + ", ".join(wrote))
     return outdir
 
 
@@ -226,7 +226,7 @@ def _plots(path, primE, edep, outdir, depth_axis):
     try:
         centers, dEdz, _, _ = longitudinal_profile(path, axis=depth_axis, verbose=False)
     except ValueError as e:
-        print(f"[g4tp] no depth-dose plot: {e}")
+        print(f"[gdmltp] no depth-dose plot: {e}")
         return wrote
     fig, ax = plt.subplots(figsize=(5, 4))
     ax.plot(centers, dEdz, lw=2)

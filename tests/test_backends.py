@@ -1,8 +1,8 @@
 """Backend registry + Geant4Backend macro rendering and run plan."""
 import pytest
 
-from g4tp import config, backends
-from g4tp.backends import geant4
+from gdmltp import config, backends
+from gdmltp.backends import geant4
 
 
 def _cfg(**geant4_block):

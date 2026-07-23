@@ -4,10 +4,10 @@ A run is described by a small tree of dataclasses (`RunConfig`) that can be buil
 two ways:
 
   * from a YAML file (`from_yaml`) -- the documented `--config run.yaml` frontend, or
-  * from CLI flags (`from_flags`) -- the historical `g4tp run --gdml ... --particle ...`.
+  * from CLI flags (`from_flags`) -- the historical `gdmltp run --gdml ... --particle ...`.
 
 `load` combines them with the precedence **CLI flag > YAML value > schema default**,
-so `g4tp run --config r.yaml --energy "200 MeV"` overrides just that one field.
+so `gdmltp run --config r.yaml --energy "200 MeV"` overrides just that one field.
 
 The config is deliberately backend-agnostic in its core (`geometry`, `beam`, `run`);
 backend-specific knobs live in namespaced blocks (`geant4:` / `genie:`) that the

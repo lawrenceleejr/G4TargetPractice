@@ -1,4 +1,4 @@
-"""bpy script: build a .blend from a g4tp scenes JSON. Run inside Blender:
+"""bpy script: build a .blend from a gdmltp scenes JSON. Run inside Blender:
 
     blender --background --python build_blend.py -- scenes.json out.blend
 
@@ -59,7 +59,7 @@ def hex_rgba(h, a=1.0):
 MM = 0.001  # mm -> Blender meters
 
 # Track-tube radius and vertex-marker size are fractions of the scene's bounding
-# radius (computed in g4tp/scene.py), so they look right at any geometry scale --
+# radius (computed in gdmltp/scene.py), so they look right at any geometry scale --
 # millimetres (silicon tracker) or metres (calorimeter). Deliberately no absolute
 # floor: a floor stops small scenes from scaling down (the old max(...,0.5mm) made
 # 1mm-diameter tubes look fat inside the 1.5mm silicon stack).
@@ -203,7 +203,7 @@ def main():
     frame_of, max_frame, t0, span = _build_frame_mapper(scenes, fps, max_seconds, log_time)
     bpy.context.scene.frame_start = 1
     bpy.context.scene.frame_end = max_frame
-    print(f"[g4tp] timeline: {max_frame} frames ({max_seconds:g}s @ {fps}fps), "
+    print(f"[gdmltp] timeline: {max_frame} frames ({max_seconds:g}s @ {fps}fps), "
           f"{'log' if log_time else 'linear'}-time over {span:.3g} ns "
           f"(t0={t0:.3g} ns); frame 1 is empty, early behavior emphasized.")
 
@@ -232,7 +232,7 @@ def main():
             _move_to(o, vtx_coll)
 
     bpy.ops.wm.save_as_mainfile(filepath=out_blend)
-    print(f"[g4tp] wrote {out_blend} with {len(scenes)} event(s), frames 1..{max_frame}")
+    print(f"[gdmltp] wrote {out_blend} with {len(scenes)} event(s), frames 1..{max_frame}")
 
 
 if __name__ == "__main__":

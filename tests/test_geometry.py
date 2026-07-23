@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from g4tp import geometry
+from gdmltp import geometry
 
 
 def test_bpe_slab(repo_root):

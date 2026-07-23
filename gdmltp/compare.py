@@ -15,7 +15,7 @@ import numpy as np
 from .analyze import longitudinal_profile
 
 
-def compare(path_a, path_b, labels=("A", "B"), outdir="g4tp_compare", axis="z"):
+def compare(path_a, path_b, labels=("A", "B"), outdir="gdmltp_compare", axis="z"):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -27,7 +27,7 @@ def compare(path_a, path_b, labels=("A", "B"), outdir="g4tp_compare", axis="z"):
     ca, da, aa, sa = longitudinal_profile(path_a, axis=axis)
     cb, db, ab, sb = longitudinal_profile(path_b, axis=axis)
 
-    lines = [f"g4tp compare: {la} ({path_a})  vs  {lb} ({path_b})", ""]
+    lines = [f"gdmltp compare: {la} ({path_a})  vs  {lb} ({path_b})", ""]
     for lab, s in ((la, sa), (lb, sb)):
         lines += [
             f"[{lab}] events={s['n_events']}  E0={s['E0_MeV']/1000:.1f} GeV  "
@@ -111,5 +111,5 @@ def compare(path_a, path_b, labels=("A", "B"), outdir="g4tp_compare", axis="z"):
         fig.savefig(outdir / "leakage.png", dpi=140); plt.close(fig)
         wrote.append("leakage.png")
 
-    print(f"\n[g4tp] wrote " + ", ".join(f"{outdir}/{w}" for w in wrote) + ", summary.txt")
+    print(f"\n[gdmltp] wrote " + ", ".join(f"{outdir}/{w}" for w in wrote) + ", summary.txt")
     return outdir

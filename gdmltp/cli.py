@@ -1,4 +1,4 @@
-"""g4tp command-line interface: run / display / analyze / compare / info."""
+"""gdmltp command-line interface: run / display / analyze / compare / info."""
 import argparse
 import sys
 from pathlib import Path
@@ -8,33 +8,33 @@ from . import __version__
 _EXAMPLES = {
     "run": """\
 examples:
-  g4tp run --mac macros/protons_water_bragg.mac
-  g4tp run --gdml water_phantom_30cm.gdml --particle proton --energy "150 MeV" -n 500
-  g4tp run --gdml my.gdml --field "0 0 5 tesla" --display
-  g4tp run --config run.yaml                            # YAML frontend (geant4 or genie)
-  g4tp run --config run.yaml --energy "200 MeV"         # flag overrides one YAML field""",
+  gdmltp run --mac macros/protons_water_bragg.mac
+  gdmltp run --gdml water_phantom_30cm.gdml --particle proton --energy "150 MeV" -n 500
+  gdmltp run --gdml my.gdml --field "0 0 5 tesla" --display
+  gdmltp run --config run.yaml                            # YAML frontend (geant4 or genie)
+  gdmltp run --config run.yaml --energy "200 MeV"         # flag overrides one YAML field""",
     "display": """\
 examples:
-  g4tp display output.root --gdml my_detector.gdml     # WebGL html + PNG stills
-  g4tp display output.root --events 0:10               # first ten events
-  g4tp display output.root --blend --blend-events 5    # animated Blender scene
-  g4tp display --gdml my_detector.gdml                 # geometry only, no events""",
+  gdmltp display output.root --gdml my_detector.gdml     # WebGL html + PNG stills
+  gdmltp display output.root --events 0:10               # first ten events
+  gdmltp display output.root --blend --blend-events 5    # animated Blender scene
+  gdmltp display --gdml my_detector.gdml                 # geometry only, no events""",
     "analyze": """\
 examples:
-  g4tp analyze output.root                             # summary.txt + plots
-  g4tp analyze output.root -o results --depth-axis x   # beam along x""",
+  gdmltp analyze output.root                             # summary.txt + plots
+  gdmltp analyze output.root -o results --depth-axis x   # beam along x""",
     "compare": """\
 examples:
-  g4tp compare du.root w.root --labels DU,W            # shower profile + containment + leakage
-  g4tp compare a.root b.root -o cmp --axis x""",
+  gdmltp compare du.root w.root --labels DU,W            # shower profile + containment + leakage
+  gdmltp compare a.root b.root -o cmp --axis x""",
     "info": """\
 examples:
-  g4tp info output.root                                # events, branches, nu block
-  g4tp info gdml/water_phantom_30cm.gdml               # solids + bounding box""",
+  gdmltp info output.root                                # events, branches, nu block
+  gdmltp info gdml/water_phantom_30cm.gdml               # solids + bounding box""",
 }
 
 # Error types that mean "bad input", shown as one friendly line. Anything else
-# is a g4tp bug and gets its full traceback so it can be reported.
+# is a gdmltp bug and gets its full traceback so it can be reported.
 _USER_ERRORS = (FileNotFoundError, IsADirectoryError, NotADirectoryError,
                 PermissionError, ValueError, OSError)
 
@@ -51,11 +51,11 @@ def _build_parser():
                         help="show full tracebacks instead of short error messages")
 
     p = argparse.ArgumentParser(
-        prog="g4tp",
+        prog="gdmltp",
         description="G4TargetPractice tooling: run sims, analyze output.root, "
                     "make event displays (no ROOT needed).",
-        epilog="run 'g4tp <command> --help' for command-specific examples")
-    p.add_argument("--version", action="version", version=f"g4tp {__version__}")
+        epilog="run 'gdmltp <command> --help' for command-specific examples")
+    p.add_argument("--version", action="version", version=f"gdmltp {__version__}")
     p.add_argument("--debug", action="store_true",
                    help="show full tracebacks instead of short error messages")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -116,7 +116,7 @@ def _build_parser():
     d.add_argument("--no-world", dest="world", action="store_false")
     d.set_defaults(world=False)
     d.add_argument("--world", dest="world", action="store_true", help="include world volume (wireframe)")
-    d.add_argument("-o", "--outdir", default="g4tp_display")
+    d.add_argument("-o", "--outdir", default="gdmltp_display")
     d.add_argument("--prefix", default="event")
 
     # compare
@@ -125,12 +125,12 @@ def _build_parser():
     c.add_argument("root_b")
     c.add_argument("--labels", default="A,B", help="comma-separated legend labels, e.g. DU,W")
     c.add_argument("--axis", default="z", choices=["x", "y", "z"], help="beam/depth axis")
-    c.add_argument("-o", "--outdir", default="g4tp_compare")
+    c.add_argument("-o", "--outdir", default="gdmltp_compare")
 
     # analyze
     a = _sub("analyze", "summary report + plots")
     a.add_argument("root", nargs="?", default="output.root")
-    a.add_argument("-o", "--outdir", default="g4tp_analysis")
+    a.add_argument("-o", "--outdir", default="gdmltp_analysis")
     a.add_argument("--no-plots", dest="plots", action="store_false")
     a.add_argument("--depth-axis", default="z", choices=["x", "y", "z"])
 
@@ -158,12 +158,12 @@ def main(argv=None):
     try:
         return _dispatch(args)
     except KeyboardInterrupt:
-        print("\n[g4tp] interrupted", file=sys.stderr)
+        print("\n[gdmltp] interrupted", file=sys.stderr)
         return 130
     except _USER_ERRORS as e:
         if getattr(args, "debug", False):
             raise
-        print(f"g4tp error: {e}\n(add --debug for the full traceback)", file=sys.stderr)
+        print(f"gdmltp error: {e}\n(add --debug for the full traceback)", file=sys.stderr)
         return 1
 
 
@@ -175,7 +175,7 @@ def _dispatch(args):
             if args.gdml:
                 # keep the documented preview workflow working: geometry-only
                 # display before the simulation has produced output.root
-                print(f"[g4tp] note: {args.root} not found; rendering geometry only",
+                print(f"[gdmltp] note: {args.root} not found; rendering geometry only",
                       file=sys.stderr)
                 args.root = None
             else:
@@ -220,7 +220,7 @@ def _run(args):
         # Real display-parser defaults (not a hand-copied Namespace), with the
         # display output next to the run output.
         dargv = [str(Path(args.outdir) / cfg.run.output),
-                 "-o", str(Path(args.outdir) / "g4tp_display")]
+                 "-o", str(Path(args.outdir) / "gdmltp_display")]
         if cfg.gdml:
             dargv += ["--gdml", cfg.gdml]
         _display(parsers["display"].parse_args(dargv))
@@ -247,17 +247,17 @@ def _display(args):
         from . import io
         n_total = io.num_events(args.root)
         if n_total == 0:
-            print("[g4tp] no events in", args.root)
+            print("[gdmltp] no events in", args.root)
         idxs = [k for k in _event_range(args, n_total) if 0 <= k < n_total]
         if idxs:
             # Read only the requested entries: a single 1 TeV shower event can be
             # hundreds of MB, so loading the whole file to show one event is wasteful.
             lo, hi = min(idxs), max(idxs) + 1
-            print(f"[g4tp] reading entr{'y' if hi - lo == 1 else 'ies'} {lo}:{hi} "
+            print(f"[gdmltp] reading entr{'y' if hi - lo == 1 else 'ies'} {lo}:{hi} "
                   f"of {n_total} from {args.root} ...", flush=True)
             t0 = time.perf_counter()
             events = io.load_events(args.root, entry_start=lo, entry_stop=hi)
-            print(f"[g4tp] loaded {len(events)} event(s) in {time.perf_counter() - t0:.2f}s; "
+            print(f"[gdmltp] loaded {len(events)} event(s) in {time.perf_counter() - t0:.2f}s; "
                   f"building scene(s) ...", flush=True)
             for k in idxs:
                 scenes.append(scenemod.build_scene(prims, events[k - lo], max_tracks=args.max_tracks,
@@ -270,29 +270,29 @@ def _display(args):
         scenes = [sc]
 
     if not scenes:
-        print("[g4tp] nothing to display"); return 1
+        print("[gdmltp] nothing to display"); return 1
 
     if args.png:
         for sc in (scenes if args.events else scenes[:1]):
             out = render_png.render_png(sc, outdir / f"{args.prefix}{('' if len(scenes)==1 else '_'+str(sc.event_id))}",
                                         include_world=args.world)
-            print("[g4tp] PNG:", *[str(o) for o in out])
+            print("[gdmltp] PNG:", *[str(o) for o in out])
     if args.html:
         out = render_web.render_html(scenes, outdir / f"{args.prefix}.html",
                                      max_tracks=args.max_tracks)
-        print("[g4tp] HTML:", out)
+        print("[gdmltp] HTML:", out)
     if args.blend:
         from . import render_blender
         sel = scenes[: args.blend_events]
         if len(scenes) > len(sel):
-            print(f"[g4tp] note: {len(scenes)} events selected but only {len(sel)} written to the "
+            print(f"[gdmltp] note: {len(scenes)} events selected but only {len(sel)} written to the "
                   f".blend (--blend-events {args.blend_events}). Raise --blend-events to include all.")
         out = render_blender.render_blend(sel, f"{args.prefix}.blend",
                                           outdir=str(outdir), blender_image=args.blender_image,
                                           fps=args.anim_fps, time_scale=args.time_scale,
                                           max_seconds=args.max_seconds, log_time=args.log_time)
         if out:
-            print("[g4tp] BLEND:", out)
+            print("[gdmltp] BLEND:", out)
     return 0
 
 

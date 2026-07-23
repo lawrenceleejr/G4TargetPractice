@@ -48,7 +48,7 @@ def render_html(scenes, out_path, max_events_embed=20, max_tracks=2000):
         scenes = [scenes]
     scenes = scenes[:max_events_embed]
     data = [_scene_to_dict(s, max_tracks=max_tracks) for s in scenes]
-    template = resources.files("g4tp.assets").joinpath("viewer_template.html").read_text()
+    template = resources.files("gdmltp.assets").joinpath("viewer_template.html").read_text()
     html = template.replace("/*{{SCENE_JSON}}*/ []", json.dumps(data))
     out_path = Path(out_path)
     out_path.write_text(html)

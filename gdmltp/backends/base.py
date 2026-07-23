@@ -3,7 +3,7 @@
 A `Backend` turns a validated `RunConfig` into something a container can execute.
 The host does all the rendering (into the run directory); the container just runs
 the engine (and, for GENIE, a converter). Every backend must ultimately produce
-`output.root` in the schema `g4tp/io.py` declares -- that shared ntuple is the
+`output.root` in the schema `gdmltp/io.py` declares -- that shared ntuple is the
 contract that lets analyze/compare/display/info work regardless of generator.
 """
 from dataclasses import dataclass, field

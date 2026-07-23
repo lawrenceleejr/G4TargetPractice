@@ -35,92 +35,29 @@ jobs:
             type=sha,prefix={{branch}}-,suffix=-celeritas
             type=raw,value=latest-celeritas,enable={{is_default_branch}}
 
-      - name: Create Dockerfile
-        run: |
-          cat > Dockerfile.celeritas << 'EOF'
-          FROM ghcr.io/lawrenceleejr/root-geant4-garfield:cpp17_root-v6-26-10_geant4-v11.4.1_garfield-e0a9f171
-
-          # Qt6 runtime libraries required by the Geant4 visualization drivers,
-          # plus build dependencies for Celeritas
-          RUN apt-get update && apt-get install -y --no-install-recommends \
-              libqt6core6 libqt6gui6 libqt6widgets6 libqt6opengl6 \
-              git ca-certificates wget nlohmann-json3-dev \
-              && rm -rf /var/lib/apt/lists/*
-
-          # Celeritas requires CMake >= 3.24, newer than the base image provides
-          RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.29.6/cmake-3.29.6-linux-x86_64.tar.gz && \
-              tar -xzf cmake-3.29.6-linux-x86_64.tar.gz -C /opt && \
-              rm cmake-3.29.6-linux-x86_64.tar.gz
-          ENV PATH=/opt/cmake-3.29.6-linux-x86_64/bin:$PATH
-
-          # Build Celeritas (CPU-only) against the Geant4 provided by the base
-          # image. CELERITAS_CORE_GEO=Geant4 uses native Geant4 navigation so
-          # any user GDML geometry is supported without conversion.
-          WORKDIR /opt
-          RUN git clone --depth 1 --branch v0.6.3 https://github.com/celeritas-project/celeritas.git && \
-              cmake -S celeritas -B celeritas-build \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCELERITAS_USE_Geant4=ON \
-                -DCELERITAS_CORE_GEO=Geant4 \
-                -DCELERITAS_USE_CUDA=OFF \
-                -DCELERITAS_USE_HIP=OFF \
-                -DCELERITAS_USE_ROOT=OFF \
-                -DCELERITAS_USE_VecGeom=OFF \
-                -DCELERITAS_USE_MPI=OFF \
-                -DCELERITAS_BUILD_TESTS=OFF \
-                -DCMAKE_INSTALL_PREFIX=/opt/celeritas-install && \
-              cmake --build celeritas-build -j$(nproc) && \
-              cmake --install celeritas-build && \
-              rm -rf celeritas celeritas-build
-          ENV LD_LIBRARY_PATH=/opt/celeritas-install/lib:/opt/celeritas-install/lib64:$LD_LIBRARY_PATH
-
-          # Copy and build g4sim with the Celeritas offload enabled
-          WORKDIR /app
-          COPY g4sim/ /app/g4sim/
-          RUN mkdir -p /app/build && cd /app/build && \
-              cmake /app/g4sim/ -DWITH_CELERITAS=ON -DCMAKE_PREFIX_PATH=/opt/celeritas-install && \
-              cmake --build .
-          RUN if [ -f /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 ]; then strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5; fi
-          RUN if [ -f /lib/x86_64-linux-gnu/libQt6Core.so.6 ]; then strip --remove-section=.note.ABI-tag /lib/x86_64-linux-gnu/libQt6Core.so.6; fi
-
-          # Parameter-scan helper scripts (run with --entrypoint bash)
-          COPY scans/ /app/scans/
-
-          # g4tp tooling: analysis + event display (uproot/numpy/matplotlib, no ROOT)
-          RUN python3 -m pip install --no-cache-dir uproot numpy matplotlib || pip3 install --no-cache-dir uproot numpy matplotlib
-          COPY g4tp/ /app/g4tp-src/g4tp/
-          COPY pyproject.toml README.md /app/g4tp-src/
-          RUN python3 -m pip install --no-cache-dir /app/g4tp-src || pip3 install --no-cache-dir /app/g4tp-src
-          COPY g4sim/entrypoint.sh /app/entrypoint.sh
-          RUN chmod +x /app/entrypoint.sh
-
-          # Dispatcher entrypoint: 'display|analyze|info' -> g4tp, else -> g4sim
-          ENTRYPOINT ["/app/entrypoint.sh"]
-          EOF
-
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile.celeritas
+          file: docker/geant4-celeritas.Dockerfile
           load: true
           push: false
-          tags: g4tp-celeritas:test
+          tags: gdmltp-celeritas:test
           cache-from: type=gha,scope=celeritas
           cache-to: type=gha,mode=max,scope=celeritas
 
       - name: Smoke test image (offload enabled and disabled)
         run: |
-          docker run --rm -v "$PWD":/work -w /work g4tp-celeritas:test g4sim/run_ci.mac
+          docker run --rm -v "$PWD":/work -w /work gdmltp-celeritas:test g4sim/run_ci.mac
           rm -f output.root
-          docker run --rm -e CELER_DISABLE=1 -v "$PWD":/work -w /work g4tp-celeritas:test g4sim/run_ci.mac
+          docker run --rm -e CELER_DISABLE=1 -v "$PWD":/work -w /work gdmltp-celeritas:test g4sim/run_ci.mac
           rm -f output.root
 
       - name: Push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile.celeritas
+          file: docker/geant4-celeritas.Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

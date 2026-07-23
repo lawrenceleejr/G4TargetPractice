@@ -1,18 +1,18 @@
 import pytest
 
-from g4tp import cli
+from gdmltp import cli
 
 
 def test_version(capsys):
     with pytest.raises(SystemExit) as exc:
         cli.main(["--version"])
     assert exc.value.code == 0
-    assert "g4tp 0." in capsys.readouterr().out
+    assert "gdmltp 0." in capsys.readouterr().out
 
 
 def test_no_args_prints_help_and_signals_misuse(capsys):
     assert cli.main([]) == 2
-    assert "usage: g4tp" in capsys.readouterr().out
+    assert "usage: gdmltp" in capsys.readouterr().out
 
 
 def test_missing_file_is_friendly(capsys):
@@ -94,7 +94,7 @@ def test_run_dry_run_generates_macro(repo_root, tmp_path, capsys):
     assert cli.main(["run", "--gdml", gdml, "--particle", "neutron",
                      "--energy", "1 GeV", "-n", "7",
                      "-o", str(tmp_path), "--dry-run"]) == 0
-    mac = (tmp_path / "g4tp_run.mac").read_text()
+    mac = (tmp_path / "gdmltp_run.mac").read_text()
     assert "/gun/particle neutron" in mac
     assert "/gun/energy 1 GeV" in mac
     assert "/run/beamOn 7" in mac
@@ -117,7 +117,7 @@ def test_run_config_yaml_dry_run(repo_root, tmp_path, capsys):
         "  energy: {mode: exp, value: '2 GeV', min: '200 MeV', max: '20 GeV'}\n"
         "run: {events: 9, seed: 7}\n")
     assert cli.main(["run", "--config", str(cfg), "-o", str(tmp_path), "--dry-run"]) == 0
-    mac = (tmp_path / "g4tp_run.mac").read_text()
+    mac = (tmp_path / "gdmltp_run.mac").read_text()
     assert "/gun/particle neutron" in mac
     assert "/gun/energyMode exp" in mac
     assert "/gun/energyMin 200 MeV" in mac
@@ -133,7 +133,7 @@ def test_run_config_flag_override(repo_root, tmp_path):
         "beam: {particle: proton, energy: '150 MeV'}\n")
     assert cli.main(["run", "--config", str(cfg), "--energy", "200 MeV",
                      "-o", str(tmp_path), "--dry-run"]) == 0
-    mac = (tmp_path / "g4tp_run.mac").read_text()
+    mac = (tmp_path / "gdmltp_run.mac").read_text()
     assert "/gun/particle proton" in mac        # kept from YAML
     assert "/gun/energy 200 MeV" in mac         # overridden by flag
 

@@ -4,23 +4,32 @@ on:
   pull_request:
 
 jobs:
-  g4tp-tests:
+  # ---- Unit tests: pure Python, no ROOT/Geant4/Docker (gating) ------------- #
+  python-tests:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
-      - name: Install g4tp
+      - name: Install gdmltp
         run: pip install -e .[dev]
 
-      - name: Run test suite
+      - name: Run unit test suite
         run: pytest tests/ -v
 
+      - name: Deprecated g4tp alias still imports
+        run: python -c "import warnings; warnings.simplefilter('ignore'); import g4tp; from g4tp import cli, io; from g4tp.backends import genie_convert; print('g4tp shim OK', g4tp.__version__)"
+
+  # ---- Geant4 build + end-to-end integration (gating) --------------------- #
   build-and-test:
     runs-on: ubuntu-latest
     container:
@@ -28,34 +37,35 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: Configure CMake
+
+      - name: Configure & build g4sim
         run: |
-          mkdir -p build
-          cd build
+          mkdir -p build && cd build
           cmake ../g4sim/
-          pwd; ls -lrt
-      
-      - name: Build
+          cmake --build .
+
+      - name: Run CI macro (direct g4sim)
         run: |
-          cd build
-          cmake --build . 
-          pwd; ls -lrt
-      
-      - name: Run executable with input file
-        run: |
-          pwd; ls -lrt
           ldconfig
-          ldd ./build/g4sim
-          echo $LD_LIBRARY_PATH
           ./build/g4sim g4sim/run_ci.mac
-          pwd; ls -lrt
+          test -f output.root && rm -f output.root
 
       - name: Run an arb-mode macro (beta spectrum into the Si tracker)
         run: |
           ./build/g4sim macros/betas_silicon_sr90.mac
-          test -f output.root
-      
+          test -f output.root && rm -f output.root
+
+      - name: Integration - YAML config -> macro -> g4sim -> analyze
+        run: |
+          python3 -m pip install --no-cache-dir -e . || pip3 install --no-cache-dir -e .
+          export PATH="$PWD/build:$PATH"
+          # Drive the whole common frontend end to end against the real engine.
+          python3 -m gdmltp run --config examples/water_proton.yaml --local -n 5 -o run_out
+          test -f run_out/output.root
+          python3 -m gdmltp analyze run_out/output.root -o run_out/analysis
+          test -f run_out/analysis/summary.txt
+          echo "Geant4 YAML integration OK"
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -63,27 +73,28 @@ jobs:
           path: build/g4sim
           retention-days: 1
 
+  # ---- Publish the Geant4 image (gated on both test jobs) ----------------- #
   docker:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    needs: [build-and-test, g4tp-tests]
+    needs: [build-and-test, python-tests]
     permissions:
       contents: read
       packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -94,45 +105,12 @@ jobs:
             type=ref,event=pr
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
-      
-      - name: Create Dockerfile
-        run: |
-          cat > Dockerfile << 'EOF'
-          FROM ghcr.io/lawrenceleejr/root-geant4-garfield:cpp17_root-v6-26-10_geant4-v11.4.1_garfield-e0a9f171
-          
-          # Set working directory
-          WORKDIR /app
-          
-          # Install Qt6 runtime libraries required by the Geant4 visualization drivers
-          RUN apt-get update && apt-get install -y --no-install-recommends \
-              libqt6core6 libqt6gui6 libqt6widgets6 libqt6opengl6 \
-              && rm -rf /var/lib/apt/lists/*
 
-          # Copy and build
-          COPY g4sim/ /app/g4sim/
-          RUN mkdir -p /app/build && cd /app/build && cmake /app/g4sim/ && cmake --build .
-
-          # Parameter-scan helper scripts (run with --entrypoint bash)
-          COPY scans/ /app/scans/
-          RUN if [ -f /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 ]; then strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5; fi
-          RUN if [ -f /lib/x86_64-linux-gnu/libQt6Core.so.6 ]; then strip --remove-section=.note.ABI-tag /lib/x86_64-linux-gnu/libQt6Core.so.6; fi
-
-          # g4tp tooling: analysis + event display (uproot/numpy/matplotlib, no ROOT)
-          RUN python3 -m pip install --no-cache-dir uproot numpy matplotlib || pip3 install --no-cache-dir uproot numpy matplotlib
-          COPY g4tp/ /app/g4tp-src/g4tp/
-          COPY pyproject.toml README.md /app/g4tp-src/
-          RUN python3 -m pip install --no-cache-dir /app/g4tp-src || pip3 install --no-cache-dir /app/g4tp-src
-          COPY g4sim/entrypoint.sh /app/entrypoint.sh
-          RUN chmod +x /app/entrypoint.sh
-
-          # Dispatcher entrypoint: 'display|analyze|info' -> g4tp, else -> g4sim
-          ENTRYPOINT ["/app/entrypoint.sh"]
-          EOF
-      
-      - name: Build and push Docker image
+      - name: Build and push the Geant4 image
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: docker/geant4.Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

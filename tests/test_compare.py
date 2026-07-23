@@ -1,4 +1,4 @@
-from g4tp import compare
+from gdmltp import compare
 
 
 def test_compare_end_to_end(synth_pair, tmp_path):
@@ -35,7 +35,7 @@ def test_compare_negative_leakage_does_not_crash(tmp_path):
 
 def test_compare_orders_materials_correctly(synth_pair, tmp_path):
     """Dense (x0=2.5, leak 1.2%) must beat loose (x0=3.5, leak 3.0%) on both axes."""
-    from g4tp.analyze import longitudinal_profile
+    from gdmltp.analyze import longitudinal_profile
     dense, loose = synth_pair
     _, _, _, sd = longitudinal_profile(dense, verbose=False)
     _, _, _, sl = longitudinal_profile(loose, verbose=False)

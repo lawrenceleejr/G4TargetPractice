@@ -63,8 +63,8 @@ def run_config(cfg, image=None, outdir=".", local=False, dry_run=False):
     backend = backends.get(cfg.generator)
     prep = backend.prepare(cfg, outdir, image=image)
 
-    if not cfg.mac and (outdir / "g4tp_run.mac").exists() and cfg.generator == "geant4":
-        print(f"[g4tp] generated {outdir / 'g4tp_run.mac'}:\n{(outdir / 'g4tp_run.mac').read_text()}")
+    if not cfg.mac and (outdir / "gdmltp_run.mac").exists() and cfg.generator == "geant4":
+        print(f"[gdmltp] generated {outdir / 'gdmltp_run.mac'}:\n{(outdir / 'gdmltp_run.mac').read_text()}")
 
     if local:
         exe = shutil.which("g4sim") or "/app/build/g4sim"
@@ -72,7 +72,7 @@ def run_config(cfg, image=None, outdir=".", local=False, dry_run=False):
         env = dict(os.environ)
         env.update(prep.env)
         if dry_run:
-            print("[g4tp] (dry-run)", " ".join(cmd), "in", str(outdir))
+            print("[gdmltp] (dry-run)", " ".join(cmd), "in", str(outdir))
             return 0
         subprocess.run(cmd, cwd=outdir, env=env, check=True)
     else:
@@ -81,7 +81,7 @@ def run_config(cfg, image=None, outdir=".", local=False, dry_run=False):
             cmd += ["-e", f"{k}={v}"]
         cmd += [prep.image, *prep.argv]
         if dry_run:
-            print("[g4tp] (dry-run)", " ".join(cmd))
+            print("[gdmltp] (dry-run)", " ".join(cmd))
             return 0
         subprocess.run(cmd, check=True)
 
@@ -94,7 +94,7 @@ def _finalize_output(cfg, prep, outdir):
     target = outdir / cfg.run.output
     if cfg.run.output != prep.output and produced.exists():
         produced.replace(target)
-    print(f"[g4tp] done -> {target if target.exists() else produced}")
+    print(f"[gdmltp] done -> {target if target.exists() else produced}")
 
 
 def run(mac=None, gdml=None, particle="e-", energy="1 GeV", position="0 0 -20 cm",

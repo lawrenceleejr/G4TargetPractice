@@ -2,7 +2,7 @@
 import argparse
 import pytest
 
-from g4tp import config
+from gdmltp import config
 
 
 def _write(tmp_path, text):
@@ -60,7 +60,7 @@ def test_yaml_off_neutrino_mode_normalized(tmp_path):
         "geometry: {gdml: g.gdml}\ngeant4: {neutrino_mode: off}\n"))
     cfg.validate()
     assert cfg.geant4["neutrino_mode"] == "off"
-    from g4tp.backends.geant4 import build_macro
+    from gdmltp.backends.geant4 import build_macro
     assert "/analysis/neutrinoMode off" in build_macro(cfg)
 
 

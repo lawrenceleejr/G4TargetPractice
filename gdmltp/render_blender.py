@@ -53,12 +53,12 @@ def render_blend(scenes, out_path, outdir=".", blender_image=DEFAULT_BLENDER_IMA
         out_path = outdir / out_path
 
     scenes_json = outdir / "scene.json"
-    print(f"[g4tp] serializing {len(scenes)} event(s) to scene.json ...", flush=True)
+    print(f"[gdmltp] serializing {len(scenes)} event(s) to scene.json ...", flush=True)
     scenes_json.write_text(json.dumps([_scene_to_dict(s) for s in scenes]))
-    print(f"[g4tp] scene.json written ({scenes_json.stat().st_size / 1e6:.1f} MB); "
+    print(f"[gdmltp] scene.json written ({scenes_json.stat().st_size / 1e6:.1f} MB); "
           f"launching Blender (headless) ...", flush=True)
     builder = outdir / "build_blend.py"
-    builder.write_text(resources.files("g4tp.assets").joinpath("build_blend.py").read_text())
+    builder.write_text(resources.files("gdmltp.assets").joinpath("build_blend.py").read_text())
 
     # positional args to build_blend.py: scene.json out.blend fps time_scale max_seconds time_mode
     mode = "log" if log_time else "linear"
@@ -76,7 +76,7 @@ def render_blend(scenes, out_path, outdir=".", blender_image=DEFAULT_BLENDER_IMA
                "--", "/work/scene.json", f"/work/{out_path.name}", *pos]
         _run(cmd)
         return out_path
-    print("[g4tp] No 'blender' or 'docker' found. Wrote scene.json + build_blend.py to",
+    print("[gdmltp] No 'blender' or 'docker' found. Wrote scene.json + build_blend.py to",
           outdir, "\n        Build it with:\n"
           f"        docker run --rm -v {outdir}:/work -w /work {blender_image} \\\n"
           f"          blender --background --python build_blend.py -- scene.json {out_path.name}")
@@ -84,5 +84,5 @@ def render_blend(scenes, out_path, outdir=".", blender_image=DEFAULT_BLENDER_IMA
 
 
 def _run(cmd):
-    print("[g4tp] $", " ".join(str(c) for c in cmd))
+    print("[gdmltp] $", " ".join(str(c) for c in cmd))
     subprocess.run(cmd, check=True)
