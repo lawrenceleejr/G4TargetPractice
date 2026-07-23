@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from . import masses, particles
+from . import masses
 
 # --- unit tables ----------------------------------------------------------- #
 _LEN_MM = {"mm": 1.0, "millimeter": 1.0, "cm": 10.0, "centimeter": 10.0,
@@ -113,12 +113,12 @@ def _sample_energy_mev(energy, n, rng):
     raise ValueError(f"unknown energy mode {energy.mode!r}")
 
 
-def _mass_mev(name):
-    pdg = particles.pdg_for(name)
+def _mass_mev(beam):
+    pdg = beam.pdg_code()
     if pdg is None:
         raise ValueError(
-            f"cannot convert energy->momentum for unknown particle {name!r}; "
-            f"specify beam.momentum (|p|) instead")
+            f"cannot convert energy->momentum for unknown particle "
+            f"{beam.identifier()!r}; specify beam.momentum (|p|) or a PDG id instead")
     return masses.mass_mev(pdg)
 
 
@@ -184,7 +184,7 @@ def _sample_independent(beam, n, rng):
         pmag = _sample_dist(beam.momentum, n, rng, _mom_mev)
     else:
         ekin = _sample_energy_mev(beam.energy, n, rng)
-        m = _mass_mev(beam.particle)
+        m = _mass_mev(beam)
         pmag = np.sqrt(np.maximum(0.0, (ekin + m) ** 2 - m * m))
 
     # --- direction: local slopes then rotate onto the central direction ---
@@ -205,7 +205,7 @@ def _sample_independent(beam, n, rng):
     d0 = _unit(np.array([float(v) for v in beam.direction.split()[:3]]))
     dirs = rotate_uz(local, d0)
     mom = dirs * pmag[:, None]
-    return Sample(beam.particle, pos, mom)
+    return Sample(beam.identifier(), pos, mom)
 
 
 def _beam_matrix(tp):
@@ -241,7 +241,7 @@ def _sample_twiss(beam, n, rng):
     ref = _vec3(tw.ref_position, _len_mm)
     pos = rotate_uz(pos_local, d0) + ref
     mom = rotate_uz(mom_local, d0)
-    return Sample(beam.particle, pos, mom)
+    return Sample(beam.identifier(), pos, mom)
 
 
 # --- beam file I/O ---------------------------------------------------------- #

@@ -138,6 +138,15 @@ def test_run_config_flag_override(repo_root, tmp_path):
     assert "/gun/energy 200 MeV" in mac         # overridden by flag
 
 
+def test_run_numeric_particle_is_pdg(repo_root, tmp_path):
+    gdml = str(repo_root / "gdml" / "bpe_slab.gdml")
+    assert cli.main(["run", "--gdml", gdml, "--particle", "2212", "--energy", "1 GeV",
+                     "-o", str(tmp_path), "--dry-run"]) == 0
+    mac = (tmp_path / "gdmltp_run.mac").read_text()
+    assert "/gun/particlePDG 2212" in mac
+    assert "/gun/particle " not in mac
+
+
 def test_run_config_bad_generator_is_friendly(repo_root, tmp_path, capsys):
     cfg = tmp_path / "run.yaml"
     cfg.write_text(f"generator: fluka\ngeometry: {{gdml: {repo_root / 'gdml' / 'bpe_slab.gdml'}}}\n")

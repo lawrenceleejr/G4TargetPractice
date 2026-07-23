@@ -4,6 +4,7 @@
 #include "G4UIcmdWithADoubleAndUnit.hh"
 #include "G4UIcmdWith3Vector.hh"
 #include "G4UIcmdWithoutParameter.hh"
+#include "G4UIcmdWithAnInteger.hh"
 #include "PrimaryGenerator.hh"
 
 class PrimaryGeneratorMessenger : public G4UImessenger {
@@ -17,6 +18,7 @@ private:
     PrimaryGenerator* fGun;
 
     G4UIcmdWithAString*        fParticleCmd;
+    G4UIcmdWithAnInteger*      fParticlePDGCmd;
     G4UIcmdWithADoubleAndUnit* fEnergyCmd;
     G4UIcmdWith3Vector*        fPositionCmd;  // parsed with optional unit in SetNewValue
     G4UIcmdWith3Vector*        fDirectionCmd;

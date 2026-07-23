@@ -81,13 +81,35 @@ def flux_gevgen_args(flux: dict):
     return ["-e", f"{parse_energy_gev(flux['value']):g}"], True
 
 
-def probe_pdg(particle: str) -> int:
+_NEUTRINO_PDGS = {12, -12, 14, -14, 16, -16}
+
+
+def probe_pdg(particle) -> int:
+    """Resolve the GENIE probe from a neutrino name or a PDG id. GENIE is a
+    neutrino generator, so a non-neutrino projectile is an error."""
+    pdg = _as_pdg(particle)
+    if pdg is not None:
+        if pdg not in _NEUTRINO_PDGS:
+            raise ConfigError(
+                f"the genie backend only supports neutrino projectiles, got PDG {pdg} "
+                f"(one of {sorted(_NEUTRINO_PDGS)})")
+        return pdg
     try:
         return _PROBE_PDG[particle]
     except KeyError:
         raise ConfigError(
             f"the genie backend only supports neutrino projectiles, got {particle!r} "
-            f"(one of: {', '.join(sorted(_PROBE_PDG))})")
+            f"(names: {', '.join(sorted(_PROBE_PDG))}, or a neutrino PDG id)")
+
+
+def _as_pdg(v):
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, int):
+        return v
+    if isinstance(v, str) and v.lstrip("-").isdigit():
+        return int(v)
+    return None
 
 
 def _nucleus_for_material(mat: str):

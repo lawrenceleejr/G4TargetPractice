@@ -108,6 +108,11 @@ Common fields: `generator`, `geometry.gdml`, `beam.{particle,position,direction,
 `run.{events,output,seed}`. Backend-specific blocks (`geant4:`, `genie:`) are
 read only by their backend and ignored by the other.
 
+The projectile can be a Geant4 **name** or a **PDG id** — `beam.particle: proton`,
+`beam.particle: 2212`, or `beam.pdg: 1000060120` (a carbon-12 ion) are all valid.
+PDG ids cover ions and anything outside the common name table; for GENIE the id
+must be a neutrino (`±12/14/16`).
+
 ### Beam distributions & Twiss phase space
 
 Any beam coordinate can be a **distribution** instead of a single value — a bare

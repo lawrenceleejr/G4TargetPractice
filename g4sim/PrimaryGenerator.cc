@@ -3,6 +3,8 @@
 #include "RunAction.hh"
 
 #include "G4ParticleTable.hh"
+#include "G4ParticleDefinition.hh"
+#include "G4IonTable.hh"
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4RunManager.hh"
@@ -141,13 +143,51 @@ G4int PrimaryGenerator::GetParticlePDG() const
 {
     // In beam-file mode the species comes from the file; report the first entry
     // so RunAction's neutrino auto-mode still resolves for a neutrino beam.
-    const G4String name = fBeam.empty() ? fParticleName : fBeam.front().name;
-    auto* particle = G4ParticleTable::GetParticleTable()->FindParticle(name);
+    if (!fBeam.empty()) {
+        return fBeam.front().def ? fBeam.front().def->GetPDGEncoding() : 0;
+    }
+    auto* particle = G4ParticleTable::GetParticleTable()->FindParticle(fParticleName);
     return particle ? particle->GetPDGEncoding() : 0;
 }
 
+// Resolve a PDG id to a definition; fall back to the ion table for nuclei
+// (ion codes 10LZZZAAAI, PDG > 1e9) which are not pre-instantiated.
+G4ParticleDefinition* PrimaryGenerator::ResolveByPDG(G4int pdg) const
+{
+    auto* table = G4ParticleTable::GetParticleTable();
+    if (auto* p = table->FindParticle(pdg)) return p;
+    if (std::abs(pdg) > 1000000000) {
+        const G4int Z = (std::abs(pdg) / 10000) % 1000;
+        const G4int A = (std::abs(pdg) / 10) % 1000;
+        return table->GetIonTable()->GetIon(Z, A, 0.0);
+    }
+    return nullptr;
+}
+
+// Resolve a beam-file token: a PDG id (all digits, optional sign) or a name.
+G4ParticleDefinition* PrimaryGenerator::ResolveToken(const G4String& token) const
+{
+    const std::string t(token);
+    std::size_t start = (t.size() && (t[0] == '-' || t[0] == '+')) ? 1 : 0;
+    bool numeric = t.size() > start &&
+                   t.find_first_not_of("0123456789", start) == std::string::npos;
+    if (numeric) return ResolveByPDG(std::stoi(t));
+    return G4ParticleTable::GetParticleTable()->FindParticle(token);
+}
+
+void PrimaryGenerator::SetParticlePDG(G4int pdg)
+{
+    auto* def = ResolveByPDG(pdg);
+    if (!def) {
+        G4Exception("PrimaryGenerator::SetParticlePDG", "NoParticle", FatalException,
+                    ("No particle for PDG id " + std::to_string(pdg)).c_str());
+        return;
+    }
+    fParticleName = def->GetParticleName();
+}
+
 // ---------------------------------------------------------------------------
-// Beam-file loader: "name  x y z [mm]  px py pz [MeV/c]" per line ('#' comments)
+// Beam-file loader: "<name|pdg>  x y z [mm]  px py pz [MeV/c]" ('#' comments)
 // ---------------------------------------------------------------------------
 void PrimaryGenerator::LoadBeamFile(const G4String& path)
 {
@@ -164,12 +204,18 @@ void PrimaryGenerator::LoadBeamFile(const G4String& path)
         std::size_t s = line.find_first_not_of(" \t\r\n");
         if (s == std::string::npos || line[s] == '#') continue;
         std::istringstream iss(line);
-        BeamEntry e;
+        std::string token;
         G4double x, y, z, px, py, pz;
-        if (!(iss >> e.name >> x >> y >> z >> px >> py >> pz)) {
+        if (!(iss >> token >> x >> y >> z >> px >> py >> pz)) {
             G4Exception("PrimaryGenerator::LoadBeamFile", "BadBeamLine", JustWarning,
                         ("Malformed beam line ignored: " + line).c_str());
             continue;
+        }
+        BeamEntry e;
+        e.def = ResolveToken(token);
+        if (!e.def) {
+            G4Exception("PrimaryGenerator::LoadBeamFile", "NoParticle", FatalException,
+                        ("Beam-file particle not found: " + token).c_str());
         }
         e.position = G4ThreeVector(x * mm, y * mm, z * mm);
         e.momentum = G4ThreeVector(px * MeV, py * MeV, pz * MeV);
@@ -214,12 +260,7 @@ void PrimaryGenerator::GeneratePrimaries(G4Event* event)
                         "More events requested than beam-file entries; reusing the last.");
         }
         const BeamEntry& e = fBeam[std::min(i, fBeam.size() - 1)];
-        auto* particle = G4ParticleTable::GetParticleTable()->FindParticle(e.name);
-        if (!particle) {
-            G4Exception("PrimaryGenerator", "NoParticle", FatalException,
-                        ("Beam-file particle not found: " + e.name).c_str());
-        }
-        fParticleGun->SetParticleDefinition(particle);
+        fParticleGun->SetParticleDefinition(e.def);
         fParticleGun->SetParticlePosition(e.position);
         fParticleGun->SetParticleMomentum(e.momentum);  // sets direction + energy
         fParticleGun->GeneratePrimaryVertex(event);

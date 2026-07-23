@@ -50,10 +50,14 @@ public:
     void ClearEnergyBins() { fEnergyBins.clear(); }
 
     /// Load a host-sampled beam file: one primary per line,
-    ///   name  x y z [mm]  px py pz [MeV/c]
-    /// When loaded, GeneratePrimaries replays entry i for event i, ignoring the
+    ///   <name|pdg>  x y z [mm]  px py pz [MeV/c]
+    /// The first token may be a Geant4 name or a PDG id. When loaded,
+    /// GeneratePrimaries replays entry i for event i, ignoring the
     /// gun/energy/position/direction sampling above.
     void LoadBeamFile(const G4String& path);
+
+    /// Set the primary particle by PDG id (handles standard particles and ions).
+    void SetParticlePDG(G4int pdg);
 
     /// PDG code of the currently configured primary particle (0 if unknown).
     /// Used by RunAction to auto-enable neutrino-mode output branches.
@@ -82,11 +86,16 @@ private:
     /// Discrete histogram for kArb mode: (energy, weight) pairs.
     std::vector<std::pair<G4double, G4double>> fEnergyBins;
 
+    /// Resolve a particle by PDG id, falling back to the ion table for nuclei.
+    G4ParticleDefinition* ResolveByPDG(G4int pdg) const;
+    /// Resolve a beam-file token: a PDG id (numeric) or a Geant4 particle name.
+    G4ParticleDefinition* ResolveToken(const G4String& token) const;
+
     /// One host-sampled primary from a beam file (Geant4 internal units).
     struct BeamEntry {
-        G4String      name;
-        G4ThreeVector position;   ///< mm
-        G4ThreeVector momentum;   ///< MeV/c
+        G4ParticleDefinition* def = nullptr;   ///< resolved at load time
+        G4ThreeVector         position;        ///< mm
+        G4ThreeVector         momentum;        ///< MeV/c
     };
     std::vector<BeamEntry> fBeam;   ///< non-empty => beam-file replay mode
 

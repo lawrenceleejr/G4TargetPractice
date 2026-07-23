@@ -56,7 +56,10 @@ def build_macro(cfg, beam_file=None) -> str:
         lines.append(f"/run/beamOn {int(cfg.run.events)}")
         return "\n".join(lines) + "\n"
 
-    lines.append(f"/gun/particle {beam.particle}")
+    if beam.is_pdg():
+        lines.append(f"/gun/particlePDG {beam.pdg}")
+    else:
+        lines.append(f"/gun/particle {beam.particle}")
     lines.append(f"/gun/energyMode {e.mode}")
     if e.mode == "gauss" and e.sigma:
         lines.append(f"/gun/gaussSigma {e.sigma}")

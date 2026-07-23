@@ -139,6 +139,24 @@ def test_beam_file_roundtrip(tmp_path):
     assert mom == pytest.approx(tuple(s.mom[0]), abs=1e-3)
 
 
+def test_pdg_beam_mass_and_token(tmp_path):
+    """A pdg-defined beam converts energy->momentum via the PDG mass (here an
+    alpha ion) and writes the PDG integer as the beam-file token."""
+    c = config.from_dict({"geometry": {"gdml": "g.gdml"},
+        "beam": {"pdg": 1000020040, "energy": {"mode": "mono", "value": "400 MeV"},
+                 "position": {"x": {"dist": "gauss", "sigma": "1 mm"}, "y": 0, "z": 0}},
+        "run": {"events": 200, "seed": 1}})
+    c.validate()
+    s = beam.sample(c, 200, seed=1)
+    assert s.name == "1000020040"
+    m = mass_mev(1000020040)
+    expect = math.sqrt((400.0 + m) ** 2 - m * m)
+    assert np.allclose(np.linalg.norm(s.mom, axis=1), expect, atol=1e-2)
+    p = tmp_path / "beam.dat"
+    beam.write_beam_file(s, p)
+    assert beam.read_beam_file(p)[0][0] == "1000020040"
+
+
 def test_rotate_uz_maps_z_to_axis():
     v = np.array([[0.0, 0.0, 1.0]])
     out = beam.rotate_uz(v, np.array([1.0, 0.0, 0.0]))

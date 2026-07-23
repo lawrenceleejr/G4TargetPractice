@@ -95,7 +95,8 @@ class Twiss:
 
 @dataclass
 class Beam:
-    particle: str = "e-"
+    particle: str = "e-"     # Geant4 name, or str(pdg) when pdg-defined (display)
+    pdg: Optional[int] = None  # set when the projectile is given by PDG id
     energy: Energy = field(default_factory=Energy)
     position: str = "0 0 -20 cm"
     direction: str = "0 0 1"     # "0 0 0" -> isotropic (geant4 only)
@@ -105,6 +106,22 @@ class Beam:
     direction_slopes: Optional[dict] = None   # {"xprime":Distribution,"yprime":Distribution}
     momentum: Optional[Distribution] = None   # |p| spectrum (MeV/c); alt to energy
     twiss: Optional[Twiss] = None
+
+    def is_pdg(self) -> bool:
+        """The projectile was given by PDG id rather than a Geant4 name."""
+        return self.pdg is not None
+
+    def pdg_code(self):
+        """Resolve to a PDG code: the explicit id, else a lookup of the name in
+        the common particle table, else None (name not in the small table)."""
+        if self.pdg is not None:
+            return self.pdg
+        from . import particles
+        return particles.pdg_for(self.particle)
+
+    def identifier(self) -> str:
+        """Beam-file / display token: the PDG integer (pdg-defined) or the name."""
+        return str(self.pdg) if self.pdg is not None else self.particle
 
     def needs_sampling(self) -> bool:
         """True when the beam must be sampled host-side into a beam file (the
@@ -140,6 +157,8 @@ class RunConfig:
             raise ConfigError("no geometry: set geometry.gdml (or, for geant4, a macro via --mac)")
         if self.mac and self.generator != "geant4":
             raise ConfigError("a verbatim macro (mac) is only meaningful for the geant4 backend")
+        if self.beam.pdg is not None and self.beam.pdg == 0:
+            raise ConfigError("beam.pdg must be a nonzero PDG id")
         e = self.beam.energy
         if e.mode not in ENERGY_MODES:
             raise ConfigError(
@@ -300,13 +319,38 @@ def _twiss_from(raw):
     )
 
 
+def _as_pdg(v):
+    """Return an int PDG code if v is an int or an all-digit (optionally signed)
+    string, else None (it's a particle name like 'mu-')."""
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, int):
+        return v
+    if isinstance(v, str) and v.lstrip("-").isdigit():
+        return int(v)
+    return None
+
+
+def _particle_from(beam_raw):
+    """Resolve (name_or_display_str, pdg). An explicit `pdg:` wins; otherwise a
+    numeric `particle:` is treated as a PDG id; otherwise it is a name."""
+    raw = beam_raw.get("particle", "e-")
+    explicit = beam_raw.get("pdg")
+    pdg = _as_pdg(explicit) if explicit is not None else _as_pdg(raw)
+    if pdg is not None:
+        return str(pdg), pdg
+    return str(raw), None
+
+
 def _beam_from(beam_raw: dict) -> Beam:
     pos_str, pos_dist = _position_from(beam_raw.get("position"))
     dir_str, cone, slopes = _direction_from(beam_raw.get("direction"))
     # a top-level angle_sigma still works and overrides a direction-mapping cone
     angle_sigma = _opt_str(beam_raw.get("angle_sigma")) or cone
+    particle, pdg = _particle_from(beam_raw)
     return Beam(
-        particle=str(beam_raw.get("particle", "e-")),
+        particle=particle,
+        pdg=pdg,
         energy=_energy_from(beam_raw.get("energy")),
         position=pos_str,
         direction=dir_str,
@@ -384,7 +428,10 @@ def _apply_flag(cfg: RunConfig, name: str, value):
     elif name == "mac":
         cfg.mac = value
     elif name == "particle":
-        cfg.beam.particle = value
+        # a numeric --particle is a PDG id (mirrors the YAML behavior)
+        pdg = _as_pdg(value)
+        cfg.beam.pdg = pdg
+        cfg.beam.particle = str(pdg) if pdg is not None else value
     elif name == "energy":
         cfg.beam.energy.value = value  # flags only drive the mono/nominal value
     elif name == "position":

@@ -16,6 +16,12 @@ PrimaryGeneratorMessenger::PrimaryGeneratorMessenger(PrimaryGenerator* gun)
     fParticleCmd->SetGuidance("Set particle type (e.g. e-, nu_mu, nu_e)");
     fParticleCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
 
+    fParticlePDGCmd = new G4UIcmdWithAnInteger("/gun/particlePDG", this);
+    fParticlePDGCmd->SetGuidance("Set the primary particle by PDG id "
+                                 "(standard particles and ions, e.g. 2212, 1000060120).");
+    fParticlePDGCmd->SetParameterName("pdg", false);
+    fParticlePDGCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+
     fEnergyCmd = new G4UIcmdWithADoubleAndUnit("/gun/energy", this);
     fEnergyCmd->SetGuidance("Set nominal particle energy (monoenergetic, or mean/E0)");
     fEnergyCmd->SetDefaultUnit("GeV");
@@ -84,6 +90,9 @@ void PrimaryGeneratorMessenger::SetNewValue(G4UIcommand* command, G4String newVa
 {
     if (command == fParticleCmd) {
         fGun->SetParticleName(newValue);
+    }
+    else if (command == fParticlePDGCmd) {
+        fGun->SetParticlePDG(fParticlePDGCmd->GetNewIntValue(newValue));
     }
     else if (command == fEnergyCmd) {
         fGun->SetEnergy(fEnergyCmd->GetNewDoubleValue(newValue));

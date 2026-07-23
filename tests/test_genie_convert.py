@@ -102,6 +102,15 @@ def test_probe_pdg():
         genie.probe_pdg("proton")
 
 
+def test_probe_pdg_by_id():
+    assert genie.probe_pdg("14") == 14        # numeric string
+    assert genie.probe_pdg(-12) == -12        # int
+    with pytest.raises(config.ConfigError, match="neutrino"):
+        genie.probe_pdg("2212")               # proton PDG rejected
+    with pytest.raises(config.ConfigError, match="neutrino"):
+        genie.probe_pdg(1000060120)           # ion rejected
+
+
 def test_infer_target_argon(repo_root):
     t = genie.infer_target(str(repo_root / "gdml" / "liquid_argon_1m3.gdml"))
     assert t == 1000180400            # Ar-40

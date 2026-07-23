@@ -40,6 +40,20 @@ def test_macro_mono_basics():
     assert "/run/beamOn 500" in mac
 
 
+def test_macro_particle_by_pdg():
+    mac = geant4.build_macro(config.RunConfig(
+        gdml="g.gdml", beam=config.Beam(particle="2212", pdg=2212)))
+    assert "/gun/particlePDG 2212" in mac
+    assert "/gun/particle " not in mac        # name form not emitted
+
+
+def test_macro_particle_by_name_unchanged():
+    mac = geant4.build_macro(config.RunConfig(
+        gdml="g.gdml", beam=config.Beam(particle="mu-")))
+    assert "/gun/particle mu-" in mac
+    assert "/gun/particlePDG" not in mac
+
+
 def test_macro_gauss_emits_sigma():
     mac = geant4.build_macro(config.RunConfig(
         gdml="g.gdml",

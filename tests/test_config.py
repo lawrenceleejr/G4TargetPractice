@@ -54,6 +54,40 @@ def test_arb_bins_parsed(tmp_path):
     ]
 
 
+def test_particle_by_pdg_int(tmp_path):
+    cfg = config.from_yaml(_write(tmp_path, "geometry: {gdml: g.gdml}\nbeam: {particle: 2212}\n"))
+    cfg.validate()
+    assert cfg.beam.is_pdg() and cfg.beam.pdg == 2212
+    assert cfg.beam.pdg_code() == 2212
+    assert cfg.beam.identifier() == "2212"
+
+
+def test_particle_by_explicit_pdg_field(tmp_path):
+    cfg = config.from_yaml(_write(tmp_path, "geometry: {gdml: g.gdml}\nbeam: {pdg: 1000060120}\n"))
+    cfg.validate()
+    assert cfg.beam.pdg == 1000060120 and cfg.beam.is_pdg()
+
+
+def test_particle_by_signed_numeric_string(tmp_path):
+    cfg = config.from_yaml(_write(tmp_path, "geometry: {gdml: g.gdml}\nbeam: {particle: '-11'}\n"))
+    cfg.validate()
+    assert cfg.beam.pdg == -11
+
+
+def test_particle_name_is_not_pdg(tmp_path):
+    cfg = config.from_yaml(_write(tmp_path, "geometry: {gdml: g.gdml}\nbeam: {particle: mu-}\n"))
+    cfg.validate()
+    assert not cfg.beam.is_pdg()
+    assert cfg.beam.pdg_code() == 13          # resolved via the name table
+    assert cfg.beam.identifier() == "mu-"
+
+
+def test_pdg_zero_rejected():
+    c = config.RunConfig(gdml="g.gdml", beam=config.Beam(pdg=0))
+    with pytest.raises(config.ConfigError, match="nonzero PDG"):
+        c.validate()
+
+
 def test_yaml_off_neutrino_mode_normalized(tmp_path):
     """YAML parses `off` as boolean False; it must become the string 'off'."""
     cfg = config.from_yaml(_write(tmp_path,
