@@ -42,10 +42,6 @@ set(SOURCES
     SteppingAction.cc
     main.cc
 )
-#set(HEADERS
-#  MyPhysicsList.hh
-#  )
-  
 
 # --------------------
 # Executable

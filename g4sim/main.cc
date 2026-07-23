@@ -16,11 +16,9 @@
 #include "PrimaryGeneratorMessenger.hh"
 #include "EventAction.hh"
 #include "G4NeutrinoPhysics.hh"
-#include "MyPhysicsList.hh"
 #include "G4PhysListFactory.hh"
 #include "G4VModularPhysicsList.hh"
 #include "SteppingAction.hh"
-//#include "ActionInitialization.hh"
 #include "G4EmExtraPhysics.hh"
 #include "G4ParticleTable.hh"
 
