@@ -29,6 +29,7 @@ Issues = "https://github.com/lawrenceleejr/G4TargetPractice/issues"
 
 [project.scripts]
 g4tp = "g4tp.cli:main"
+genie2root = "g4tp.backends.genie_convert:main"
 
 [tool.setuptools]
 packages = ["g4tp", "g4tp.assets", "g4tp.backends"]

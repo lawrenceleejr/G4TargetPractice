@@ -126,6 +126,72 @@ def write_synthetic(path, n_events=30, e0_mev=50000.0, x0_cm=3.0,
     return str(path)
 
 
+def write_synthetic_gst(path, n_events=25, seed=0):
+    """A synthetic GENIE 'gst' summary tree, faithful to the branches the
+    converter reads. Energies/momenta in GeV, Q2 in GeV^2, vertex in cm (the
+    geometry length units), matching real gst output -- so genie_convert exercises
+    the real branch names and units without needing GENIE installed."""
+    rng = np.random.default_rng(seed)
+    is_cc = rng.random(n_events) < 0.7
+    qel = (rng.random(n_events) < 0.4) & is_cc
+    res = (rng.random(n_events) < 0.3) & is_cc & ~qel
+    dis = is_cc & ~qel & ~res
+    Ev = rng.uniform(0.5, 8.0, n_events)                 # GeV
+    El = np.clip(Ev * rng.uniform(0.2, 0.9, n_events), 0.0, Ev)
+
+    # Per-event final-state particle lists (GeV). Muon for CC, plus hadrons.
+    pdgf, Ef, pxf, pyf, pzf, nf = [], [], [], [], [], []
+    for i in range(n_events):
+        parts = [13 if is_cc[i] else 14]                 # mu- (CC) or nu_mu (NC)
+        energies = [max(El[i], 0.106)]
+        nhad = int(rng.integers(1, 5))
+        for _ in range(nhad):
+            parts.append(int(rng.choice([2212, 2112, 211, -211, 111])))
+            energies.append(float(rng.uniform(0.15, 1.5)))
+        p = np.array(parts, np.int64)
+        e = np.array(energies, float)
+        pdgf.append(p); Ef.append(e); nf.append(len(p))
+        pxf.append(rng.normal(0, 0.2, len(p)))
+        pyf.append(rng.normal(0, 0.2, len(p)))
+        pzf.append(np.abs(rng.normal(0.5, 0.3, len(p))))
+
+    data = {
+        "iev": np.arange(n_events, dtype=np.int64),
+        "neu": np.full(n_events, 14, np.int64),
+        "fspl": np.where(is_cc, 13, 14).astype(np.int64),
+        "tgt": np.full(n_events, 1000180400, np.int64),
+        "Z": np.full(n_events, 18, np.int64),
+        "A": np.full(n_events, 40, np.int64),
+        "cc": is_cc.astype(np.int32), "nc": (~is_cc).astype(np.int32),
+        "qel": qel.astype(np.int32), "res": res.astype(np.int32),
+        "dis": dis.astype(np.int32),
+        "coh": np.zeros(n_events, np.int32), "mec": np.zeros(n_events, np.int32),
+        "Ev": Ev, "pxv": np.zeros(n_events), "pyv": np.zeros(n_events), "pzv": Ev,
+        "El": El, "pxl": rng.normal(0, 0.1, n_events),
+        "pyl": rng.normal(0, 0.1, n_events), "pzl": El * 0.9,
+        "Q2": rng.uniform(0.1, 3.0, n_events),
+        "W": rng.uniform(0.9, 3.0, n_events),
+        "x": rng.uniform(0.05, 0.9, n_events),
+        "y": rng.uniform(0.05, 0.9, n_events),
+        "vtxx": rng.normal(0, 5.0, n_events),            # cm
+        "vtxy": rng.normal(0, 5.0, n_events),
+        "vtxz": rng.uniform(-40, 40, n_events),
+        "vtxt": np.zeros(n_events),
+        "nf": np.array(nf, np.int32),
+        "pdgf": ak.Array(pdgf), "Ef": ak.Array(Ef),
+        "pxf": ak.Array(pxf), "pyf": ak.Array(pyf), "pzf": ak.Array(pzf),
+    }
+    with uproot.recreate(path) as f:
+        f["gst"] = data
+    return str(path)
+
+
+@pytest.fixture(scope="session")
+def synth_gst(tmp_path_factory):
+    p = tmp_path_factory.mktemp("gst") / "events.gst.root"
+    return write_synthetic_gst(p, seed=7)
+
+
 @pytest.fixture(scope="session")
 def synth_root(tmp_path_factory):
     """Standard synthetic run: 50 GeV e-, -z beam from z=650 cm, 2% leakage."""
