@@ -12,6 +12,7 @@ from .base import Backend, Prepared
 
 DEFAULT_IMAGE = "ghcr.io/lawrenceleejr/g4targetpractice:main"
 GENERATED_MACRO = "gdmltp_run.mac"
+BEAM_FILE = "beam.dat"
 
 
 def _progress(events):
@@ -21,13 +22,17 @@ def _progress(events):
         return 100
 
 
-def build_macro(cfg) -> str:
+def build_macro(cfg, beam_file=None) -> str:
     """Render `cfg` to Geant4 macro text.
 
     Order matters only in that /analysis/neutrinoMode, the seed and the field
     must precede /run/beamOn (branches/field are set up at run start); the gun
     commands are state-flexible. We keep the historical layout:
     readGDML -> initialize -> neutrinoMode -> [seed] -> [field] -> gun -> beamOn.
+
+    When `beam_file` is given (host-sampled distributions / Twiss), the per-event
+    gun block is replaced by a single `/gun/beamFile`, and g4sim replays one
+    sampled primary per event.
     """
     beam = cfg.beam
     e = beam.energy
@@ -44,6 +49,12 @@ def build_macro(cfg) -> str:
     field = cfg.geant4.get("field")
     if field:
         lines.append(f"/detector/setGlobalField {field}")
+
+    if beam_file:
+        lines.append(f"/gun/beamFile {beam_file}")
+        lines.append(f"/run/printProgress {_progress(cfg.run.events)}")
+        lines.append(f"/run/beamOn {int(cfg.run.events)}")
+        return "\n".join(lines) + "\n"
 
     lines.append(f"/gun/particle {beam.particle}")
     lines.append(f"/gun/energyMode {e.mode}")
@@ -96,6 +107,12 @@ class Geant4Backend(Backend):
             src = Path(cfg.mac)
             if src.resolve().parent != outdir.resolve() and src.exists():
                 shutil.copy(src, outdir / macro_name)
+        elif cfg.beam.needs_sampling():
+            from .. import beam as beammod
+            s = beammod.sample(cfg, int(cfg.run.events), seed=cfg.run.seed)
+            beammod.write_beam_file(s, outdir / BEAM_FILE)
+            macro_name = GENERATED_MACRO
+            (outdir / macro_name).write_text(build_macro(cfg, beam_file=BEAM_FILE))
         else:
             macro_name = GENERATED_MACRO
             (outdir / macro_name).write_text(build_macro(cfg))

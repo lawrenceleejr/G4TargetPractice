@@ -51,6 +51,16 @@ def name_for(pdg):
     return f"pdg{pdg}"
 
 
+# Reverse map (name -> PDG) for the common set above, used by the beam sampler
+# (name -> PDG -> rest mass) and the GENIE probe resolver.
+NAME_TO_PDG = {name: pdg for pdg, (name, _color) in _PARTICLES.items()}
+
+
+def pdg_for(name):
+    """PDG code for a Geant4 particle name, or None if not in the common table."""
+    return NAME_TO_PDG.get(name)
+
+
 def color_for(pdg):
     pdg = int(pdg)
     if pdg in _PARTICLES:

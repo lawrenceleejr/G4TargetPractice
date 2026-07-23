@@ -31,4 +31,7 @@ private:
     // Arbitrary-histogram commands
     G4UIcmdWithAString*        fAddEnergyBinCmd;  // "energy unit weight"
     G4UIcmdWithoutParameter*   fClearEnergyBinsCmd;
+
+    // Host-sampled beam file (distributions / Twiss); one primary per event
+    G4UIcmdWithAString*        fBeamFileCmd;
 };

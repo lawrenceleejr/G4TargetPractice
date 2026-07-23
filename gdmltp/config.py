@@ -43,13 +43,76 @@ class Energy:
     bins: list = field(default_factory=list)  # arb: list of {"value","weight"}
 
 
+DIST_KINDS = ("fixed", "gauss", "uniform")
+
+
+def _validate_dist(d, name):
+    if d.kind not in DIST_KINDS:
+        raise ConfigError(f"{name}: unknown distribution {d.kind!r}; "
+                          f"choose one of {', '.join(DIST_KINDS)}")
+    if d.kind == "fixed" and d.value is None:
+        raise ConfigError(f"{name}: fixed distribution needs a value")
+    if d.kind == "gauss" and d.sigma is None:
+        raise ConfigError(f"{name}: gauss distribution needs sigma (mean defaults to 0)")
+    if d.kind == "uniform" and (d.min is None or d.max is None):
+        raise ConfigError(f"{name}: uniform distribution needs min and max")
+
+
+@dataclass
+class Distribution:
+    """A 1-D distribution for a single beam coordinate. A bare scalar-with-unit
+    in the YAML means `fixed`; a mapping selects gauss/uniform. Values are
+    unit-carrying strings (e.g. "2 mm", "5 mrad", "10 MeV/c")."""
+    kind: str = "fixed"                 # fixed | gauss | uniform
+    value: Optional[str] = None         # fixed
+    mean: Optional[str] = None          # gauss
+    sigma: Optional[str] = None         # gauss
+    min: Optional[str] = None           # uniform
+    max: Optional[str] = None           # uniform
+
+    def is_fixed(self):
+        return self.kind == "fixed"
+
+
+@dataclass
+class TwissPlane:
+    alpha: float = 0.0
+    beta: float = 1.0        # [m]
+    emittance: float = 0.0   # geometric, [mm.mrad]
+
+
+@dataclass
+class Twiss:
+    """Correlated phase space at a reference point (geometric emittance,
+    mm.mrad; beta in m). Sampled as a correlated Gaussian from the beam matrix."""
+    x: TwissPlane = field(default_factory=TwissPlane)
+    y: TwissPlane = field(default_factory=TwissPlane)
+    p0: str = "1 GeV/c"      # reference momentum magnitude
+    dp_over_p: float = 0.0   # fractional momentum spread (gaussian sigma)
+    ref_position: str = "0 0 0 mm"
+    ref_direction: str = "0 0 1"
+
+
 @dataclass
 class Beam:
     particle: str = "e-"
     energy: Energy = field(default_factory=Energy)
     position: str = "0 0 -20 cm"
     direction: str = "0 0 1"     # "0 0 0" -> isotropic (geant4 only)
-    angle_sigma: Optional[str] = None  # gaussian angular spread, e.g. "10 deg"
+    angle_sigma: Optional[str] = None  # gaussian angular cone spread, e.g. "10 deg"
+    # --- distribution / phase-space extensions (host-sampled -> beam file) ---
+    position_dist: Optional[dict] = None      # {"x":Distribution,"y":...,"z":...}
+    direction_slopes: Optional[dict] = None   # {"xprime":Distribution,"yprime":Distribution}
+    momentum: Optional[Distribution] = None   # |p| spectrum (MeV/c); alt to energy
+    twiss: Optional[Twiss] = None
+
+    def needs_sampling(self) -> bool:
+        """True when the beam must be sampled host-side into a beam file (the
+        engines can't produce these per-event distributions from single-value
+        gun commands). Plain energy modes + a fixed position/direction (+ cone)
+        stay on the analytic macro path."""
+        return bool(self.position_dist or self.direction_slopes
+                    or self.momentum or self.twiss)
 
 
 @dataclass
@@ -91,11 +154,32 @@ class RunConfig:
         if nm is not None and nm not in ("auto", "on", "off"):
             raise ConfigError(
                 f"geant4.neutrino_mode must be auto/on/off, got {nm!r}")
+        self._validate_beam_distributions()
         try:
             int(self.run.events)
         except (TypeError, ValueError):
             raise ConfigError(f"run.events must be an integer, got {self.run.events!r}")
         return self
+
+    def _validate_beam_distributions(self):
+        b = self.beam
+        for group in (b.position_dist, b.direction_slopes):
+            for name, d in (group or {}).items():
+                _validate_dist(d, name)
+        if b.momentum:
+            _validate_dist(b.momentum, "momentum")
+        if b.twiss:
+            # Twiss defines position + angle + momentum together; independent
+            # spreads on the same coordinates would be ambiguous.
+            if b.position_dist or b.direction_slopes or b.momentum:
+                raise ConfigError(
+                    "beam.twiss is mutually exclusive with position_dist / "
+                    "direction slopes / momentum (twiss defines them jointly)")
+            for plane, tp in (("x", b.twiss.x), ("y", b.twiss.y)):
+                if tp.beta <= 0:
+                    raise ConfigError(f"twiss.{plane}.beta must be > 0")
+                if tp.emittance < 0:
+                    raise ConfigError(f"twiss.{plane}.emittance must be >= 0")
 
 
 # --------------------------------------------------------------------------- #
@@ -132,6 +216,108 @@ def _opt_str(v):
     return None if v is None else str(v)
 
 
+def _distribution_from(raw) -> Distribution:
+    """A scalar (str/number) -> fixed; a mapping {dist: gauss|uniform|fixed, ...}."""
+    if raw is None:
+        return Distribution(kind="fixed", value="0")
+    if isinstance(raw, (str, int, float)):
+        return Distribution(kind="fixed", value=str(raw))
+    if not isinstance(raw, dict):
+        raise ConfigError("a distribution must be a scalar or a mapping")
+    kind = str(raw.get("dist", "fixed"))
+    return Distribution(
+        kind=kind,
+        value=_opt_str(raw.get("value")),
+        mean=_opt_str(raw.get("mean")),
+        sigma=_opt_str(raw.get("sigma")),
+        min=_opt_str(raw.get("min")),
+        max=_opt_str(raw.get("max")),
+    )
+
+
+def _position_from(raw):
+    """Return (position_str, position_dist). A string -> fixed; a {x,y,z} mapping
+    -> per-axis Distributions (each axis a scalar or a distribution mapping)."""
+    if raw is None:
+        return "0 0 -20 cm", None
+    if isinstance(raw, str):
+        return raw, None
+    if isinstance(raw, dict):
+        dist = {axis: _distribution_from(raw.get(axis)) for axis in ("x", "y", "z")}
+        return "0 0 0 mm", dist
+    raise ConfigError("beam.position must be a string or an {x,y,z} mapping")
+
+
+def _direction_from(raw):
+    """Return (direction_str, angle_sigma, direction_slopes).
+       - string           -> fixed direction
+       - {theta_sigma}    -> fixed direction (optional 'central') + gaussian cone
+       - {xprime,yprime}  -> angular slope distributions (requires host sampling)"""
+    if raw is None:
+        return "0 0 1", None, None
+    if isinstance(raw, str):
+        return raw, None, None
+    if not isinstance(raw, dict):
+        raise ConfigError("beam.direction must be a string or a mapping")
+    central = str(raw.get("central", "0 0 1"))
+    if "xprime" in raw or "yprime" in raw:
+        slopes = {"xprime": _distribution_from(raw.get("xprime", 0)),
+                  "yprime": _distribution_from(raw.get("yprime", 0))}
+        return central, None, slopes
+    return central, _opt_str(raw.get("theta_sigma")), None
+
+
+def _momentum_from(raw):
+    if raw is None:
+        return None
+    return _distribution_from(raw)
+
+
+def _twiss_plane(raw, name) -> TwissPlane:
+    if not isinstance(raw, dict):
+        raise ConfigError(f"twiss.{name} must be a mapping with alpha, beta, emittance")
+    try:
+        return TwissPlane(alpha=float(raw.get("alpha", 0.0)),
+                          beta=float(raw["beta"]),
+                          emittance=float(raw["emittance"]))
+    except (KeyError, TypeError, ValueError):
+        raise ConfigError(f"twiss.{name} needs numeric beta and emittance (and optional alpha)")
+
+
+def _twiss_from(raw):
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ConfigError("beam.twiss must be a mapping")
+    ref = raw.get("reference") or {}
+    return Twiss(
+        x=_twiss_plane(raw.get("x"), "x"),
+        y=_twiss_plane(raw.get("y"), "y"),
+        p0=str(raw.get("p0", "1 GeV/c")),
+        dp_over_p=float(raw.get("dp_over_p", 0.0)),
+        ref_position=str(ref.get("position", "0 0 0 mm")),
+        ref_direction=str(ref.get("direction", "0 0 1")),
+    )
+
+
+def _beam_from(beam_raw: dict) -> Beam:
+    pos_str, pos_dist = _position_from(beam_raw.get("position"))
+    dir_str, cone, slopes = _direction_from(beam_raw.get("direction"))
+    # a top-level angle_sigma still works and overrides a direction-mapping cone
+    angle_sigma = _opt_str(beam_raw.get("angle_sigma")) or cone
+    return Beam(
+        particle=str(beam_raw.get("particle", "e-")),
+        energy=_energy_from(beam_raw.get("energy")),
+        position=pos_str,
+        direction=dir_str,
+        angle_sigma=angle_sigma,
+        position_dist=pos_dist,
+        direction_slopes=slopes,
+        momentum=_momentum_from(beam_raw.get("momentum")),
+        twiss=_twiss_from(beam_raw.get("twiss")),
+    )
+
+
 def from_dict(data: dict) -> RunConfig:
     """Build a RunConfig from a parsed YAML/JSON mapping (no flag merge)."""
     if not isinstance(data, dict):
@@ -149,13 +335,7 @@ def from_dict(data: dict) -> RunConfig:
         generator=str(data.get("generator", "geant4")),
         gdml=_opt_str(geometry.get("gdml")),
         mac=_opt_str(data.get("mac")),
-        beam=Beam(
-            particle=str(beam_raw.get("particle", "e-")),
-            energy=_energy_from(beam_raw.get("energy")),
-            position=str(beam_raw.get("position", "0 0 -20 cm")),
-            direction=str(beam_raw.get("direction", "0 0 1")),
-            angle_sigma=_opt_str(beam_raw.get("angle_sigma")),
-        ),
+        beam=_beam_from(beam_raw),
         run=_run_from(data.get("run") or {}),
         geant4=dict(data.get("geant4") or {}),
         genie=dict(data.get("genie") or {}),

@@ -71,6 +71,13 @@ PrimaryGeneratorMessenger::PrimaryGeneratorMessenger(PrimaryGenerator* gun)
     fClearEnergyBinsCmd = new G4UIcmdWithoutParameter("/gun/clearEnergyBins", this);
     fClearEnergyBinsCmd->SetGuidance("Clear all bins defined for the arb energy mode");
     fClearEnergyBinsCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+
+    fBeamFileCmd = new G4UIcmdWithAString("/gun/beamFile", this);
+    fBeamFileCmd->SetGuidance(
+        "Replay a host-sampled beam file (one primary per event):\n"
+        "  name  x y z [mm]  px py pz [MeV/c]\n"
+        "Overrides the /gun energy/position/direction sampling above.");
+    fBeamFileCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
 }
 
 void PrimaryGeneratorMessenger::SetNewValue(G4UIcommand* command, G4String newValue)
@@ -130,5 +137,8 @@ void PrimaryGeneratorMessenger::SetNewValue(G4UIcommand* command, G4String newVa
     }
     else if (command == fClearEnergyBinsCmd) {
         fGun->ClearEnergyBins();
+    }
+    else if (command == fBeamFileCmd) {
+        fGun->LoadBeamFile(newValue);
     }
 }

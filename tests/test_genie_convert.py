@@ -147,6 +147,36 @@ def test_genie_backend_registered():
     assert backends.get("genie").name == "genie"
 
 
+# --- per-event beam replay (vertex + direction rotation) ------------------- #
+def test_convert_with_beam_places_vertex_and_rotates(synth_gst, tmp_path):
+    """A beam replay overrides each event's vertex and orients the +z GENIE
+    event along the ray. Give every ray a +x direction and check the outgoing
+    lepton momentum rotated from +z into +x, and the vertex is the ray's."""
+    import uproot
+    n = io.num_events(synth_gst)
+    entries = [("nu_mu", (7.0, 0.0, -3.0), (500.0, 0.0, 0.0)) for _ in range(n)]
+    out = str(tmp_path / "output.root")
+    genie_convert.convert(synth_gst, out, beam=entries)
+    conv = uproot.open(out)["tree"]
+    vx = conv["nu_vertexX"].array(library="np")
+    vz = conv["nu_vertexZ"].array(library="np")
+    assert np.allclose(vx, 7.0) and np.allclose(vz, -3.0)
+    assert np.allclose(conv["primaryStartPx"].array(library="np"), 500.0)
+    assert np.allclose(conv["primaryStartPz"].array(library="np"), 0.0)
+    # outgoing lepton rotated: its old +z component lands on +x
+    gst = uproot.open(synth_gst)["gst"]
+    pzl = gst["pzl"].array(library="np") * 1000.0
+    assert np.allclose(conv["nu_outLeptonPx"].array(library="np"), pzl, atol=1e-6)
+    tx = conv["trk_startX"].array()
+    assert all(np.allclose(np.asarray(row), 7.0) for row in tx if len(row))
+
+
+def test_convert_beam_length_mismatch_errors(synth_gst, tmp_path):
+    with pytest.raises(ValueError, match="entries but gst"):
+        genie_convert.convert(synth_gst, str(tmp_path / "o.root"),
+                              beam=[("nu_mu", (0, 0, 0), (1, 0, 0))])
+
+
 # --- flux mapping (driver logic, pure python) ------------------------------ #
 def test_parse_energy_gev():
     assert genie.parse_energy_gev("2.0 GeV") == pytest.approx(2.0)

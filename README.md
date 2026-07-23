@@ -108,6 +108,47 @@ Common fields: `generator`, `geometry.gdml`, `beam.{particle,position,direction,
 `run.{events,output,seed}`. Backend-specific blocks (`geant4:`, `genie:`) are
 read only by their backend and ignored by the other.
 
+### Beam distributions & Twiss phase space
+
+Any beam coordinate can be a **distribution** instead of a single value — a bare
+scalar is fixed, a mapping picks `gauss`/`uniform`:
+
+```yaml
+beam:
+  particle: proton
+  position:                                  # a gaussian spot at a fixed z
+    x: { dist: gauss, mean: "0 mm", sigma: "3 mm" }
+    y: { dist: gauss, sigma: "3 mm" }        # mean defaults to 0
+    z: "-200 mm"
+  direction:                                 # angular slopes about the axis
+    central: "0 0 1"
+    xprime: { dist: gauss, sigma: "5 mrad" }
+    yprime: { dist: gauss, sigma: "5 mrad" }
+  momentum: { dist: gauss, mean: "600 MeV/c", sigma: "12 MeV/c" }   # or use beam.energy
+```
+
+Or define a **Twiss** phase space at a point and sample N particles from it
+(geometric emittance in mm·mrad, β in m):
+
+```yaml
+beam:
+  particle: mu-
+  twiss:
+    x: { alpha: -1.2, beta: 5.0, emittance: 3.0 }
+    y: { alpha:  0.4, beta: 2.0, emittance: 1.5 }
+    p0: "300 MeV/c"
+    dp_over_p: 0.01
+    reference: { position: "0 0 -20 cm", direction: "0 0 1" }
+```
+
+How it works: when any beam parameter is a distribution (or `twiss` is set), the
+**host** samples N primaries deterministically (seeded by `run.seed`) into a
+portable `beam.dat` (`name  x y z [mm]  px py pz [MeV/c]`), and each generator
+**replays** it one primary per event — Geant4 via a `/gun/beamFile` command, GENIE
+by generating one interaction per ray and placing/orienting it along that ray.
+Plain energy modes with a fixed position/direction stay on the fast analytic path
+(no beam file). See `examples/twiss_muon.yaml` and `examples/gauss_beam.yaml`.
+
 ### Or plain flags (no file)
 
 ```bash

@@ -1,0 +1,26 @@
+# Independent per-parameter distributions: a gaussian spot + angular divergence
+# + a gaussian momentum spread. Each coordinate is sampled independently.
+#   gdmltp run --config examples/gauss_beam.yaml
+generator: geant4
+
+geometry:
+  gdml: gdml/water_phantom_30cm.gdml
+
+beam:
+  particle: proton
+  # position: a gaussian spot in x and y at a fixed z (entrance plane)
+  position:
+    x: { dist: gauss, mean: "0 mm", sigma: "3 mm" }
+    y: { dist: gauss, mean: "0 mm", sigma: "3 mm" }
+    z: "-200 mm"
+  # direction: angular slopes about the central axis (rad/mrad)
+  direction:
+    central: "0 0 1"
+    xprime: { dist: gauss, sigma: "5 mrad" }
+    yprime: { dist: gauss, sigma: "5 mrad" }
+  # momentum magnitude (alternative to energy)
+  momentum: { dist: gauss, mean: "600 MeV/c", sigma: "12 MeV/c" }
+
+run:
+  events: 1000
+  seed: 7

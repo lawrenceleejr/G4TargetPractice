@@ -13,6 +13,7 @@ from ..config import ConfigError
 
 GENIE_IMAGE = "ghcr.io/lawrenceleejr/g4targetpractice-genie:main"
 JOB_FILE = "genie_job.json"
+BEAM_FILE = "beam.dat"
 
 # Geant4 particle names -> PDG (neutrinos only; GENIE is a neutrino generator).
 _PROBE_PDG = {
@@ -166,6 +167,16 @@ class GenieBackend(Backend):
             "length_units": cfg.genie.get("length_units", "cm"),
             "seed": cfg.run.seed,
         }
+
+        # Host-sampled distributions / Twiss -> a per-event beam file the driver
+        # replays (one gevgen call per ray, vertex + direction applied by the
+        # converter). Overrides the aggregate flux above.
+        if cfg.beam.needs_sampling():
+            from .. import beam as beammod
+            s = beammod.sample(cfg, int(cfg.run.events), seed=cfg.run.seed)
+            beammod.write_beam_file(s, outdir / BEAM_FILE)
+            job["beam_file"] = BEAM_FILE
+
         (outdir / JOB_FILE).write_text(json.dumps(job, indent=2) + "\n")
 
         return Prepared(argv=[JOB_FILE],

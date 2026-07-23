@@ -13,6 +13,9 @@
 
 #include <cmath>
 #include <sstream>
+#include <fstream>
+#include <string>
+#include <algorithm>
 
 /*
  * Supported particle names (examples):
@@ -136,8 +139,44 @@ G4double PrimaryGenerator::SampleArbitrary() const
 
 G4int PrimaryGenerator::GetParticlePDG() const
 {
-    auto* particle = G4ParticleTable::GetParticleTable()->FindParticle(fParticleName);
+    // In beam-file mode the species comes from the file; report the first entry
+    // so RunAction's neutrino auto-mode still resolves for a neutrino beam.
+    const G4String name = fBeam.empty() ? fParticleName : fBeam.front().name;
+    auto* particle = G4ParticleTable::GetParticleTable()->FindParticle(name);
     return particle ? particle->GetPDGEncoding() : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Beam-file loader: "name  x y z [mm]  px py pz [MeV/c]" per line ('#' comments)
+// ---------------------------------------------------------------------------
+void PrimaryGenerator::LoadBeamFile(const G4String& path)
+{
+    std::ifstream in(path.c_str());
+    if (!in) {
+        G4Exception("PrimaryGenerator::LoadBeamFile", "NoBeamFile", FatalException,
+                    ("Could not open beam file: " + path).c_str());
+        return;
+    }
+    fBeam.clear();
+    std::string line;
+    while (std::getline(in, line)) {
+        // trim leading whitespace; skip blanks and comments
+        std::size_t s = line.find_first_not_of(" \t\r\n");
+        if (s == std::string::npos || line[s] == '#') continue;
+        std::istringstream iss(line);
+        BeamEntry e;
+        G4double x, y, z, px, py, pz;
+        if (!(iss >> e.name >> x >> y >> z >> px >> py >> pz)) {
+            G4Exception("PrimaryGenerator::LoadBeamFile", "BadBeamLine", JustWarning,
+                        ("Malformed beam line ignored: " + line).c_str());
+            continue;
+        }
+        e.position = G4ThreeVector(x * mm, y * mm, z * mm);
+        e.momentum = G4ThreeVector(px * MeV, py * MeV, pz * MeV);
+        fBeam.push_back(e);
+    }
+    G4cout << "PrimaryGenerator: loaded " << fBeam.size()
+           << " primaries from beam file " << path << G4endl;
 }
 
 G4double PrimaryGenerator::SampleEnergy() const
@@ -167,6 +206,26 @@ G4double PrimaryGenerator::SampleEnergy() const
 // ---------------------------------------------------------------------------
 void PrimaryGenerator::GeneratePrimaries(G4Event* event)
 {
+    // --- Beam-file replay: one host-sampled primary per event ---
+    if (!fBeam.empty()) {
+        const std::size_t i = static_cast<std::size_t>(event->GetEventID());
+        if (i >= fBeam.size()) {
+            G4Exception("PrimaryGenerator", "BeamExhausted", JustWarning,
+                        "More events requested than beam-file entries; reusing the last.");
+        }
+        const BeamEntry& e = fBeam[std::min(i, fBeam.size() - 1)];
+        auto* particle = G4ParticleTable::GetParticleTable()->FindParticle(e.name);
+        if (!particle) {
+            G4Exception("PrimaryGenerator", "NoParticle", FatalException,
+                        ("Beam-file particle not found: " + e.name).c_str());
+        }
+        fParticleGun->SetParticleDefinition(particle);
+        fParticleGun->SetParticlePosition(e.position);
+        fParticleGun->SetParticleMomentum(e.momentum);  // sets direction + energy
+        fParticleGun->GeneratePrimaryVertex(event);
+        return;
+    }
+
     // --- Particle ---
     if (fParticleName.empty()) {
         G4Exception("PrimaryGenerator", "NoParticle", FatalException,

@@ -84,8 +84,13 @@ def _out_lepton_pdg(t, keys, neu, cc):
     return np.where(cc.astype(bool), charged, neu).astype(np.int64)
 
 
-def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree"):
-    """Read GENIE `gst` at `gst_path`, write schema `output.root` at `out_path`."""
+def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", beam=None):
+    """Read GENIE `gst` at `gst_path`, write schema `output.root` at `out_path`.
+
+    `beam` (a beam-file path or a list of (name, pos_mm, mom_mev) entries) replays
+    a host-sampled beam: it overrides each event's vertex and orients the event
+    along the sampled ray (see the per-event beam-replay block below).
+    """
     with uproot.open(gst_path) as f:
         tname = gst_tree or ("gst" if any(k.split(";")[0] == "gst" for k in f.keys())
                              else _first_tree(f))
@@ -129,6 +134,29 @@ def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree"):
     vx = vtxx * len_scale; vy = vtxy * len_scale; vz = vtxz * len_scale
     vt = vtxt * S_TO_NS
 
+    # Per-event beam replay: place the vertex at the sampled ray's position and
+    # orient the (point-mode, +z) GENIE event along the ray direction. The
+    # incoming neutrino momentum IS the sampled beam momentum; the outgoing
+    # lepton is rotated from +z onto the ray. trk_* positions follow the vertex.
+    if beam is not None:
+        from .. import beam as beammod
+        entries = beammod.read_beam_file(beam) if isinstance(beam, str) else list(beam)
+        if len(entries) < n:
+            raise ValueError(f"beam file has {len(entries)} entries but gst has {n} events")
+        bpos = np.array([e[1] for e in entries[:n]], float)   # (n,3) mm
+        bmom = np.array([e[2] for e in entries[:n]], float)   # (n,3) MeV/c
+        vx, vy, vz = bpos[:, 0].copy(), bpos[:, 1].copy(), bpos[:, 2].copy()
+        primary_p = bmom
+        primaryE = np.linalg.norm(bmom, axis=1)
+        lep_local = np.column_stack([pxl, pyl, pzl]) * GEV_TO_MEV
+        outlep_p = beammod.rotate_uz_rows(lep_local, bmom)
+        q0 = primaryE - El * GEV_TO_MEV
+    else:
+        primary_p = np.column_stack([pxv, pyv, pzv]) * GEV_TO_MEV
+        primaryE = Ev * GEV_TO_MEV
+        outlep_p = np.column_stack([pxl, pyl, pzl]) * GEV_TO_MEV
+        q0 = (Ev - El) * GEV_TO_MEV
+
     flat_mass = np.array([mass_mev(p) for p in flat_pdg], dtype=float)
     flat_kin = np.maximum(0.0, flat_Ef_mev - flat_mass)
 
@@ -148,10 +176,10 @@ def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree"):
         # --- event scalars ---
         "eventID": eid.astype(np.int32),
         "primaryPDG": neu.astype(np.int32),
-        "primaryE": Ev * GEV_TO_MEV,
+        "primaryE": primaryE,
         "primaryStartX": vx, "primaryStartY": vy, "primaryStartZ": vz,
-        "primaryStartPx": pxv * GEV_TO_MEV, "primaryStartPy": pyv * GEV_TO_MEV,
-        "primaryStartPz": pzv * GEV_TO_MEV,
+        "primaryStartPx": primary_p[:, 0], "primaryStartPy": primary_p[:, 1],
+        "primaryStartPz": primary_p[:, 2],
         "primaryEndE": np.zeros(n),
         "primaryEndX": vx, "primaryEndY": vy, "primaryEndZ": vz,
         "primaryEndPx": np.zeros(n), "primaryEndPy": np.zeros(n), "primaryEndPz": np.zeros(n),
@@ -182,17 +210,17 @@ def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree"):
         # --- neutrino interaction block ---
         "nu_isCC": cc.astype(bool),
         "nu_isNC": nc.astype(bool),
-        "nu_interactionProcess": _process_names(t, keys, n),
+        "nu_interactionProcess": procs,
         "nu_vertexX": vx, "nu_vertexY": vy, "nu_vertexZ": vz, "nu_vertexT": vt,
         "nu_targetZ": Z.astype(np.int32), "nu_targetA": A.astype(np.int32),
         "nu_outLeptonPDG": lep_pdg.astype(np.int32),
         "nu_outLeptonE": El * GEV_TO_MEV,
-        "nu_outLeptonPx": pxl * GEV_TO_MEV, "nu_outLeptonPy": pyl * GEV_TO_MEV,
-        "nu_outLeptonPz": pzl * GEV_TO_MEV,
+        "nu_outLeptonPx": outlep_p[:, 0], "nu_outLeptonPy": outlep_p[:, 1],
+        "nu_outLeptonPz": outlep_p[:, 2],
         "nu_Q2": Q2 * GEV2_TO_MEV2,
         "nu_W": W * GEV_TO_MEV,
         "nu_x": xbj, "nu_y": ybj,
-        "nu_q0": (Ev - El) * GEV_TO_MEV,
+        "nu_q0": q0,
     }
 
     with uproot.recreate(out_path) as f:

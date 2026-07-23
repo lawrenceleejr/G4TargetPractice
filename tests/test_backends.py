@@ -95,6 +95,28 @@ def test_prepare_field_sets_celer_disable(tmp_path):
     assert prep.env.get("CELER_DISABLE") == "1"
 
 
+def test_prepare_sampled_beam_writes_beamfile(tmp_path):
+    """A distribution beam makes the geant4 macro use /gun/beamFile + writes beam.dat."""
+    b = backends.get("geant4")
+    cfg = config.RunConfig(
+        gdml="gdml/water_phantom_30cm.gdml",
+        beam=config.Beam(particle="mu-",
+                         momentum=config.Distribution(kind="fixed", value="500 MeV/c"),
+                         position_dist={"x": config.Distribution(kind="gauss", sigma="2 mm"),
+                                        "y": config.Distribution(kind="fixed", value="0"),
+                                        "z": config.Distribution(kind="fixed", value="-200 mm")}),
+        run=config.RunSettings(events=25, seed=1))
+    cfg.validate()
+    prep = b.prepare(cfg, tmp_path)
+    assert (tmp_path / geant4.BEAM_FILE).exists()
+    macro = (tmp_path / prep.argv[0]).read_text()
+    assert "/gun/beamFile beam.dat" in macro
+    assert "/run/beamOn 25" in macro
+    # 25 sampled primaries in the beam file
+    from gdmltp import beam as beammod
+    assert len(beammod.read_beam_file(tmp_path / geant4.BEAM_FILE)) == 25
+
+
 def test_prepare_verbatim_mac_is_copied(tmp_path):
     src = tmp_path / "src"
     src.mkdir()
