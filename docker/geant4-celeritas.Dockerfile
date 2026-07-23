@@ -47,12 +47,13 @@ RUN if [ -f /lib/x86_64-linux-gnu/libQt6Core.so.6 ]; then strip --remove-section
 COPY scans/ /app/scans/
 
 # gdmltp tooling (pure Python, no ROOT) + deprecated g4tp shim
-RUN python3 -m pip install --no-cache-dir uproot awkward numpy matplotlib pyyaml \
-    || pip3 install --no-cache-dir uproot awkward numpy matplotlib pyyaml
+RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    python3 -m pip install --no-cache-dir uproot awkward numpy matplotlib pyyaml
 COPY gdmltp/ /app/pysrc/gdmltp/
 COPY g4tp/ /app/pysrc/g4tp/
 COPY pyproject.toml README.md /app/pysrc/
-RUN python3 -m pip install --no-cache-dir /app/pysrc || pip3 install --no-cache-dir /app/pysrc
+RUN python3 -m pip install --no-cache-dir /app/pysrc && \
+    python3 -c "import gdmltp; from gdmltp.backends import genie_convert, achilles_convert; print('gdmltp', gdmltp.__version__)"
 COPY g4sim/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 

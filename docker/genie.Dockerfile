@@ -16,13 +16,13 @@ WORKDIR /app
 
 # Python tooling: the gst -> output.root converter and the gdmltp analysis suite
 # (pure Python: uproot/awkward/numpy/matplotlib/pyyaml -- no ROOT needed here).
-RUN python3 -m pip install --no-cache-dir uproot awkward numpy matplotlib pyyaml \
-    || pip3 install --no-cache-dir uproot awkward numpy matplotlib pyyaml
+RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    python3 -m pip install --no-cache-dir uproot awkward numpy matplotlib pyyaml
 COPY gdmltp/ /app/pysrc/gdmltp/
 COPY g4tp/ /app/pysrc/g4tp/
 COPY pyproject.toml README.md /app/pysrc/
-RUN python3 -m pip install --no-cache-dir /app/pysrc \
-    || pip3 install --no-cache-dir /app/pysrc
+RUN python3 -m pip install --no-cache-dir /app/pysrc && \
+    python3 -c "import gdmltp; from gdmltp.backends import genie_convert, achilles_convert; print('gdmltp', gdmltp.__version__)"
 
 # GENIE driver (reads genie_job.json, runs gevgen -> gntpc -> genie2root).
 COPY genie/ /app/genie/
