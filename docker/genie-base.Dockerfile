@@ -104,19 +104,30 @@ ENV PATH=${APFEL_DIR}/bin:${PATH}
 # files are required at run time. With ENABLE_HEDIS=1, --enable-apfel is added
 # so the high-energy-DIS (GHE19/HEDIS) tunes are available too.
 ENV GENIE=/opt/genie
+# Bump GENIE_SRC_REV to force a genuine recompile when a GENIE source patch
+# below changes. A separate `RUN sed ...` before the build does NOT reliably
+# bust the registry build cache: BuildKit's cache-from matched the old compiled
+# `make` layer even with a new patch layer above it, so the patched source was
+# never actually recompiled (the baked HEDIS metafile came out at old, low
+# precision). Keeping the patch and the build in ONE RUN -- keyed by this rev --
+# guarantees the compile sees the patched source. Bump on any source-patch edit.
+ARG GENIE_SRC_REV=2
 # Patch a GENIE HEDIS metafile round-trip bug: HEDISStrucFunc's operator<<
 # writes the SF Inputs.txt at default (~6 sig-fig) precision, but operator==
 # compares the re-read metafile against the tune config at 1e-10. Tunes whose
 # masses/couplings carry more digits (e.g. GHE19_00c: MassW=79.177...) then
 # fail the "Info from MetaFile and Tune doesnt match" assertion in gevgen even
 # though the SF tables are valid. Write full precision so the round-trip is
-# exact. (Verified: this is exactly what blocks GHE19_00c event generation.)
-RUN sed -i '/#include <fstream>/a #include <iomanip>' \
-      ${GENIE}/src/Physics/HEDIS/XSection/HEDISStrucFunc.h && \
+# exact. (Verified end-to-end: this is exactly what blocks GHE19_00c event
+# generation, and setprecision(15) clears it.) The patch runs in the SAME RUN
+# as configure+make so the fix is always compiled in (see GENIE_SRC_REV above).
+RUN echo "GENIE_SRC_REV=${GENIE_SRC_REV}" && \
+    cd ${GENIE} && \
+    sed -i '/#include <fstream>/a #include <iomanip>' \
+      src/Physics/HEDIS/XSection/HEDISStrucFunc.h && \
     sed -i 's/return os <</return os << std::setprecision(15) <</' \
-      ${GENIE}/src/Physics/HEDIS/XSection/HEDISStrucFunc.h && \
-    grep -n "setprecision" ${GENIE}/src/Physics/HEDIS/XSection/HEDISStrucFunc.h
-RUN cd ${GENIE} && \
+      src/Physics/HEDIS/XSection/HEDISStrucFunc.h && \
+    grep -n "setprecision" src/Physics/HEDIS/XSection/HEDISStrucFunc.h && \
     HEDIS_CFG="" && \
     if [ "$ENABLE_HEDIS" = "1" ]; then \
       HEDIS_CFG="--enable-apfel --with-apfel-inc=${APFEL_DIR}/include --with-apfel-lib=${APFEL_DIR}/lib" ; \
