@@ -72,7 +72,9 @@ def _ensure_hedis_sf(job, workdir):
                                  str(Path(os.environ.get("GENIE", "/opt/genie"))
                                      / "data" / "evgen" / "hedis-sf")))
     stamp = sf_dir / f".gdmltp_hedis_sf_{tune}.done"
-    if stamp.exists() or (sf_dir.exists() and any(sf_dir.glob("QrkSF*.dat"))):
+    # gmkhedissf writes QrkSF*.dat under a per-tune subdir (<sf_dir>/<tune>/),
+    # so search recursively -- baked-in tables live one level down.
+    if stamp.exists() or (sf_dir.exists() and any(sf_dir.rglob("QrkSF*"))):
         return
     # Preflight: gmkhedissf aborts (SIGABRT, "Assertion `0'") on an image without
     # APFEL/LHAPDF -- turn that into a clear, actionable message up front.

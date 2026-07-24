@@ -130,17 +130,18 @@ ENV LD_LIBRARY_PATH=${GENIE}/lib:${LD_LIBRARY_PATH}
 # Bake in the PDF grid + structure-function tables for the reference HEDIS tune
 # so a HEDIS run needs no manual setup. Only runs when ENABLE_HEDIS=1.
 #
-# Default to the LO tune GHE19_00c_00_000: it uses the standard cteq6l1 PDF
-# (published on the LHAPDF server) and no NLO structure functions, so it builds
-# reliably. (The NLO GHE19_00a tune's PDF, NNPDF31sx_nlo_as_0118_LHCb_nf_6, is
-# not on the LHAPDF server, so it can't be fetched here; APFEL is still built
-# above, so a correct NLO PDF could be dropped in and the tune switched.)
+# Default to the LO tune GHE19_00c_00_000. Its config asks for LHAPDF set
+# 'cteq6', which is NOT in the public LHAPDF distribution -- but the compatible
+# LO CTEQ6 grid 'cteq6l1' IS on the LHAPDF server, so fetch that and point the
+# tune at it. (This recipe was validated end-to-end: gmkhedissf builds the full
+# QrkSF_LO_* table set.) LO needs no NLO structure functions; APFEL is still
+# built above so a correct NLO PDF could be dropped in and the tune switched.
 ARG HEDIS_TUNE=GHE19_00c_00_000
 ARG HEDIS_PDF=cteq6l1
 ARG LHAPDF_SETS_URL=https://lhapdfsets.web.cern.ch/current
-# gmkhedissf writes the QrkSF tables here; the gdmltp genie driver reads the
-# same path at run time (its HEDIS_SF_DATA_PATH default), so a baked-in tune
-# needs no on-demand rebuild.
+# gmkhedissf writes the QrkSF tables under $HEDIS_SF_DATA_PATH/<tune>/; the
+# gdmltp genie driver reads the same path at run time (its HEDIS_SF_DATA_PATH
+# default), so a baked-in tune needs no on-demand rebuild.
 ENV HEDIS_SF_DATA_PATH=${GENIE}/data/evgen/hedis-sf
 RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
       set -e && \
@@ -150,6 +151,9 @@ RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
       tar -xzf /tmp/pdf.tar.gz -C "$DD" && rm /tmp/pdf.tar.gz && \
       test -e "$DD/${HEDIS_PDF}/${HEDIS_PDF}.info" \
         || { echo "ERROR: LHAPDF set ${HEDIS_PDF} missing after download"; ls -la "$DD"; exit 1; } && \
+      sed -i 's/>[[:space:]]*cteq6[[:space:]]*</> '"${HEDIS_PDF}"' </' \
+        "${GENIE}/config/${HEDIS_TUNE}/CommonParam.xml" && \
+      grep -n "LHAPDF-set" "${GENIE}/config/${HEDIS_TUNE}/CommonParam.xml" && \
       mkdir -p "$HEDIS_SF_DATA_PATH" && cd "$HEDIS_SF_DATA_PATH" && \
       gmkhedissf --tune "${HEDIS_TUNE}" && \
       echo "HEDIS SF tables built:" && find "$HEDIS_SF_DATA_PATH" -name 'QrkSF*' | head ; \
