@@ -71,6 +71,9 @@ RUN wget -q https://lhapdf.hepforge.org/downloads/?f=LHAPDF-${LHAPDF_VERSION}.ta
     cd /opt && rm -rf LHAPDF-${LHAPDF_VERSION}
 ENV LHAPDF_DIR=/opt/lhapdf
 ENV LD_LIBRARY_PATH=${LHAPDF_DIR}/lib:${LD_LIBRARY_PATH}
+# lhapdf-config on PATH: APFEL's configure and `lhapdf install` both need it
+# (APFEL aborts "LHAPDF cannot be found!" otherwise).
+ENV PATH=${LHAPDF_DIR}/bin:${PATH}
 
 # --- APFEL (OPTIONAL: only for HEDIS high-energy-DIS tunes) -------------------
 # ENABLE_HEDIS=0 (default) builds nothing here and leaves the GENIE configure
