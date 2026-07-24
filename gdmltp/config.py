@@ -20,7 +20,14 @@ from typing import Optional
 
 
 GENERATORS = ("geant4", "genie", "achilles")
-ENERGY_MODES = ("mono", "gauss", "exp", "arb")
+# mudecay_*: the neutrino energy spectrum from in-flight muon decay (the
+# neutrino-factory / muon-collider "neutrino slice" flux, angle-integrated over
+# the ~1/gamma cone; unpolarized). energy.value is the PARENT MUON energy E_mu:
+#   mudecay_numu (nu_mu / anti-nu_mu): dN/dy = 5/3 - 3y^2 + 4/3 y^3, y = E/E_mu
+#   mudecay_nue  (nu_e  / anti-nu_e ): dN/dy = 2 - 6y^2 + 4y^3
+ENERGY_MODES = ("mono", "gauss", "exp", "arb", "mudecay_numu", "mudecay_nue")
+# Modes with no native g4sim gun command: the host samples them into a beam file.
+SAMPLED_ENERGY_MODES = ("mudecay_numu", "mudecay_nue")
 
 
 class ConfigError(ValueError):
@@ -123,13 +130,21 @@ class Beam:
         """Beam-file / display token: the PDG integer (pdg-defined) or the name."""
         return str(self.pdg) if self.pdg is not None else self.particle
 
+    def needs_phase_space_sampling(self) -> bool:
+        """Position/direction/momentum distributions or Twiss: per-event values
+        no engine can produce from single-value gun/flux settings."""
+        return bool(self.position_dist or self.direction_slopes
+                    or self.momentum or self.twiss)
+
     def needs_sampling(self) -> bool:
         """True when the beam must be sampled host-side into a beam file (the
         engines can't produce these per-event distributions from single-value
         gun commands). Plain energy modes + a fixed position/direction (+ cone)
-        stay on the analytic macro path."""
-        return bool(self.position_dist or self.direction_slopes
-                    or self.momentum or self.twiss)
+        stay on the analytic macro path. Backends with a native spectral flux
+        (GENIE's functional -f) may use needs_phase_space_sampling() instead and
+        map SAMPLED_ENERGY_MODES themselves."""
+        return (self.needs_phase_space_sampling()
+                or self.energy.mode in SAMPLED_ENERGY_MODES)
 
 
 @dataclass

@@ -103,6 +103,17 @@ Vertex-level events (no transport) draw momentum-direction rays per
 final-state particle (length ∝ √|p|), so GENIE/Achilles events are as visible
 as transported ones.
 
+## Muon collider: the neutrino slice
+
+Muons decaying in a collider ring flood the detector with a plane-confined
+ribbon of neutrinos (arXiv:2412.14115). The `mudecay_numu` / `mudecay_nue`
+energy modes sample the exact muon-decay neutrino spectra (`energy: {mode:
+mudecay_numu, value: "5 TeV"}` — value is the parent muon energy), and
+`examples/maia/` ships a full config set aiming that flux into the MAIA
+detector concept (`gdml/MAIA_v0.gdml`): all four flavor components, both
+collider stages, slice phase-space painting in the tungsten nozzles, and a
+fast spectrum-only variant. See `examples/maia/README.md`.
+
 ## Realistic beams
 
 Everything above uses a pencil beam. The frontend also samples **distributions

@@ -66,10 +66,11 @@ def parse_energy_gev(s) -> float:
 def flux_gevgen_args(flux: dict):
     """Map the common energy spec to gevgen -e/-f arguments.
 
-    v1 maps `mono` (single energy) and `exp` (functional spectrum over a range).
-    `gauss`/`arb` are approximated by their nominal energy (a faithful histogram
-    flux driver is a documented follow-up); the second return value flags whether
-    the mapping is approximate so the caller can warn.
+    Exact mappings: `mono` (single energy), `exp` and `mudecay_*` (functional
+    spectra over a range -- gevgen -f takes a TF1 expression). `gauss`/`arb`
+    are approximated by their nominal energy (a faithful histogram flux driver
+    is a documented follow-up); the second return value flags whether the
+    mapping is approximate so the caller can warn.
     """
     mode = flux.get("mode", "mono")
     if mode == "mono":
@@ -78,7 +79,31 @@ def flux_gevgen_args(flux: dict):
         e0 = parse_energy_gev(flux["value"])
         emin = parse_energy_gev(flux["min"]); emax = parse_energy_gev(flux["max"])
         return ["-e", f"{emin:g},{emax:g}", "-f", f"exp(-x/{e0:g})"], False
+    if mode in ("mudecay_numu", "mudecay_nue"):
+        # Angle-integrated lab spectrum of neutrinos from in-flight muon decay
+        # (value = parent muon energy). Exact TF1 expressions in y = x/E_mu.
+        emu = parse_energy_gev(flux["value"])
+        y = f"(x/{emu:g})"
+        if mode == "mudecay_numu":
+            expr = f"5./3.-3.*pow({y},2)+4./3.*pow({y},3)"
+        else:
+            expr = f"2.-6.*pow({y},2)+4.*pow({y},3)"
+        emin = max(0.1, 1e-3 * emu)      # gevgen needs a nonzero lower edge
+        return ["-e", f"{emin:g},{emu:g}", "-f", expr], False
     return ["-e", f"{parse_energy_gev(flux['value']):g}"], True
+
+
+def flux_emax_gev(flux: dict) -> float:
+    """Upper edge of the flux in GeV -- what the cross-section splines must
+    reach. gauss has no hard edge; 5 sigma covers it for spline purposes."""
+    mode = flux.get("mode", "mono")
+    if mode == "exp":
+        return parse_energy_gev(flux["max"])
+    if mode == "arb":
+        return max(parse_energy_gev(b["value"]) for b in flux["bins"])
+    if mode == "gauss":
+        return parse_energy_gev(flux["value"]) + 5.0 * parse_energy_gev(flux.get("sigma") or 0)
+    return parse_energy_gev(flux["value"])   # mono, mudecay_* (value = E_mu)
 
 
 _NEUTRINO_PDGS = {12, -12, 14, -14, 16, -16}
@@ -181,6 +206,9 @@ class GenieBackend(Backend):
             },
             "position": cfg.beam.position,
             "direction": cfg.beam.direction,
+            "flux_emax_gev": flux_emax_gev({
+                "mode": e.mode, "value": e.value, "sigma": e.sigma,
+                "min": e.min, "max": e.max, "bins": e.bins}),
             "events": int(cfg.run.events),
             "output": cfg.run.output,
             "tune": cfg.genie.get("tune", "G18_10a_00_000"),
@@ -192,8 +220,10 @@ class GenieBackend(Backend):
 
         # Host-sampled distributions / Twiss -> a per-event beam file the driver
         # replays (one gevgen call per ray, vertex + direction applied by the
-        # converter). Overrides the aggregate flux above.
-        if cfg.beam.needs_sampling():
+        # converter). Overrides the aggregate flux above. Pure spectral modes
+        # (incl. mudecay_*) stay on the fast native gevgen flux -- only actual
+        # phase-space distributions force the per-event path.
+        if cfg.beam.needs_phase_space_sampling():
             from .. import beam as beammod
             s = beammod.sample(cfg, int(cfg.run.events), seed=cfg.run.seed)
             beammod.write_beam_file(s, outdir / BEAM_FILE)

@@ -1,0 +1,28 @@
+# Spectrum-only variant: the 10 TeV neutrino-slice energy distribution with a
+# fixed vertex, no phase-space painting. Because nothing needs per-event
+# sampling, the genie backend maps the muon-decay spectrum to gevgen's native
+# functional flux (-f) -- ONE gevgen call for all events instead of one per
+# event, so this is the config for large-statistics spectrum/kinematics
+# studies (raise run.events freely).
+generator: genie
+
+geometry:
+  gdml: gdml/MAIA_v0.gdml
+
+beam:
+  particle: nu_mu
+  energy: {mode: mudecay_numu, value: "5 TeV"}
+  position: "0 0 300 cm"       # mid-nozzle
+  direction: "0 0 1"
+
+run:
+  events: 2000
+  output: output.root
+  seed: 20241416
+
+genie:
+  tune: G18_10a_00_000
+  cross_sections: auto
+  event_generator_list: Default
+  length_units: cm
+  target: 1000741840

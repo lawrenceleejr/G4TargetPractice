@@ -110,6 +110,20 @@ def _sample_energy_mev(energy, n, rng):
         w = np.array([float(b.get("weight", 1.0)) for b in energy.bins])
         w = w / w.sum()
         return rng.choice(vals, size=n, p=w)
+    if mode in ("mudecay_numu", "mudecay_nue"):
+        # Neutrinos from in-flight muon decay (energy.value = parent muon
+        # energy E_mu), angle-integrated over the forward ~1/gamma cone,
+        # unpolarized -- the standard neutrino-factory / muon-collider flux.
+        # Exact inverse-CDF via a fine grid (polynomial CDFs, y = E/E_mu):
+        #   nu_mu / anti-nu_mu: pdf 5/3 - 3y^2 + 4/3y^3, CDF 5/3 y - y^3 + y^4/3
+        #   nu_e  / anti-nu_e : pdf 2 - 6y^2 + 4y^3,     CDF 2y - 2y^3 + y^4
+        emu = _ene_mev(energy.value)
+        y = np.linspace(0.0, 1.0, 4001)
+        if mode == "mudecay_numu":
+            cdf = (5.0 / 3.0) * y - y ** 3 + y ** 4 / 3.0
+        else:
+            cdf = 2.0 * y - 2.0 * y ** 3 + y ** 4
+        return np.interp(rng.random(n), cdf, y) * emu
     raise ValueError(f"unknown energy mode {energy.mode!r}")
 
 

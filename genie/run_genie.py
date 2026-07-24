@@ -24,13 +24,25 @@ from pathlib import Path
 from gdmltp.backends.genie import flux_gevgen_args
 
 
-def _xsec_args(job, workdir):
+def spline_emax_gev(job, beam_energies_gev=None):
+    """Upper energy the cross-section splines must cover: the flux endpoint
+    from the job (written by the host backend), or the hardest beam-file ray,
+    with a 100 GeV floor so the common few-GeV case shares one cached file."""
+    emax = float(job.get("flux_emax_gev") or 0.0)
+    if beam_energies_gev:
+        emax = max(emax, max(beam_energies_gev))
+    return max(100.0, math.ceil(emax))
+
+
+def _xsec_args(job, workdir, emax_gev=None):
     """Cross-section splines for gevgen, in priority order: an explicit path in
     the job, the image's $GENIE_XSEC_FILE, else generate them ON DEMAND with
     gmkspl into the run directory (cached there, so the mounted volume makes
     reruns fast). The on-demand path is what lets a freshly built image run with
     no manual setup at all -- the first run on a new probe/target just takes
-    longer while the splines compute."""
+    longer while the splines compute. `emax_gev` (see spline_emax_gev) sets the
+    spline reach and is part of the cache name, so a TeV run never silently
+    reuses a 100 GeV file."""
     xsec = job.get("cross_sections", "auto")
     if xsec and xsec != "auto":
         return ["--cross-sections", xsec]
@@ -40,14 +52,15 @@ def _xsec_args(job, workdir):
     probe = int(job["probe"])
     target = int(job["target"])
     tune = job.get("tune", "G18_10a_00_000")
-    out = Path(workdir) / f"gxspl_{abs(probe)}_{target}_{tune}.xml"
+    emax = int(emax_gev if emax_gev is not None else spline_emax_gev(job))
+    out = Path(workdir) / f"gxspl_{abs(probe)}_{target}_{tune}_{emax}gev.xml"
     if not out.exists():
         print(f"[run_genie] no spline file found; generating with gmkspl for "
-              f"probe {probe} on {target} (tune {tune}). This is slow the "
-              f"first time; the result is cached in the run directory.",
-              flush=True)
+              f"probe {probe} on {target} (tune {tune}, up to {emax} GeV). "
+              f"This is slow the first time; the result is cached in the run "
+              f"directory.", flush=True)
         cmd = ["gmkspl", "-p", f"{probe},{-probe}", "-t", str(target),
-               "-n", "100", "-e", "100", "--tune", tune, "-o", str(out)]
+               "-n", "100", "-e", str(emax), "--tune", tune, "-o", str(out)]
         print("[run_genie]", " ".join(cmd), flush=True)
         subprocess.run(cmd, cwd=workdir, check=True)
     return ["--cross-sections", str(out)]
@@ -100,15 +113,17 @@ def _run_beam(job, workdir):
     out = job.get("output", "output.root")
     seed = job.get("seed")
     gst_files = []
+    energies = [math.sqrt(sum(c * c for c in mom)) / 1000.0   # |p|(MeV/c) -> GeV (nu massless)
+                for _name, _pos, mom in entries]
+    emax = spline_emax_gev(job, energies)
     print(f"[run_genie] per-event replay of {len(entries)} rays "
           f"({len(entries)} gevgen calls; this can be slow) ...", flush=True)
-    for i, (_name, _pos, mom) in enumerate(entries):
-        e_gev = math.sqrt(sum(c * c for c in mom)) / 1000.0   # |p|(MeV/c) -> GeV (nu massless)
+    for i, e_gev in enumerate(energies):
         ghep = workdir / f"_beam_{i}.ghep.root"
         gst = workdir / f"_beam_{i}.gst.root"
         cmd = ["gevgen", "-n", "1", "-p", str(job["probe"]), "-t", str(job["target"]),
                "--tune", job["tune"], "--event-generator-list", job["event_generator_list"],
-               "-e", f"{e_gev:g}", "-o", str(ghep)] + _xsec_args(job, workdir)
+               "-e", f"{e_gev:g}", "-o", str(ghep)] + _xsec_args(job, workdir, emax)
         if seed is not None:
             cmd += ["--seed", str(int(seed) + i)]
         subprocess.run(cmd, cwd=workdir, check=True)

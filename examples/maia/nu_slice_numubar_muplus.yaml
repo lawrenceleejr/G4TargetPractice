@@ -1,0 +1,33 @@
+# Neutrino slice at a 10 TeV muon collider -- the counter-propagating mu+ beam.
+# mu+ decays make anti-nu_mu (this config) and nu_e, entering MAIA from the
+# opposite side: the slice geometry is mirrored in z and the neutrinos travel
+# along -z. Together with nu_slice_numu.yaml / nu_slice_nuebar.yaml this covers
+# all four flavor components crossing the detector.
+generator: genie
+
+geometry:
+  gdml: gdml/MAIA_v0.gdml
+
+beam:
+  particle: anti_nu_mu
+  energy: {mode: mudecay_numu, value: "5 TeV"}   # same shape as nu_mu
+  position:
+    x: {dist: uniform, min: "-25 cm", max: "25 cm"}
+    y: {dist: gauss, sigma: "5 mm"}
+    z: {dist: uniform, min: "-595 cm", max: "-100 cm"}   # the -z nozzle
+  direction:
+    central: "0 0 -1"
+    xprime: {dist: gauss, sigma: "10 mrad"}
+    yprime: {dist: gauss, sigma: "0.1 mrad"}
+
+run:
+  events: 200
+  output: output.root
+  seed: 20241414
+
+genie:
+  tune: G18_10a_00_000
+  cross_sections: auto
+  event_generator_list: Default
+  length_units: cm
+  target: 1000741840

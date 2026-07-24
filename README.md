@@ -110,7 +110,9 @@ and executes it. Individual fields can be overridden from the command line
 (`--energy "200 MeV"` beats the YAML value): **flag > YAML > default**.
 
 Common fields: `generator`, `geometry.gdml`, `beam.{particle,position,direction,angle_sigma}`,
-`beam.energy.{mode,value,sigma,min,max,bins}` (modes `mono|gauss|exp|arb`),
+`beam.energy.{mode,value,sigma,min,max,bins}` (modes `mono|gauss|exp|arb|mudecay_numu|mudecay_nue`
+— the `mudecay_*` modes are the exact neutrino spectra from in-flight muon decay,
+with `value` the parent muon energy; see `examples/maia/`),
 `run.{events,output,seed}`. Backend-specific blocks (`geant4:`, `genie:`) are
 read only by their backend and ignored by the other.
 

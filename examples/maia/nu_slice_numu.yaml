@@ -1,0 +1,53 @@
+# The "neutrino slice" at a 10 TeV muon collider, shot into the MAIA detector.
+# Based on arXiv:2412.14115 (Bojorquez-Lopez, Hostert, Arguelles, Liu): muons
+# decaying in the final arcs and IP straight (~30-100 m upstream) flood the
+# detector with a ribbon of neutrinos confined to the plane of the collider
+# ring. This config: the nu_mu component of the mu- beam (E_mu = 5 TeV).
+#
+#   gdmltp run --config examples/maia/nu_slice_numu.yaml -o slice_numu
+#   gdmltp validate slice_numu/output.root
+#   gdmltp analyze  slice_numu/output.root   # nu kinematics panel
+#
+# First run generates GENIE cross-section splines up to 5 TeV for nu_mu on W
+# (slow, ~hours; cached in the run dir). Each event is one gevgen call (the
+# per-event beam replay), so keep run.events modest and scale up deliberately.
+generator: genie
+
+geometry:
+  gdml: gdml/MAIA_v0.gdml
+
+beam:
+  particle: nu_mu
+  # Exact angle-integrated spectrum of neutrinos from in-flight muon decay:
+  # dN/dy = 5/3 - 3y^2 + 4/3 y^3 with y = E/E_mu  ->  <E> = 0.35 E_mu = 1.75 TeV
+  energy: {mode: mudecay_numu, value: "5 TeV"}
+  # Interaction vertices painted where ~79% of neutrino interactions occur
+  # (arXiv:2412.14115 Tab. rates): the tungsten shielding nozzle, which in
+  # MAIA_v0 spans z = 6..595 cm with outer radius growing to 43 cm. The slice
+  # is thin vertically (theta_nu ~ 1/gamma_mu ~ 2e-5 over 30-100 m -> mm scale)
+  # and wide horizontally. (Explicit painting stands in for geometry-aware
+  # vertex sampling, which is on the roadmap.)
+  position:
+    x: {dist: uniform, min: "-25 cm", max: "25 cm"}
+    y: {dist: gauss, sigma: "5 mm"}
+    z: {dist: uniform, min: "100 cm", max: "595 cm"}
+  # Crossing angles: neutrinos from the last arcs enter at 0.1-2.5 degrees in
+  # the ring plane (x-z here); out-of-plane spread is the ~1/gamma decay cone.
+  direction:
+    central: "0 0 1"
+    xprime: {dist: gauss, sigma: "10 mrad"}
+    yprime: {dist: gauss, sigma: "0.1 mrad"}
+
+run:
+  events: 200
+  output: output.root
+  seed: 20241412
+
+genie:
+  tune: G18_10a_00_000        # standard tune; DIS extrapolation above ~1 TeV
+  cross_sections: auto        # on-demand gmkspl up to E_mu, cached in run dir
+  event_generator_list: Default
+  length_units: cm
+  target: 1000741840          # W-184: the nozzles dominate the interaction rate
+  # transport: true           # add Geant4 transport of the final state through
+                              # MAIA (two-stage run; see docs/neutrino.md)
