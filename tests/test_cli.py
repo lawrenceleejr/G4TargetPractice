@@ -89,6 +89,56 @@ def test_display_geometry_only(repo_root, tmp_path):
     assert (tmp_path / "geo" / "event.html").exists()
 
 
+def test_display_auto_picks_richest_event(tmp_path, capsys):
+    """No --event: show the event with the most content, not (empty) event 0."""
+    import uproot, awkward as ak, numpy as np
+    p = tmp_path / "vary.root"
+    # 4 events; event 2 has by far the most tracks (the "interesting" one)
+    pdg = ak.Array([[13], [13], [13, 211, 2212, 111, 22], [13]])
+    zero = ak.Array([[0.0]] * 3 + [[0.0]])
+    with uproot.recreate(p) as f:
+        f["tree"] = {
+            "eventID": np.arange(4, dtype=np.int32),
+            "nSteps": np.zeros(4, np.int32),
+            "nTracks": np.array([1, 1, 5, 1], np.int32),
+            "trk_id": ak.Array([[1], [1], [1, 2, 3, 4, 5], [1]]),
+            "trk_pdg": pdg,
+            "trk_startX": ak.Array([[0.0], [0.0], [0.0, 1, 2, 3, 4], [0.0]]),
+            "trk_startY": ak.Array([[0.0], [0.0], [0.0, 0, 0, 0, 0], [0.0]]),
+            "trk_startZ": ak.Array([[0.0], [0.0], [0.0, 0, 0, 0, 0], [0.0]]),
+            "trk_endX": ak.Array([[0.0], [0.0], [0.0, 1, 2, 3, 4], [0.0]]),
+            "trk_endY": ak.Array([[0.0], [0.0], [0.0, 0, 0, 0, 0], [0.0]]),
+            "trk_endZ": ak.Array([[1.0], [1.0], [1.0, 1, 1, 1, 1], [1.0]]),
+            "trk_parentID": ak.Array([[0], [0], [0, 1, 1, 1, 1], [0]]),
+            "trk_creatorProcess": ak.Array([["Primary"], ["Primary"],
+                                            ["Primary", "x", "x", "x", "x"], ["Primary"]]),
+        }
+    assert cli.main(["display", str(p), "--no-png", "--no-blend",
+                     "-o", str(tmp_path / "d")]) == 0
+    assert "event 2 (richest)" in capsys.readouterr().out
+
+
+def test_display_all_events_overlay(synth_root, tmp_path, capsys):
+    """--all overlays every event into one scene (opt-in, not the default)."""
+    assert cli.main(["display", synth_root, "--all", "--no-blend", "--no-png",
+                     "-o", str(tmp_path / "all")]) == 0
+    out = capsys.readouterr().out
+    assert "overlaying all 30 events" in out
+    assert "combined 30 events" in out
+
+
+def test_display_blend_default_is_graceful(synth_root, tmp_path, monkeypatch, capsys):
+    """Blend is on by default; if the Blender step fails it must not sink the
+    PNG/HTML that already succeeded."""
+    import gdmltp.render_blender as rb
+    monkeypatch.setattr(rb, "render_blend",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no blender")))
+    assert cli.main(["display", synth_root, "--no-html",
+                     "-o", str(tmp_path / "b")]) == 0
+    assert (tmp_path / "b" / "event_iso.png").exists()
+    assert "Blender export skipped" in capsys.readouterr().err
+
+
 def test_run_dry_run_generates_macro(repo_root, tmp_path, capsys):
     gdml = str(repo_root / "gdml" / "bpe_slab.gdml")
     assert cli.main(["run", "--gdml", gdml, "--particle", "neutron",

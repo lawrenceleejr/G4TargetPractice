@@ -59,6 +59,21 @@ def _stage_gdml(cfg, outdir):
         shutil.copy(gsrc, outdir / gsrc.name)
 
 
+def _local_cmd(argv):
+    """The command to run an engine stage WITHOUT spawning a container -- either
+    on a dev host (g4sim on PATH) or, crucially, INSIDE a generator image so a
+    single `docker run <image> run --config x.yaml --local` renders and runs
+    end-to-end with no nested docker. Inside an image we defer to
+    /app/entrypoint.sh, which dispatches the rendered input to the right engine
+    (*.mac -> g4sim, *.json -> the generator driver) exactly as a bare
+    `docker run` would."""
+    entry = "/app/entrypoint.sh"
+    if os.path.exists(entry):
+        return [entry, *argv]
+    exe = shutil.which("g4sim") or "/app/build/g4sim"   # host dev fallback (geant4)
+    return [exe, *argv]
+
+
 def _exec_stage(argv, image, env, outdir, local, dry_run, label="", events=None):
     """Run one container (or local-engine) stage; returns True if executed.
 
@@ -67,16 +82,15 @@ def _exec_stage(argv, image, env, outdir, local, dry_run, label="", events=None)
     are turned into clear messages instead of raw tracebacks.
     """
     if local:
-        exe = shutil.which("g4sim") or "/app/build/g4sim"
-        cmd = [exe, *argv]
+        cmd = _local_cmd(argv)
         run_env = dict(os.environ)
         run_env.update(env)
         if dry_run:
             print(f"[gdmltp] (dry-run{label})", " ".join(cmd), "in", str(outdir))
             return False
-        print(f"[gdmltp] launching g4sim{label} in {outdir}; engine output follows:",
-              flush=True)
-        _stream_run(cmd, image=exe, cwd=outdir, env=run_env,
+        print(f"[gdmltp] running the in-container engine{label} in {outdir}; "
+              f"output follows:", flush=True)
+        _stream_run(cmd, image=cmd[0], cwd=outdir, env=run_env,
                     events=events, is_docker=False)
     else:
         cmd = ["docker", "run", "--rm", "--init", "-v", f"{outdir}:/run", "-w", "/run"]
@@ -235,6 +249,13 @@ def run_config(cfg, image=None, outdir=".", local=False, dry_run=False):
     cfg.validate()
     outdir = Path(outdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
+
+    # Inside a gdmltp engine image, run the engine here rather than spawning a
+    # nested container -- so a single `docker run <image> run --config x.yaml`
+    # renders inputs AND runs end-to-end. On a host (no /app/entrypoint.sh) this
+    # is a no-op and runs default to Docker as before.
+    if not local and os.path.exists("/app/entrypoint.sh"):
+        local = True
 
     _stage_gdml(cfg, outdir)
 

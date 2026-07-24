@@ -220,6 +220,24 @@ def build_scenes(primitives, events, **kw):
     return [build_scene(primitives, ev, **kw) for ev in events]
 
 
+def combine_scenes(scenes, primitives=None, include_world=False, max_tracks=None):
+    """Overlay several event scenes into one (all tracks/vertices together) --
+    e.g. every neutrino interaction in a run shown at once. Not the default;
+    opt in with `display --all`."""
+    tracks, vertices = [], []
+    for sc in scenes:
+        tracks.extend(sc.tracks)
+        vertices.extend(sc.vertices)
+    if max_tracks and len(tracks) > max_tracks:
+        tracks = tracks[:max_tracks]
+    prims = primitives if primitives is not None else (scenes[0].primitives if scenes else [])
+    out = Scene(primitives=prims, tracks=tracks, vertices=vertices,
+                event_id=-1, meta={"combined_events": len(scenes),
+                                   "tracks": len(tracks)})
+    _fit(out, include_world)
+    return out
+
+
 def _fit(sc, include_world=False):
     lo = np.array([np.inf] * 3)
     hi = np.array([-np.inf] * 3)

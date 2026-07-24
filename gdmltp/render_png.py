@@ -10,6 +10,16 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Circle
 
 
+def _pad_bbox(lo, hi, min_half=1.0):
+    """Expand any axis whose extent is ~0 so plot limits are never identical."""
+    lo = np.asarray(lo, float).copy()
+    hi = np.asarray(hi, float).copy()
+    flat = (hi - lo) < 1e-6
+    lo[flat] -= min_half
+    hi[flat] += min_half
+    return lo, hi
+
+
 def _box_corners(p):
     pm = p.params
     h = np.array([pm.get("sx", 0) / 2, pm.get("sy", 0) / 2, pm.get("sz", 0) / 2])
@@ -79,6 +89,9 @@ def render_png(scene, out_prefix, include_world=False, dpi=150):
         ax.plot(t.polyline[:, 0], t.polyline[:, 1], t.polyline[:, 2],
                 color=t.color, lw=0.6, alpha=0.85)
     lo, hi = scene.bbox_min, scene.bbox_max
+    # pad any zero-width axis (a point-like single-vertex event) so matplotlib
+    # doesn't warn about identical low/high limits
+    lo, hi = _pad_bbox(lo, hi)
     ax.set_xlim(lo[0], hi[0]); ax.set_ylim(lo[1], hi[1]); ax.set_zlim(lo[2], hi[2])
     try:
         ax.set_box_aspect(hi - lo + 1e-9)

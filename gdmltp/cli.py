@@ -99,15 +99,19 @@ def _build_parser():
     d = _sub("display", "event display: WebGL HTML, PNG stills, and/or Blender")
     d.add_argument("root", nargs="?", help="output.root (optional; geometry-only allowed)")
     d.add_argument("--gdml", help="overlay this geometry")
-    d.add_argument("--event", type=int, default=0)
+    d.add_argument("--image", default=None,
+                   help="run the display inside this container image (else runs locally)")
+    d.add_argument("--event", type=int, default=None,
+                   help="event index to show (default: the richest event -- most "
+                        "steps, else most final-state tracks)")
     d.add_argument("--events", help="range A:B (embedded in HTML / first events in Blender)")
     d.add_argument("--html", dest="html", action="store_true")
     d.add_argument("--no-html", dest="html", action="store_false")
     d.add_argument("--png", dest="png", action="store_true")
     d.add_argument("--no-png", dest="png", action="store_false")
-    d.add_argument("--blend", action="store_true")
+    d.add_argument("--blend", dest="blend", action="store_true")
     d.add_argument("--no-blend", dest="blend", action="store_false")
-    d.set_defaults(html=True, png=True, blend=False)
+    d.set_defaults(html=True, png=True, blend=True)
     d.add_argument("--blender-image", default="linuxserver/blender:4.2.0")
     d.add_argument("--blend-events", type=int, default=10)
     d.add_argument("--time-scale", type=float, default=0.5,
@@ -119,6 +123,9 @@ def _build_parser():
                    help="map step time to frames linearly (default: log, emphasizes early behavior)")
     d.set_defaults(log_time=True)
     d.add_argument("--max-tracks", type=int, default=2000)
+    d.add_argument("--all", dest="all_events", action="store_true",
+                   help="overlay ALL events into one scene (not the default; "
+                        "best for many small events like neutrino interactions)")
     d.add_argument("--no-world", dest="world", action="store_false")
     d.set_defaults(world=False)
     d.add_argument("--world", dest="world", action="store_true", help="include world volume (wireframe)")
@@ -169,6 +176,10 @@ def main(argv=None):
         p.print_help()
         return 2  # no command given is misuse (scripts must not read it as success)
     args = p.parse_args(argv)
+    # `display --image IMG` runs the display inside that container (parity with
+    # `run --image`), so the same command works with no local install.
+    if args.cmd == "display" and getattr(args, "image", None):
+        return _display_in_docker(args.image, _strip_opt(argv, "--image"))
     try:
         return _dispatch(args)
     except KeyboardInterrupt:
@@ -178,6 +189,39 @@ def main(argv=None):
         if getattr(args, "debug", False):
             raise
         print(f"gdmltp error: {e}\n(add --debug for the full traceback)", file=sys.stderr)
+        return 1
+
+
+def _strip_opt(argv, opt):
+    """Drop `opt VALUE` (and `opt=VALUE`) from an argv list."""
+    out, skip = [], False
+    for a in argv:
+        if skip:
+            skip = False
+            continue
+        if a == opt:
+            skip = True
+            continue
+        if a.startswith(opt + "="):
+            continue
+        out.append(a)
+    return out
+
+
+def _display_in_docker(image, display_argv):
+    """Run `<display_argv>` (starting with 'display') inside `image`, mounting
+    the working directory -- so `gdmltp display --image IMG ...` needs no local
+    install. Blender export inside a container writes scene.json + build
+    instructions (it can't spawn the Blender image from within)."""
+    import subprocess
+    cwd = str(Path.cwd())
+    cmd = ["docker", "run", "--rm", "-v", f"{cwd}:/run", "-w", "/run", image, *display_argv]
+    print("[gdmltp] $", " ".join(cmd), flush=True)
+    try:
+        return subprocess.run(cmd).returncode
+    except FileNotFoundError:
+        print("gdmltp error: docker not found; drop --image to render locally.",
+              file=sys.stderr)
         return 1
 
 
@@ -252,7 +296,22 @@ def _event_range(args, n_events):
     if args.events:
         a, b = args.events.split(":")
         return range(int(a or 0), int(b or n_events))
-    return range(args.event, args.event + 1)
+    ev = args.event if getattr(args, "event", None) is not None else 0
+    return range(ev, ev + 1)
+
+
+def _richest_event(path, n_total):
+    """The most display-worthy event: most steps (transport), else most tracks
+    (vertex-level generators) -- so neutrino runs don't default to a
+    non-interacting event 0."""
+    import numpy as np
+    from . import io
+    sc = io.read_scalars(path, ["nSteps", "nTracks"])
+    for key in ("nSteps", "nTracks"):
+        arr = sc.get(key)
+        if arr is not None and len(arr) and np.any(np.asarray(arr) > 0):
+            return int(np.argmax(np.asarray(arr)))
+    return 0
 
 
 def _display(args):
@@ -269,7 +328,19 @@ def _display(args):
         n_total = io.num_events(args.root)
         if n_total == 0:
             print("[gdmltp] no events in", args.root)
-        idxs = [k for k in _event_range(args, n_total) if 0 <= k < n_total]
+        if getattr(args, "all_events", False) and n_total:
+            idxs = list(range(n_total))       # overlay everything
+            print(f"[gdmltp] --all: overlaying all {n_total} events into one scene.",
+                  flush=True)
+        elif args.event is None and not args.events and n_total:
+            # No explicit selection -> show the richest event, not the (often
+            # non-interacting) event 0 of a neutrino run.
+            pick = _richest_event(args.root, n_total)
+            print(f"[gdmltp] no --event given; showing event {pick} (richest); "
+                  f"use --event N, --events A:B, or --all to choose.", flush=True)
+            idxs = [pick]
+        else:
+            idxs = [k for k in _event_range(args, n_total) if 0 <= k < n_total]
         if idxs:
             # Read only the requested entries: a single 1 TeV shower event can be
             # hundreds of MB, so loading the whole file to show one event is wasteful.
@@ -283,6 +354,13 @@ def _display(args):
             for k in idxs:
                 scenes.append(scenemod.build_scene(prims, events[k - lo], max_tracks=args.max_tracks,
                                                    include_world=args.world, verbose=True))
+            if getattr(args, "all_events", False) and len(scenes) > 1:
+                combined = scenemod.combine_scenes(scenes, primitives=prims,
+                                                   include_world=args.world,
+                                                   max_tracks=args.max_tracks)
+                print(f"[gdmltp] combined {len(scenes)} events -> "
+                      f"{len(combined.tracks)} track(s) in one scene.", flush=True)
+                scenes = [combined]
     else:
         # geometry-only
         from .scene import Scene
@@ -308,12 +386,19 @@ def _display(args):
         if len(scenes) > len(sel):
             print(f"[gdmltp] note: {len(scenes)} events selected but only {len(sel)} written to the "
                   f".blend (--blend-events {args.blend_events}). Raise --blend-events to include all.")
-        out = render_blender.render_blend(sel, f"{args.prefix}.blend",
-                                          outdir=str(outdir), blender_image=args.blender_image,
-                                          fps=args.anim_fps, time_scale=args.time_scale,
-                                          max_seconds=args.max_seconds, log_time=args.log_time)
-        if out:
-            print("[gdmltp] BLEND:", out)
+        # blend is on by default, so a missing/broken Blender or Docker must not
+        # sink the whole display -- the PNG/HTML above are already written.
+        try:
+            out = render_blender.render_blend(sel, f"{args.prefix}.blend",
+                                              outdir=str(outdir), blender_image=args.blender_image,
+                                              fps=args.anim_fps, time_scale=args.time_scale,
+                                              max_seconds=args.max_seconds, log_time=args.log_time)
+            if out:
+                print("[gdmltp] BLEND:", out)
+        except Exception as e:
+            print(f"[gdmltp] note: Blender export skipped ({e}). scene.json + "
+                  f"build_blend.py are in {outdir}; build the .blend with Blender, "
+                  f"or pass --no-blend.", file=sys.stderr)
     return 0
 
 

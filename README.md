@@ -31,45 +31,110 @@ Every backend writes the **same** `output.root` schema, so `analyze`, `display`,
 Achilles, and Geant4 — generate, validate, compare kinematics, transport, and
 display in a handful of commands.
 
-## Do anything in one line with Docker — no install
+## Run it in one line with Docker — no install, no compiling
 
-Set `IMG=ghcr.io/lawrenceleejr/g4targetpractice:main`, mount your working
-directory once (`-v $PWD:/run -w /run`).
+You describe a run in a **YAML file** (a target + a beam + a backend) and run it
+with a single `docker run`. No macros, no local build. Clone the repo (so you
+have the example YAMLs and geometries) and run from its root — the mount
+`-v "$PWD:/run" -w /run` makes the repo visible inside the container, and `-o
+out` collects the output.
 
 ```bash
-# 1) Simulate from a Geant4 macro (writes output.root)
-docker run --rm -v $PWD:/run -w /run $IMG run.mac
+git clone https://github.com/lawrenceleejr/G4TargetPractice && cd G4TargetPractice
 
-# 2) Event display — interactive WebGL (.html) + PNG stills
-docker run --rm -v $PWD:/run -w /run $IMG display output.root --gdml my_detector.gdml
-
-# 3) Analyze — summary report + plots
-docker run --rm -v $PWD:/run -w /run $IMG analyze output.root
-
-# 4) Compare two runs
-docker run --rm -v $PWD:/run -w /run $IMG compare du.root w.root --labels DU,W
-
-# 5) Inspect a file
-docker run --rm -v $PWD:/run -w /run $IMG info output.root
+# one image per backend (all on GHCR; :main is the released tag)
+GEANT4=ghcr.io/lawrenceleejr/g4targetpractice:main
+GENIE=ghcr.io/lawrenceleejr/g4targetpractice-genie:main
+ACHILLES=ghcr.io/lawrenceleejr/g4targetpractice-achilles:main
 ```
 
-A dispatcher entrypoint routes the argument by shape: `*.mac` → the Geant4
-engine, `*.json` → the GENIE driver (in the GENIE image), everything else → the
-`gdmltp` analysis tools. So the same image serves the simulator **and** the
-analysis suite.
+**Simulate — one command per generator, always from a YAML:**
 
-Prefer your laptop? `pip install "git+https://github.com/lawrenceleejr/G4TargetPractice"`
-gives the same commands without Docker (pure Python, **no ROOT needed**).
+```bash
+# Geant4 — 150 MeV protons into a water phantom (particle transport)
+docker run --rm -v "$PWD:/run" -w /run $GEANT4 \
+    run --config examples/water_proton.yaml -o out
 
-## The common front-end
+# GENIE — 2 GeV muon-neutrinos on liquid argon (neutrino event generator)
+docker run --rm -v "$PWD:/run" -w /run $GENIE \
+    run --config examples/nu_argon.yaml -o out
 
-You can drive a run two ways; both build the same internal config and dispatch
-to the selected backend.
+# Achilles — 2 GeV muon-neutrinos on argon (theory-driven lepton-nucleus)
+docker run --rm -v "$PWD:/run" -w /run $ACHILLES \
+    run --config examples/nu_argon_achilles.yaml -o out
 
-### A YAML config (recommended)
+# BSM decay — an HNL decaying in flight inside a detector (Geant4 does the decay)
+docker run --rm -v "$PWD:/run" -w /run $GEANT4 \
+    run --config examples/maia/hnl_decay.yaml -o out
+```
+
+Each writes `out/output.root` in one common schema. The container renders the
+engine inputs from the YAML and runs the engine itself — one self-contained
+command, no nested Docker. Override any field on the command line, e.g.
+`… run --config examples/nu_argon.yaml --energy "5 GeV" -n 2000 -o out`.
+
+**Then analyze / validate / display / compare the output — same pattern, any
+image (the `gdmltp` tools ship in all of them):**
+
+```bash
+# physics + schema sanity check (exit 0 = PASS)
+docker run --rm -v "$PWD:/run" -w /run $GEANT4 validate out/output.root
+
+# summary report + plots (spectra, depth-dose, neutrino kinematics, ...)
+docker run --rm -v "$PWD:/run" -w /run $GEANT4 analyze out/output.root -o out/analysis
+
+# event display: PNG stills + interactive WebGL + a Blender scene (see below)
+docker run --rm -v "$PWD:/run" -w /run $GEANT4 \
+    display out/output.root --gdml gdml/liquid_argon_1m3.gdml -o out/display
+
+# overlay two runs (shower containment, and neutrino Q²/W/x/y across generators)
+docker run --rm -v "$PWD:/run" -w /run $GEANT4 \
+    compare a/output.root b/output.root --labels A,B -o cmp
+
+# inspect any .root or .gdml
+docker run --rm -v "$PWD:/run" -w /run $GEANT4 info out/output.root
+```
+
+### Picking the event to display
+
+`display` writes a Blender scene by default (plus PNG stills and WebGL HTML).
+With no event chosen it shows the **richest event** (most steps, else most
+final-state tracks) — so a neutrino run doesn't default to a non-interacting
+event 0. To choose:
+
+```bash
+# a specific event
+docker run --rm -v "$PWD:/run" -w /run $GEANT4 display out/output.root --event 12 -o out/display
+
+# a range (all embedded in the HTML / first N in the Blender scene)
+docker run --rm -v "$PWD:/run" -w /run $GEANT4 display out/output.root --events 0:20 -o out/display
+
+# overlay EVERY event into one scene (great for a whole neutrino slice at once)
+docker run --rm -v "$PWD:/run" -w /run $GEANT4 display out/output.root --all -o out/display
+
+# turn outputs on/off: --no-blend / --no-png / --no-html
+```
+
+The `.blend` build needs Blender or Docker on the host, so it happens on the
+**host** path (`gdmltp display …`, or `--image`); inside a plain `docker run`
+the display writes `scene.json` + `build_blend.py` and prints the one command
+to turn them into the `.blend`. `display --image $GEANT4 …` runs the whole
+display in the container for you.
+
+**Prefer your laptop?** `pip install "gdmltp @ git+https://github.com/lawrenceleejr/G4TargetPractice"`
+installs the thin front-end (pure Python, **no ROOT**). Then `gdmltp run
+--config …` launches the right container for you and handles multi-stage runs
+(e.g. generator→Geant4 transport); `gdmltp display …` builds the Blender scene
+directly. Add `[geometry]` for the accurate pyg4ometry GDML reader.
+
+## The YAML front-end
+
+Every run is a YAML file: a **target** (a GDML geometry), a **beam**, and a
+**backend**. The same file works from a bare `docker run` (above) or the
+`gdmltp` CLI, and drives whichever generator you name.
 
 ```yaml
-# water_proton.yaml — a 150 MeV proton pencil beam into a water phantom (Geant4)
+# examples/water_proton.yaml — 150 MeV protons into a water phantom (Geant4)
 generator: geant4
 geometry:
   gdml: gdml/water_phantom_30cm.gdml
@@ -84,7 +149,7 @@ run:
 ```
 
 ```yaml
-# nu_argon.yaml — a 2 GeV muon-neutrino beam on liquid argon (GENIE)
+# examples/nu_argon.yaml — 2 GeV muon-neutrinos on liquid argon (GENIE)
 generator: genie
 geometry:
   gdml: gdml/liquid_argon_1m3.gdml
@@ -96,20 +161,15 @@ run:
   seed: 12345
 genie:
   tune: G18_10a_00_000
-  cross_sections: auto          # baked-in splines
+  cross_sections: auto          # cross-section splines built on demand, cached
   target: 1000180400            # optional; else inferred from the GDML material
 ```
 
-Run either with:
-
-```bash
-gdmltp run --config water_proton.yaml
-gdmltp run --config nu_argon.yaml
-```
-
-`gdmltp run` reads the config, validates it, picks the backend's container image,
-and executes it. Individual fields can be overridden from the command line
-(`--energy "200 MeV"` beats the YAML value): **flag > YAML > default**.
+Run either the bare-Docker way shown above, or — with the front-end installed —
+`gdmltp run --config examples/nu_argon.yaml -o out`, which validates the config,
+picks the backend's image, and runs it. Individual fields can be overridden from
+the command line (`--energy "200 MeV"` beats the YAML value): **flag > YAML >
+default**.
 
 Common fields: `generator`, `geometry.gdml`, `beam.{particle,position,direction,angle_sigma}`,
 `beam.energy.{mode,value,sigma,min,max,bins}` (modes `mono|gauss|exp|arb|mudecay_numu|mudecay_nue`
@@ -164,12 +224,14 @@ by generating one interaction per ray and placing/orienting it along that ray.
 Plain energy modes with a fixed position/direction stay on the fast analytic path
 (no beam file). See `examples/twiss_muon.yaml` and `examples/gauss_beam.yaml`.
 
-### Or plain flags (no file)
+### Quick one-offs with flags (no YAML)
+
+For a throwaway run you can skip the file and pass flags instead (same
+precedence rules); a YAML config is the recommended, reproducible form.
 
 ```bash
-gdmltp run --gdml water_phantom_30cm.gdml --particle proton --energy "150 MeV" -n 500
-gdmltp run --gdml my.gdml --field "0 0 5 tesla" --display
-gdmltp run --generator genie --gdml liquid_argon_1m3.gdml --particle nu_mu --energy "2 GeV" -n 1000
+gdmltp run --gdml gdml/water_phantom_30cm.gdml --particle proton --energy "150 MeV" -n 500
+gdmltp run --generator genie --gdml gdml/liquid_argon_1m3.gdml --particle nu_mu --energy "2 GeV" -n 1000
 ```
 
 ### Backends & images
@@ -291,8 +353,8 @@ ROOT dependency** (it reads the file with `uproot`). Run via Docker
 
 | Command | What it does |
 |---|---|
-| `gdmltp run` | Run a simulation (`--config run.yaml`, or flags). `--display` opens an event display after; `--field "0 0 5 tesla"` adds a field (auto-sets `CELER_DISABLE=1`). |
-| `gdmltp display` | Event display from `output.root` and/or `--gdml`: self-contained **WebGL HTML**, **PNG stills**, optional **Blender** scene (`--blend`). |
+| `gdmltp run` | Run a simulation from a YAML config (`--config run.yaml`; or quick flags). `--display` opens an event display after; `--field "0 0 5 tesla"` adds a field (auto-sets `CELER_DISABLE=1`). |
+| `gdmltp display` | Event display from `output.root` and/or `--gdml`: a **Blender** scene (default), **PNG stills**, and **WebGL HTML**. Shows the richest event by default; pick with `--event N`, `--events A:B`, or overlay all with `--all`. Toggle outputs with `--no-blend`/`--no-png`/`--no-html`. |
 | `gdmltp analyze` | Summary report + plots: primary spectrum, total Edep, depth-dose, energy leakage, secondary counts; for neutrino files also interacted/CC fractions, ⟨Q²⟩/⟨W⟩, and a Q²/W/x/y kinematics panel. |
 | `gdmltp compare` | Overlay two runs: longitudinal shower profile, containment vs depth (d90/d95/d99), per-event leakage. For neutrino files it also overlays Q²/W/x/y — the cross-generator check (GENIE vs Achilles vs Geant4 on the same target). |
 | `gdmltp validate` | Schema + physics sanity checks on any backend's `output.root` (branch completeness, count/energy bookkeeping, nu-block invariants like y∈[0,1], CC lepton flavor, q0=Eν−Eℓ). Exit code 0 = PASS; `--strict` also fails on warnings — CI-friendly. |
