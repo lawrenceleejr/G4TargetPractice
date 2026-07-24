@@ -24,6 +24,11 @@ just Docker.
 Every backend writes the **same** `output.root` schema, so `analyze`, `display`,
 `compare`, and `info` work identically no matter which engine produced the file.
 
+**Doing neutrino physics?** Start with the
+[neutrino quickstart](docs/neutrino.md): νμ on liquid argon through GENIE,
+Achilles, and Geant4 — generate, validate, compare kinematics, transport, and
+display in a handful of commands.
+
 ## Do anything in one line with Docker — no install
 
 Set `IMG=ghcr.io/lawrenceleejr/g4targetpractice:main`, mount your working
@@ -305,6 +310,7 @@ GDMLTargetPractice/
 ├── genie/                   # in-container GENIE driver (run_genie.py)
 ├── achilles/                # in-container Achilles driver (run_achilles.py)
 ├── docker/                  # checked-in Dockerfiles: geant4, geant4-celeritas, genie, achilles
+├── docs/                    # topic guides (neutrino quickstart)
 ├── examples/                # example YAML run configs
 ├── gdml/                    # example GDML geometries
 ├── macros/                  # example Geant4 macros + README (branch reference)

@@ -48,17 +48,20 @@ def test_pass_on_converted_genie(synth_gst, tmp_path):
     from gdmltp.backends import genie_convert
     out = tmp_path / "genie.root"
     genie_convert.convert(synth_gst, str(out))
-    report, code = val.validate(str(out))
+    # strict: converted generator output must be warning-free, closures included
+    report, code = val.validate(str(out), strict=True)
     assert code == 0, report
-    # vertex-level neutrino files exercise every nu check incl. q0/flavor
+    # vertex-level neutrino files exercise every nu check incl. q0/flavor/closure
     assert "q0 == primaryE - outLeptonE" in report
+    assert "y ~= q0/Enu" in report
+    assert "Q2 ~= 2*M*q0*x" in report
 
 
 def test_pass_on_converted_achilles(synth_nuhepmc, tmp_path):
     from gdmltp.backends import achilles_convert
     out = tmp_path / "ach.root"
     achilles_convert.convert(synth_nuhepmc, str(out))
-    report, code = val.validate(str(out))
+    report, code = val.validate(str(out), strict=True)
     assert code == 0, report
 
 
@@ -177,6 +180,33 @@ def test_nu_primary_q0_and_flavor_checks(synth_nu, tmp_path):
     report, code = val.validate(p)
     assert code == 1
     assert "q0 inconsistent" in report
+
+
+def test_q2_unit_bug_trips_x_closure(synth_gst, tmp_path):
+    """nu_Q2 accidentally left in GeV^2 (off by 1e6): the Bjorken-x closure
+    must warn -- this is exactly the class of converter bug it exists for."""
+    from gdmltp.backends import genie_convert
+    out = tmp_path / "genie.root"
+    genie_convert.convert(synth_gst, str(out))
+    (q2,) = _scalars(out, "nu_Q2")
+    p = _rewrite(out, tmp_path / "gev2.root", nu_Q2=np.asarray(q2, float) * 1e-6)
+    report, code = val.validate(p)
+    assert code == 0                       # WARN-level: suspicious, not impossible
+    assert "check Q2/x units" in report
+    _, code = val.validate(p, strict=True)
+    assert code == 1
+
+
+def test_y_unit_bug_trips_y_closure(synth_gst, tmp_path):
+    from gdmltp.backends import genie_convert
+    out = tmp_path / "genie.root"
+    genie_convert.convert(synth_gst, str(out))
+    (y,) = _scalars(out, "nu_y")
+    p = _rewrite(out, tmp_path / "milli.root", nu_y=np.asarray(y, float) * 1e-3)
+    report, code = val.validate(p)
+    assert "check y/q0 units" in report
+    _, code = val.validate(p, strict=True)
+    assert code == 1
 
 
 def test_non_neutrino_primary_skips_flavor_check(synth_nu):

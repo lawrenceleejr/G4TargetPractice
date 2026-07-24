@@ -23,6 +23,13 @@ _EDEP_OVER_BEAM_WARN = 1.02      # totalEdep may exceed primaryE a little (captu
 _BJORKEN_X_WARN = 1.2            # x > 1 possible on nuclei (Fermi motion); flag if large
 _Q0_REL_TOL = 1e-3               # nu_q0 vs primaryE - outLeptonE (CC)
 
+# Kinematic-closure thresholds (median over CC events, so a real generator's
+# few-percent Fermi-motion/frame tails never flag, while a wrong unit factor
+# -- MeV vs GeV is 1e3, MeV^2 vs GeV^2 is 1e6 -- shifts every event and does).
+_Y_CLOSURE_WARN = 0.05           # median |y - q0/Enu|
+_X_CLOSURE_WARN = 0.15           # median |Q2/(2*M*q0*x) - 1|
+_NUCLEON_MASS_MEV = 939.565      # matches EventAction.cc and the converters
+
 _NU_FLAVORS = {12, 14, 16}
 
 
@@ -187,6 +194,27 @@ def validate(path, strict=False, max_events=20000):
                         "nu: q0 == primaryE - outLeptonE (CC)",
                         f"nu: q0 inconsistent with primaryE - outLeptonE "
                         f"in {_frac(bad_q0)} CC events")
+
+                # Kinematic closure across the block: the cross-generator
+                # unit-scaling cross-checks (see the thresholds above).
+                enu = np.asarray(sc["primaryE"], float)
+                sel = cc & is_nu & (enu > 0)
+                if sel.any():
+                    dy = float(np.median(np.abs(y[sel] - q0[sel] / enu[sel])))
+                    if dy > _Y_CLOSURE_WARN:
+                        r.warn(f"nu: median |y - q0/Enu| = {dy:.3f} over CC events "
+                               f"(> {_Y_CLOSURE_WARN}); check y/q0 units")
+                    else:
+                        r.ok("nu: y ~= q0/Enu (CC median closure)")
+                    den = 2.0 * _NUCLEON_MASS_MEV * q0[sel] * x[sel]
+                    good = den > 0
+                    if good.any():
+                        dx = float(np.median(np.abs(q2[sel][good] / den[good] - 1.0)))
+                        if dx > _X_CLOSURE_WARN:
+                            r.warn(f"nu: median |Q2/(2*M*q0*x) - 1| = {dx:.2f} over "
+                                   f"CC events (> {_X_CLOSURE_WARN}); check Q2/x units")
+                        else:
+                            r.ok("nu: Q2 ~= 2*M*q0*x (CC median closure)")
 
     return _finish(r, strict)
 

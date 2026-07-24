@@ -130,14 +130,24 @@ def write_synthetic_gst(path, n_events=25, seed=0):
     """A synthetic GENIE 'gst' summary tree, faithful to the branches the
     converter reads. Energies/momenta in GeV, Q2 in GeV^2, vertex in cm (the
     geometry length units), matching real gst output -- so genie_convert exercises
-    the real branch names and units without needing GENIE installed."""
+    the real branch names and units without needing GENIE installed.
+
+    Kinematics are mutually consistent like real gst output: y = 1 - El/Ev,
+    Q2 = 2*M*q0*x, W^2 = M^2 + 2*M*q0 - Q2, so validate's closure cross-checks
+    (which exist to catch unit-scaling bugs between backends) hold exactly."""
     rng = np.random.default_rng(seed)
+    M = 0.939565                                         # GeV, matches the converters
     is_cc = rng.random(n_events) < 0.7
     qel = (rng.random(n_events) < 0.4) & is_cc
     res = (rng.random(n_events) < 0.3) & is_cc & ~qel
     dis = is_cc & ~qel & ~res
     Ev = rng.uniform(0.5, 8.0, n_events)                 # GeV
-    El = np.clip(Ev * rng.uniform(0.2, 0.9, n_events), 0.0, Ev)
+    ybj = rng.uniform(0.05, 0.9, n_events)
+    El = Ev * (1.0 - ybj)
+    q0 = Ev * ybj
+    xbj = rng.uniform(0.05, 0.9, n_events)
+    Q2 = 2.0 * M * q0 * xbj                              # GeV^2
+    W = np.sqrt(np.maximum(M * M + 2.0 * M * q0 - Q2, 0.0))
 
     # Per-event final-state particle lists (GeV). Muon for CC, plus hadrons.
     pdgf, Ef, pxf, pyf, pzf, nf = [], [], [], [], [], []
@@ -169,10 +179,7 @@ def write_synthetic_gst(path, n_events=25, seed=0):
         "Ev": Ev, "pxv": np.zeros(n_events), "pyv": np.zeros(n_events), "pzv": Ev,
         "El": El, "pxl": rng.normal(0, 0.1, n_events),
         "pyl": rng.normal(0, 0.1, n_events), "pzl": El * 0.9,
-        "Q2": rng.uniform(0.1, 3.0, n_events),
-        "W": rng.uniform(0.9, 3.0, n_events),
-        "x": rng.uniform(0.05, 0.9, n_events),
-        "y": rng.uniform(0.05, 0.9, n_events),
+        "Q2": Q2, "W": W, "x": xbj, "y": ybj,
         "vtxx": rng.normal(0, 5.0, n_events),            # cm
         "vtxy": rng.normal(0, 5.0, n_events),
         "vtxz": rng.uniform(-40, 40, n_events),
