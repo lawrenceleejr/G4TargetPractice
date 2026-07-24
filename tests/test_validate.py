@@ -197,6 +197,20 @@ def test_q2_unit_bug_trips_x_closure(synth_gst, tmp_path):
     assert code == 1
 
 
+def test_w_unit_bug_trips_w_closure(synth_gst, tmp_path):
+    """nu_W accidentally left in GeV (off by 1e3): the W closure must warn."""
+    from gdmltp.backends import genie_convert
+    out = tmp_path / "genie.root"
+    genie_convert.convert(synth_gst, str(out))
+    (w,) = _scalars(out, "nu_W")
+    p = _rewrite(out, tmp_path / "gev.root", nu_W=np.asarray(w, float) * 1e-3)
+    report, code = val.validate(p)
+    assert code == 0
+    assert "check W/q0/Q2 units" in report
+    _, code = val.validate(p, strict=True)
+    assert code == 1
+
+
 def test_y_unit_bug_trips_y_closure(synth_gst, tmp_path):
     from gdmltp.backends import genie_convert
     out = tmp_path / "genie.root"

@@ -28,6 +28,7 @@ _Q0_REL_TOL = 1e-3               # nu_q0 vs primaryE - outLeptonE (CC)
 # -- MeV vs GeV is 1e3, MeV^2 vs GeV^2 is 1e6 -- shifts every event and does).
 _Y_CLOSURE_WARN = 0.05           # median |y - q0/Enu|
 _X_CLOSURE_WARN = 0.15           # median |Q2/(2*M*q0*x) - 1|
+_W_CLOSURE_WARN = 0.15           # median |W/sqrt(M^2 + 2*M*q0 - Q2) - 1|
 _NUCLEON_MASS_MEV = 939.565      # matches EventAction.cc and the converters
 
 _NU_FLAVORS = {12, 14, 16}
@@ -167,6 +168,21 @@ def validate(path, strict=False, max_events=20000):
                    f"(possible from Fermi motion; check kinematics otherwise)")
         else:
             r.ok(f"nu: Bjorken x <= {_BJORKEN_X_WARN}")
+
+        # W closure against the free-nucleon invariant (needs only nu_* branches;
+        # a true generator W differs by Fermi motion/binding at the few-% level,
+        # a MeV-vs-GeV bug by 1e3 -- hence the median and the loose threshold).
+        w = np.asarray(nu["nu_W"], float)
+        q0b = np.asarray(nu["nu_q0"], float)
+        w2_pred = _NUCLEON_MASS_MEV ** 2 + 2.0 * _NUCLEON_MASS_MEV * q0b - q2
+        selw = act & (w > 0) & (w2_pred > 0)
+        if selw.any():
+            dw = float(np.median(np.abs(w[selw] / np.sqrt(w2_pred[selw]) - 1.0)))
+            if dw > _W_CLOSURE_WARN:
+                r.warn(f"nu: median |W/sqrt(M^2+2*M*q0-Q2) - 1| = {dw:.2f} "
+                       f"(> {_W_CLOSURE_WARN}); check W/q0/Q2 units")
+            else:
+                r.ok("nu: W ~= sqrt(M^2 + 2*M*q0 - Q2) (median closure)")
 
         # Checks that relate the nu block to the primary only make sense when
         # the primary IS the neutrino (vertex-level generator files, g4sim

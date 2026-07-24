@@ -54,8 +54,8 @@ gdmltp validate achilles_out/output.root --strict   # warnings also fail
 `validate` checks the schema contract (branch completeness, per-event counts)
 and physics invariants: CC/NC exclusivity, y ∈ [0, 1], Q² ≥ 0, the CC outgoing
 lepton flavor against the beam neutrino, q₀ = Eν − Eℓ, and **median kinematic
-closures** (y ≈ q₀/Eν and Q² ≈ 2M·q₀·x) that catch MeV-vs-GeV unit-scaling
-bugs between backends immediately. Exit code 0 = PASS, so it drops straight
+closures** (y ≈ q₀/Eν, Q² ≈ 2M·q₀·x, W ≈ √(M² + 2M·q₀ − Q²)) that catch
+MeV-vs-GeV unit-scaling bugs between backends immediately. Exit code 0 = PASS, so it drops straight
 into scripts and CI.
 
 ## 3. Compare generators — the physics payoff
