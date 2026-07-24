@@ -9,16 +9,23 @@ sensitive elements but in the machine-detector interface: **~79% in the
 tungsten shielding nozzles**, 13% in the muon system, 7% in the HCal.
 
 The target here is the real thing: `gdml/MAIA_v0.gdml`, the MAIA detector
-concept export, whose tungsten nozzles span z = 6–595 cm with outer radius
-growing to 43 cm.
+concept export, whose detector body reaches ~±600 cm in each dimension.
+
+**Injection geometry.** Rather than simulating the parent muons, these configs
+**inject the neutrinos directly** as a *slice*: a thin sheet in the **ZX plane
+at y ≈ 0** that cuts across the **whole negative-x half** of the detector
+(x ∈ [−600, 0] cm, z ∈ [−600, 600] cm). Each event's vertex is sampled
+uniformly over that sheet, so interactions spray across the negative-x region.
+The neutrino *energy* still follows the exact muon-decay spectrum (the physical
+origin of the flux); only the spatial model is the direct-injection slice.
 
 | Config | What it is |
 |---|---|
-| `nu_slice_numu.yaml` | νμ from the μ⁻ beam, Eμ = 5 TeV, vertices painted in the +z nozzle |
+| `nu_slice_numu.yaml` | νμ from the μ⁻ beam, Eμ = 5 TeV, sprayed across the negative-x ZX slice |
 | `nu_slice_nuebar.yaml` | the ν̄e companion (one per μ⁻ decay), softer spectrum |
-| `nu_slice_numubar_muplus.yaml` | ν̄μ from the counter-propagating μ⁺ beam (−z nozzle) |
+| `nu_slice_numubar_muplus.yaml` | ν̄μ from the counter-propagating μ⁺ beam (travels along −z) |
 | `nu_slice_numu_3tev.yaml` | the √s = 3 TeV collider stage (Eμ = 1.5 TeV, wider fan) |
-| `nu_slice_spectrum_only.yaml` | fixed vertex, native gevgen spectral flux — for large-N spectrum studies |
+| `nu_slice_spectrum_only.yaml` | single fixed vertex in the slice, native gevgen spectral flux — for large-N spectrum studies |
 | `nu_slice_geant4_biased.yaml` | the slice simulated **entirely in Geant4** with 1e10 neutrino biasing (guaranteed interaction + full transport) |
 | `nu_slice_numu_hedis.yaml` | the TeV slice with GENIE's **HEDIS** high-energy-DIS tune (needs a HEDIS-provisioned image; see `docs/neutrino.md`) |
 | `hnl_decay.yaml` | a 1 GeV HNL decaying displaced inside MAIA — decayed **by Geant4** (`decay` backend; see `docs/bsm.md`) |
@@ -31,13 +38,14 @@ growing to 43 cm.
   `2 − 6y² + 4y³` (νe/ν̄e, ⟨E⟩ = 0.30 Eμ), y = E/Eμ. With phase-space painting
   the host samples them into the per-event beam file; without it the genie
   backend hands gevgen the exact functional flux.
-- **Slice geometry** is an explicit approximation (until geometry-aware vertex
-  sampling lands): vertices are painted uniformly along the nozzle, mm-thin
-  vertically (θν ~ 1/γμ over the 30–100 m baseline), with ring-plane crossing
-  angles of the size the paper quotes (0.1°–2.5° at 10 TeV, 0.6°–6° at 3 TeV).
-  Interaction *rates per component* are not reproduced — you choose where to
-  aim; `genie.target` picks the struck nucleus (W-184 for the nozzles; switch
-  to `1000260560` for iron/yoke studies).
+- **Slice geometry** is a direct-injection approximation (until geometry-aware
+  vertex sampling lands): neutrinos are injected across a thin sheet in the ZX
+  plane at y ≈ 0 covering the whole negative-x half, kept in-plane by a
+  ring-plane (x-z) fan of the size the paper quotes (0.1°–2.5° at 10 TeV,
+  0.6°–6° at 3 TeV) with negligible out-of-plane (y) spread. Interaction
+  *rates per component* are not reproduced — you choose the struck nucleus with
+  `genie.target` (W-184 for the tungsten nozzles/shielding, which dominate the
+  rate; switch to `1000260560` for iron/yoke studies).
 
 ## Honest caveats
 

@@ -33,7 +33,10 @@ geometry:
 beam:
   particle: nu_mu
   energy: {mode: mudecay_numu, value: "5 TeV"}   # E_mu = 5 TeV, <E_nu> ~ 1.75 TeV
-  position: "0 0 300 cm"       # mid-nozzle; fixed vertex -> native spectral flux
+  # Fixed vertex in the negative-x half of the ZX plane (y = 0): keeps the
+  # single native-flux gevgen call (per-event replay of the full slice would
+  # re-run gmkhedissf + gevgen per event -- prohibitive for HEDIS).
+  position: "-300 0 0 cm"
   direction: "0 0 1"
 
 run:

@@ -11,10 +11,12 @@ geometry:
 beam:
   particle: anti_nu_mu
   energy: {mode: mudecay_numu, value: "5 TeV"}   # same shape as nu_mu
+  # Same direct-injection slice (ZX plane, y ~ 0, whole negative-x half); the
+  # mu+ beam counter-propagates, so the neutrinos travel along -z.
   position:
-    x: {dist: uniform, min: "-25 cm", max: "25 cm"}
-    y: {dist: gauss, sigma: "5 mm"}
-    z: {dist: uniform, min: "-595 cm", max: "-100 cm"}   # the -z nozzle
+    x: {dist: uniform, min: "-600 cm", max: "0 cm"}    # whole negative-x half
+    y: {dist: gauss, sigma: "1 cm"}                     # thin: near y = 0
+    z: {dist: uniform, min: "-600 cm", max: "600 cm"}   # full detector length
   direction:
     central: "0 0 -1"
     xprime: {dist: gauss, sigma: "10 mrad"}
