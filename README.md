@@ -112,6 +112,13 @@ gtp $GEANT4 display out/output.root --all -o out/display
 # turn outputs on/off: --no-blend / --no-png / --no-html
 ```
 
+Each event becomes **one Blender object** — a single curve holding every track
+(colored per particle) — so it builds fast (thousands of tracks in one
+datablock) and you can select/move/parent a whole event as a unit; `--all`
+gives one object for the entire overlay. Add `--animate` for the time-reveal
+animation instead (one object per track, slower). Progress is printed as the
+scene builds.
+
 The `.blend` build needs Blender or Docker on the host, so it happens on the
 **host** path (`gdmltp display …`, or `--image`); inside a plain `docker run`
 the display writes `scene.json` + `build_blend.py` and prints the one command
