@@ -144,12 +144,15 @@ def add_lighting_environment(center_m, radius_m):
     coll = new_collection("Lighting")
 
     # --- enclosing environment sphere: very large, inside-out, warm emissive ---
+    # A high-res UV sphere, shaded smooth so the backdrop reads as a seamless
+    # dome rather than faceted panels.
     bm = bmesh.new()
-    _uvsphere(bm, R * 14.0, Matrix.Translation((cx, cy, cz)))
+    _uvsphere(bm, R * 14.0, Matrix.Translation((cx, cy, cz)), segs=96)
     bmesh.ops.reverse_faces(bm, faces=list(bm.faces))   # normals face inward
     me = bpy.data.meshes.new("Environment")
     bm.to_mesh(me)
     bm.free()
+    me.polygons.foreach_set("use_smooth", [True] * len(me.polygons))  # shade smooth
     em = bpy.data.materials.new("environment")
     em.use_nodes = True
     bsdf = em.node_tree.nodes.get("Principled BSDF")
@@ -208,14 +211,15 @@ VERTEX_EDGE_FRAC = 0.0016    # vertex cube edge = 0.16% of scene radius
 GEO_SEG = 24   # segments for curved geometry primitives (smoothness vs speed)
 
 
-def _uvsphere(bm, radius, matrix):
-    """bmesh.ops.create_uvsphere across Blender versions: the radius kwarg was
-    named `diameter` before ~3.0 and `radius` after. Try radius, fall back."""
+def _uvsphere(bm, radius, matrix, segs=GEO_SEG):
+    """Add a UV sphere to `bm`. bmesh.ops.create_uvsphere's radius kwarg was
+    named `diameter` before ~3.0 and `radius` after -- try radius, fall back."""
+    v = max(3, segs // 2)
     try:
-        bmesh.ops.create_uvsphere(bm, u_segments=GEO_SEG, v_segments=GEO_SEG // 2,
+        bmesh.ops.create_uvsphere(bm, u_segments=segs, v_segments=v,
                                   radius=radius, matrix=matrix)
     except TypeError:
-        bmesh.ops.create_uvsphere(bm, u_segments=GEO_SEG, v_segments=GEO_SEG // 2,
+        bmesh.ops.create_uvsphere(bm, u_segments=segs, v_segments=v,
                                   diameter=radius, matrix=matrix)
 
 
