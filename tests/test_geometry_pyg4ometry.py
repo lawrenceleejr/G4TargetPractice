@@ -38,7 +38,20 @@ def test_matches_lightweight_bbox(repo_root, name):
 def test_dispatch_prefers_pyg4ometry(repo_root):
     assert G._use_pyg4ometry(_gdml(repo_root, "liquid_argon_1m3.gdml")) is True
     prims = G.parse_gdml(_gdml(repo_root, "silicon_3layer.gdml"))
-    assert prims and all(p.type in ("box", "orb", "tube", "bbox") for p in prims)
+    assert prims and all(p.type in ("box", "orb", "tube", "bbox", "mesh") for p in prims)
+
+
+def test_complex_solids_are_faithful_meshes(repo_root):
+    """The faithful-geometry win: a polycone/cone/tube is carried as its REAL
+    triangulated surface (Mesh), not collapsed to a box. Repeated placements of
+    one solid share a single Mesh object so instancing stays cheap."""
+    prims = G._parse_pyg4ometry(_gdml(repo_root, "nozzles_tungsten.gdml"))
+    meshed = [p for p in prims if p.type == "mesh"]
+    assert len(meshed) >= 6                      # the six nozzle polycones
+    for p in meshed:
+        assert p.mesh is not None
+        assert p.mesh.vertices.shape[1] == 3 and len(p.mesh.vertices) > 4
+        assert p.mesh.faces.shape[1] == 3 and len(p.mesh.faces) > 4
 
 
 def test_material_names_for_target_inference(repo_root):

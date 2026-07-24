@@ -14,14 +14,25 @@ DEFAULT_BLENDER_IMAGE = "linuxserver/blender:4.2.0"
 
 def _scene_to_dict(sc, max_tracks=4000):
     geo = []
+    meshes = []            # deduped faithful surfaces: [{v:[...], f:[...]}]
+    mesh_index = {}        # id(Mesh) -> table index
     for p in sc.primitives:
         if p.is_world or p.transform is None:
             continue
         c = p.transform[:3, 3]
         pm = p.params or {}
+        # full transform as a row-major 4x4 (mathutils.Matrix takes this directly)
+        m = [[float(p.transform[r, col]) for col in range(4)] for r in range(4)]
         d = {"type": p.type, "x": float(c[0]), "y": float(c[1]), "z": float(c[2]),
-             "name": p.volume_name}
-        if p.type in ("box", "bbox"):
+             "m": m, "name": p.volume_name}
+        if p.type == "mesh" and p.mesh is not None:
+            mid = id(p.mesh)
+            if mid not in mesh_index:
+                mesh_index[mid] = len(meshes)
+                meshes.append({"v": [round(float(x), 4) for x in p.mesh.vertices.flatten()],
+                               "f": [int(i) for i in p.mesh.faces.flatten()]})
+            d["mesh"] = mesh_index[mid]
+        elif p.type in ("box", "bbox"):
             d.update(sx=float(pm.get("sx", 0)), sy=float(pm.get("sy", 0)), sz=float(pm.get("sz", 0)))
         elif p.type == "orb":
             d.update(r=float(pm.get("r", 0)))
@@ -37,7 +48,7 @@ def _scene_to_dict(sc, max_tracks=4000):
                        "p": [round(float(v), 3) for v in t.polyline.flatten()],
                        "t": [round(float(v), 6) for v in t.times]})
     return {"event_id": sc.event_id, "center": [float(v) for v in sc.center],
-            "radius": float(sc.radius), "geometry": geo, "tracks": tracks,
+            "radius": float(sc.radius), "meshes": meshes, "geometry": geo, "tracks": tracks,
             "vertices": [[float(v.pos[0]), float(v.pos[1]), float(v.pos[2])] for v in sc.vertices]}
 
 

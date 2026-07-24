@@ -27,13 +27,60 @@ def _box_corners(p):
     return c, h
 
 
+# Total mesh triangles to draw across a still before falling back to bounding
+# boxes (matplotlib's Python-side patch drawing is the limit, not the geometry).
+_PNG_TRI_CAP = 60000
+
+
+def _mesh_world_verts(p):
+    R, t = p.transform[:3, :3], p.transform[:3, 3]
+    return p.mesh.vertices @ R.T + t
+
+
+def _tri_budget(prims, include_world):
+    """How many mesh prims fit under the triangle cap (largest-first is not
+    needed; draw in order and stop)."""
+    ok = set()
+    total = 0
+    for k, p in enumerate(prims):
+        if p.type == "mesh" and p.mesh is not None and not (p.is_world and not include_world):
+            n = len(p.mesh.faces)
+            if total + n > _PNG_TRI_CAP:
+                continue
+            total += n
+            ok.add(k)
+    return ok
+
+
 def _draw_geo_2d(ax, prims, ax_i, ax_j, include_world):
-    for p in prims:
+    from matplotlib.collections import LineCollection
+    budget = _tri_budget(prims, include_world)
+    for k, p in enumerate(prims):
         if p.is_world and not include_world:
             continue
         if p.transform is None:
             continue
         c = p.transform[:3, 3]
+        if p.type == "mesh" and p.mesh is not None:
+            if k in budget:
+                w = _mesh_world_verts(p)
+                f = p.mesh.faces
+                # unique triangle edges projected to (ax_i, ax_j)
+                e = np.vstack([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]])
+                e = np.unique(np.sort(e, axis=1), axis=0)
+                segs = np.stack([w[e[:, 0]][:, [ax_i, ax_j]],
+                                 w[e[:, 1]][:, [ax_i, ax_j]]], axis=1)
+                ax.add_collection(LineCollection(segs, colors="0.45", linewidths=0.3, alpha=0.6))
+            else:
+                pm = p.params
+                w2, h2 = pm.get("sx", 0), pm.get("sy", 0)
+                off = np.array([pm.get("cx", 0), pm.get("cy", 0), pm.get("cz", 0)])
+                cc = c + p.transform[:3, :3] @ off
+                sz = [pm.get("sx", 0), pm.get("sy", 0), pm.get("sz", 0)]
+                ax.add_patch(Rectangle((cc[ax_i] - sz[ax_i] / 2, cc[ax_j] - sz[ax_j] / 2),
+                                       sz[ax_i], sz[ax_j], fill=False, edgecolor="0.6",
+                                       lw=0.6, ls=":"))
+            continue
         if p.type in ("box", "bbox", "trd"):
             pm = p.params
             sx = [pm.get("sx", pm.get("x1", 0)), pm.get("sy", pm.get("y1", 0)), pm.get("sz", 0)]
@@ -108,14 +155,23 @@ def render_png(scene, out_prefix, include_world=False, dpi=150):
 
 
 def _draw_geo_3d(ax, scene, include_world):
-    from mpl_toolkits.mplot3d.art3d import Line3DCollection
+    from mpl_toolkits.mplot3d.art3d import Line3DCollection, Poly3DCollection
+    budget = _tri_budget(scene.primitives, include_world)
     segs = []
-    for p in scene.primitives:
+    tris = []
+    for k, p in enumerate(scene.primitives):
         if (p.is_world and not include_world) or p.transform is None:
             continue
-        if p.type in ("box", "bbox"):
+        if p.type == "mesh" and p.mesh is not None and k in budget:
+            w = _mesh_world_verts(p)
+            tris.extend(w[f] for f in p.mesh.faces)
+        elif p.type in ("box", "bbox", "mesh"):
             c, h = _box_corners(p)
             segs += _cube_edges(c, h)
+    if tris:
+        pc = Poly3DCollection(tris, facecolor="#6688aa", edgecolor="#3a4a5a",
+                              linewidths=0.15, alpha=0.28)
+        ax.add_collection3d(pc)
     if segs:
         ax.add_collection3d(Line3DCollection(segs, colors="0.6", linewidths=0.5))
 

@@ -148,10 +148,14 @@ def _nucleus_for_material(mat: str):
 
 
 def _primitive_size(p):
-    """A crude volume proxy (product of the numeric params) to pick the target
+    """A crude volume proxy (product of the extent params) to pick the target
     volume over small structural pieces like windows/vessels."""
-    vals = [abs(float(v)) for v in p.params.values()
-            if isinstance(v, (int, float))]
+    pm = p.params or {}
+    # AABB-bearing types (box/bbox/mesh) carry sx/sy/sz; cx/cy/cz are CENTER
+    # offsets, not sizes, so multiply only the extents.
+    if {"sx", "sy", "sz"} <= set(pm):
+        return abs(pm["sx"]) * abs(pm["sy"]) * abs(pm["sz"]) or 1.0
+    vals = [abs(float(v)) for v in pm.values() if isinstance(v, (int, float))]
     size = 1.0
     for v in vals:
         if v > 0:

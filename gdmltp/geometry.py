@@ -32,13 +32,26 @@ DEFAULT_MAX_BYTES = 8_000_000
 
 
 @dataclass
+class Mesh:
+    """A real triangulated solid surface in the solid's own local frame (mm).
+
+    Shared across every placement of the same solid, so a detector that places
+    one logical volume thousands of times carries the geometry once and the
+    emitters instance it (dedupe by `id(mesh)`).
+    """
+    vertices: np.ndarray          # (N,3) local mm
+    faces: np.ndarray             # (M,3) int, triangles
+
+
+@dataclass
 class Primitive:
-    type: str                     # box | orb | tube | trd | bbox
-    params: dict                  # in mm
+    type: str                     # box | orb | tube | trd | bbox | mesh
+    params: dict                  # in mm (for mesh: the local AABB, for fallbacks)
     transform: np.ndarray         # 4x4, mm
     material: str = ""
     volume_name: str = ""
     is_world: bool = False
+    mesh: "Mesh" = None           # set when type == "mesh": faithful surface
 
 
 def _strip_ns(tag):
@@ -228,63 +241,109 @@ def parse_gdml(path, include_world=False, max_bytes=DEFAULT_MAX_BYTES):
 
 
 # --------------------------------------------------------------------------- #
-# pyg4ometry-backed parser (the standard tool; accurate mesh extents)
+# pyg4ometry-backed parser (the standard tool; FAITHFUL solid surfaces)
 # --------------------------------------------------------------------------- #
-# Solids whose axis-aligned extent we take from parameters (verified: Box
-# pX/pY/pZ are FULL lengths, Orb pRMax is the radius) -- no meshing, so the
-# common fast case stays fast. Every other solid is meshed for a true AABB
-# (pyg4ometry's per-solid pDz etc. are not consistent across solid types).
-_MESH_CAP_DEFAULT = 600
+# Box and Orb are drawn analytically (a cube/sphere IS the exact shape, and it
+# keeps the common case light). EVERY other solid -- polycone, polyhedron,
+# cone, trd, (cut/hollow) tube, boolean, ... -- is meshed to its true surface
+# so the display matches the GDML instead of a bounding-box caricature. The
+# mesh of a given solid is built ONCE and shared across all its placements
+# (id(mesh) dedupe), so a detector that instances a volume thousands of times
+# stays cheap; the emitters instance the shared surface.
+#
+# Placement cap: a full LHC-scale detector can place volumes millions of times.
+# We emit up to this many placements (env GDMLTP_MAX_PLACEMENTS overrides), then
+# stop and warn -- honest truncation beats a multi-GB scene the renderers choke
+# on. Realistic single-target geometries are far under it.
+_MAX_PLACEMENTS_DEFAULT = 40000
 
 
-def _parse_pyg4ometry(path, include_world=False, mesh_cap=_MESH_CAP_DEFAULT):
+def _triangulate(polys):
+    """Fan-triangulate polygons (index lists, any length >= 3) into (M,3) int."""
+    tris = []
+    for p in polys:
+        idx = list(p)
+        for k in range(1, len(idx) - 1):
+            tris.append((idx[0], idx[k], idx[k + 1]))
+    return np.asarray(tris, dtype=np.int32).reshape(-1, 3)
+
+
+def _mesh_of_solid(s):
+    """Real surface of a pyg4ometry solid as a Mesh (local mm), or None."""
+    vp = s.mesh().toVerticesAndPolygons()
+    v = np.asarray(vp[0], float)
+    faces = _triangulate(vp[1])
+    if not len(v) or not len(faces):
+        return None
+    return Mesh(vertices=v, faces=faces)
+
+
+def _parse_pyg4ometry(path, include_world=False, max_placements=None):
     import pyg4ometry as pg
     from pyg4ometry import transformation as _T
 
+    if max_placements is None:
+        max_placements = int(os.environ.get("GDMLTP_MAX_PLACEMENTS",
+                                            _MAX_PLACEMENTS_DEFAULT))
     reg = pg.gdml.Reader(str(path), skipMaterials=True).getRegistry()
     world = reg.getWorldVolume()
     prims = []
-    meshed = [0]
+    mesh_cache = {}          # id(solid) -> (ptype, params, Mesh|None)
     capped = [False]
 
-    def solid_prim(s):
+    def solid_repr(s):
+        """(ptype, params_mm, Mesh|None) for a solid -- built once, cached."""
+        key = id(s)
+        hit = mesh_cache.get(key)
+        if hit is not None:
+            return hit
         t = type(s).__name__
 
         def g(a):
             return float(s.evaluateParameterWithUnits(a))
 
         if t == "Box":
-            return "box", {"sx": g("pX"), "sy": g("pY"), "sz": g("pZ")}, (0.0, 0.0, 0.0)
-        if t in ("Orb", "Sphere"):
-            return "orb", {"r": g("pRMax")}, (0.0, 0.0, 0.0)
-        if meshed[0] >= mesh_cap:
-            capped[0] = True
-            return None, None, None
-        meshed[0] += 1
-        v = np.asarray(s.mesh().toVerticesAndPolygons()[0], float)
-        lo, hi = v.min(axis=0), v.max(axis=0)
-        ext = hi - lo
-        center = tuple(0.5 * (lo + hi))
-        if t in ("Tubs", "CutTubs"):
-            # render as a cylinder from the AABB (rmin dropped for display)
-            return "tube", {"rmin": 0.0, "rmax": 0.5 * ext[0], "z": ext[2]}, center
-        return "bbox", {"sx": ext[0], "sy": ext[1], "sz": ext[2]}, center
+            out = ("box", {"sx": g("pX"), "sy": g("pY"), "sz": g("pZ")}, None)
+        elif t == "Orb":
+            out = ("orb", {"r": g("pRMax")}, None)
+        else:
+            m = None
+            try:
+                m = _mesh_of_solid(s)
+            except Exception:
+                m = None
+            if m is not None:
+                lo, hi = m.vertices.min(axis=0), m.vertices.max(axis=0)
+                ext = hi - lo
+                out = ("mesh", {"sx": float(ext[0]), "sy": float(ext[1]),
+                                "sz": float(ext[2]),
+                                "cx": float(0.5 * (lo[0] + hi[0])),
+                                "cy": float(0.5 * (lo[1] + hi[1])),
+                                "cz": float(0.5 * (lo[2] + hi[2]))}, m)
+            else:
+                # last resort: a sphere for anything we truly cannot mesh
+                out = ("orb", {"r": g("pRMax") if _has(s, "pRMax") else 1.0}, None)
+        mesh_cache[key] = out
+        return out
 
     def matname(lv):
         m = getattr(lv, "material", None)
         return getattr(m, "name", "") if m is not None else ""
 
     def recurse(lv, transform, is_world, depth):
-        if depth > 25:
+        if depth > 25 or capped[0]:
             return
         solid = getattr(lv, "solid", None)          # AssemblyVolume has none
         if solid is not None and (not is_world or include_world):
-            ptype, params, off = solid_prim(solid)
-            if ptype is not None:
-                tr = transform.copy()
-                tr[:3, 3] = tr[:3, 3] + tr[:3, :3] @ np.asarray(off, float)
-                prims.append(Primitive(ptype, params, tr, matname(lv), lv.name, is_world))
+            if len(prims) >= max_placements:
+                capped[0] = True
+                return
+            ptype, params, mesh = solid_repr(solid)
+            prims.append(Primitive(ptype, params, transform.copy(),
+                                   matname(lv), lv.name, is_world, mesh=mesh))
         for pv in getattr(lv, "daughterVolumes", []):
+            if capped[0]:
+                return
             pos = np.asarray(pv.position.eval(), float)
             rot = pv.rotation.eval() if getattr(pv, "rotation", None) is not None else [0, 0, 0]
             local = np.eye(4)
@@ -294,9 +353,18 @@ def _parse_pyg4ometry(path, include_world=False, mesh_cap=_MESH_CAP_DEFAULT):
 
     recurse(world, np.eye(4), True, 0)
     if capped[0]:
-        warnings.warn(f"{os.path.basename(str(path))}: meshed the first {mesh_cap} "
-                      f"complex solids for display; further ones were skipped.")
+        warnings.warn(f"{os.path.basename(str(path))}: reached the "
+                      f"{max_placements}-placement display cap; remaining volumes "
+                      f"omitted (set GDMLTP_MAX_PLACEMENTS to raise it).")
     return prims
+
+
+def _has(s, attr):
+    try:
+        s.evaluateParameterWithUnits(attr)
+        return True
+    except Exception:
+        return False
 
 
 def _parse_lightweight(path, include_world=False, max_bytes=DEFAULT_MAX_BYTES):
@@ -357,6 +425,13 @@ def bounding_box(prims, include_world=False):
             continue
         if p.transform is None:
             continue
+        if p.type == "mesh" and p.mesh is not None:
+            # transform the real vertices so a rotated solid's true extent is used
+            R, t = p.transform[:3, :3], p.transform[:3, 3]
+            w = p.mesh.vertices @ R.T + t
+            lo = np.minimum(lo, w.min(axis=0))
+            hi = np.maximum(hi, w.max(axis=0))
+            continue
         c = p.transform[:3, 3]
         ext = _half_extent(p)
         lo = np.minimum(lo, c - ext)
@@ -368,7 +443,7 @@ def bounding_box(prims, include_world=False):
 
 def _half_extent(p):
     pm = p.params or {}
-    if p.type == "box" or p.type == "bbox":
+    if p.type == "box" or p.type == "bbox" or p.type == "mesh":
         return np.array([pm.get("sx", 0) / 2, pm.get("sy", 0) / 2, pm.get("sz", 0) / 2])
     if p.type == "orb":
         r = pm.get("r", 0)

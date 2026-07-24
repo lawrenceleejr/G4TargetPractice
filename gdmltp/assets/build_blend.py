@@ -284,31 +284,54 @@ def _uvsphere(bm, radius, matrix, segs=GEO_SEG):
                                   diameter=radius, matrix=matrix)
 
 
-def add_geometry(coll, geometry, name="Geometry_solids"):
+def _mat(g):
+    """Full 4x4 placement (row-major list in mm) as a Blender Matrix in meters,
+    or a translation-only fallback for old scene.json without 'm'."""
+    m = g.get("m")
+    if m:
+        M = Matrix([[float(x) for x in row] for row in m])
+        M.translation = M.translation * MM
+        return M
+    return Matrix.Translation((g["x"] * MM, g["y"] * MM, g["z"] * MM))
+
+
+def add_geometry(coll, geometry, meshes=None, name="Geometry_solids"):
     """All detector solids merged into ONE mesh via bmesh -- no bpy.ops.
 
-    bpy.ops.mesh.primitive_*_add runs a full scene/view-layer update on every
-    call, so hundreds of GDML solids took seconds and left hundreds of separate
-    objects in the outliner. bmesh.ops build each primitive as raw geometry (a
-    couple of C calls) into one shared bmesh that becomes a single joined
-    object -- far faster and a single backdrop you can hide/move as a unit."""
+    Faithful solids (polycones, tubes, cones, booleans, ...) come through as
+    real triangulated surfaces in `meshes` and are placed by their full 4x4
+    transform (rotation included); box/orb are still built analytically. Merging
+    into one bmesh keeps it a single fast backdrop object (bpy.ops.*_add would
+    run a scene update per solid)."""
+    meshes = meshes or []
     bm = bmesh.new()
     prog = Progress(len(geometry), "geometry")
     for g in geometry:
         prog.update()
         t = g["type"]
-        loc = Matrix.Translation((g["x"] * MM, g["y"] * MM, g["z"] * MM))
-        if t in ("box", "bbox"):
+        M = _mat(g)
+        if t == "mesh" and "mesh" in g and g["mesh"] < len(meshes):
+            md = meshes[g["mesh"]]
+            vs = md["v"]
+            verts = [bm.verts.new(M @ Vector((vs[i] * MM, vs[i + 1] * MM, vs[i + 2] * MM)))
+                     for i in range(0, len(vs), 3)]
+            fs = md["f"]
+            for k in range(0, len(fs), 3):
+                try:
+                    bm.faces.new((verts[fs[k]], verts[fs[k + 1]], verts[fs[k + 2]]))
+                except ValueError:
+                    pass   # duplicate face (shared triangle) -- skip
+        elif t in ("box", "bbox"):
             scale = Matrix.Diagonal((g.get("sx", 1) * MM, g.get("sy", 1) * MM,
                                      g.get("sz", 1) * MM, 1.0))
-            bmesh.ops.create_cube(bm, size=1.0, matrix=loc @ scale)
+            bmesh.ops.create_cube(bm, size=1.0, matrix=M @ scale)
         elif t == "orb":
-            _uvsphere(bm, g.get("r", 1) * MM, loc)
+            _uvsphere(bm, g.get("r", 1) * MM, M)
         elif t == "tube":
             r = g.get("rmax", 1) * MM
             bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=GEO_SEG,
                                   radius1=r, radius2=r, depth=g.get("z", 1) * MM,
-                                  matrix=loc)
+                                  matrix=M)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
@@ -526,7 +549,7 @@ def main():
 
     geo_coll = new_collection("Geometry")
     if scenes:
-        add_geometry(geo_coll, scenes[0]["geometry"])
+        add_geometry(geo_coll, scenes[0]["geometry"], scenes[0].get("meshes"))
 
     radius_m = (scenes[0]["radius"] * MM) if scenes else MM
     center_m = tuple(v * MM for v in scenes[0]["center"]) if scenes else (0.0, 0.0, 0.0)
