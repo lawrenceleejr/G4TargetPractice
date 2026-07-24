@@ -22,7 +22,8 @@ NeutrinoBiasMessenger::NeutrinoBiasMessenger(G4NeutrinoPhysics* nuPhysics)
         "UI commands.");
     for (const char* name : {"ccBias", "ncBias", "nucleusBias"}) {
         auto* p = new G4UIparameter(name, 'd', false);
-        p->SetParameterRange(std::string(name) + " >= 1.");
+        const std::string range = std::string(name) + " >= 1.";
+        p->SetParameterRange(range.c_str());
         fBiasCmd->SetParameter(p);
     }
     fBiasCmd->SetParameter(new G4UIparameter("detectorRegion", 's', true));
