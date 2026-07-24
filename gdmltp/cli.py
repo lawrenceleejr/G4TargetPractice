@@ -214,8 +214,13 @@ def _display_in_docker(image, display_argv):
     install. Blender export inside a container writes scene.json + build
     instructions (it can't spawn the Blender image from within)."""
     import subprocess
+    from .run import _docker_user_args
     cwd = str(Path.cwd())
-    cmd = ["docker", "run", "--rm", "-v", f"{cwd}:/run", "-w", "/run", image, *display_argv]
+    user = _docker_user_args()
+    cmd = ["docker", "run", "--rm", *user]
+    if user:
+        cmd += ["-e", "HOME=/tmp"]     # writable home for matplotlib/ROOT caches
+    cmd += ["-v", f"{cwd}:/run", "-w", "/run", image, *display_argv]
     print("[gdmltp] $", " ".join(cmd), flush=True)
     try:
         return subprocess.run(cmd).returncode

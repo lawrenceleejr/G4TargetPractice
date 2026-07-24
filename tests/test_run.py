@@ -2,6 +2,8 @@
 
 subprocess is mocked so these exercise the real code path without Docker/engines.
 """
+import os
+
 import pytest
 
 from gdmltp import run, config
@@ -95,6 +97,27 @@ def test_engine_failure_surfaces_stderr(repo_root, tmp_path, monkeypatch):
         lines=["G4 fatal: bad macro command"], returncode=1))
     with pytest.raises(RuntimeError, match="bad macro command"):
         run.run_config(_geant4_cfg(repo_root), outdir=str(tmp_path), image="img")
+
+
+def test_docker_user_args(monkeypatch):
+    """The container runs as the host user by default so outputs aren't
+    root-owned; GDMLTP_DOCKER_USER overrides."""
+    monkeypatch.delenv("GDMLTP_DOCKER_USER", raising=False)
+    assert run._docker_user_args() == ["--user", f"{os.getuid()}:{os.getgid()}"]
+    monkeypatch.setenv("GDMLTP_DOCKER_USER", "root")
+    assert run._docker_user_args() == []            # opt back into root
+    monkeypatch.setenv("GDMLTP_DOCKER_USER", "1234:5678")
+    assert run._docker_user_args() == ["--user", "1234:5678"]
+
+
+def test_docker_command_runs_as_host_user(repo_root, tmp_path, monkeypatch, capsys):
+    """The generated `docker run` carries --user and a writable HOME."""
+    monkeypatch.delenv("GDMLTP_DOCKER_USER", raising=False)
+    run.run_config(_geant4_cfg(repo_root), outdir=str(tmp_path), image="img",
+                   dry_run=True)
+    out = capsys.readouterr().out
+    assert "--user" in out and f"{os.getuid()}:{os.getgid()}" in out
+    assert "HOME=/tmp" in out
 
 
 def test_local_uses_engine_binary(repo_root, tmp_path, monkeypatch):

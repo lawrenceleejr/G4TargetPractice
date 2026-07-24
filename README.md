@@ -35,9 +35,7 @@ display in a handful of commands.
 
 You describe a run in a **YAML file** (a target + a beam + a backend) and run it
 with a single `docker run`. No macros, no local build. Clone the repo (so you
-have the example YAMLs and geometries) and run from its root — the mount
-`-v "$PWD:/run" -w /run` makes the repo visible inside the container, and `-o
-out` collects the output.
+have the example YAMLs and geometries) and run from its root.
 
 ```bash
 git clone https://github.com/lawrenceleejr/G4TargetPractice && cd G4TargetPractice
@@ -46,53 +44,52 @@ git clone https://github.com/lawrenceleejr/G4TargetPractice && cd G4TargetPracti
 GEANT4=ghcr.io/lawrenceleejr/g4targetpractice:main
 GENIE=ghcr.io/lawrenceleejr/g4targetpractice-genie:main
 ACHILLES=ghcr.io/lawrenceleejr/g4targetpractice-achilles:main
+
+# a tiny wrapper: mounts the repo, and runs as YOU so outputs are owned by you
+# (not root), with a writable HOME for in-container caches
+gtp() { docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+                   -v "$PWD:/run" -w /run "$@"; }
 ```
 
 **Simulate — one command per generator, always from a YAML:**
 
 ```bash
 # Geant4 — 150 MeV protons into a water phantom (particle transport)
-docker run --rm -v "$PWD:/run" -w /run $GEANT4 \
-    run --config examples/water_proton.yaml -o out
+gtp $GEANT4   run --config examples/water_proton.yaml -o out
 
 # GENIE — 2 GeV muon-neutrinos on liquid argon (neutrino event generator)
-docker run --rm -v "$PWD:/run" -w /run $GENIE \
-    run --config examples/nu_argon.yaml -o out
+gtp $GENIE    run --config examples/nu_argon.yaml -o out
 
 # Achilles — 2 GeV muon-neutrinos on argon (theory-driven lepton-nucleus)
-docker run --rm -v "$PWD:/run" -w /run $ACHILLES \
-    run --config examples/nu_argon_achilles.yaml -o out
+gtp $ACHILLES run --config examples/nu_argon_achilles.yaml -o out
 
 # BSM decay — an HNL decaying in flight inside a detector (Geant4 does the decay)
-docker run --rm -v "$PWD:/run" -w /run $GEANT4 \
-    run --config examples/maia/hnl_decay.yaml -o out
+gtp $GEANT4   run --config examples/maia/hnl_decay.yaml -o out
 ```
 
-Each writes `out/output.root` in one common schema. The container renders the
-engine inputs from the YAML and runs the engine itself — one self-contained
-command, no nested Docker. Override any field on the command line, e.g.
-`… run --config examples/nu_argon.yaml --energy "5 GeV" -n 2000 -o out`.
+Each writes `out/output.root` in one common schema, **owned by you**. The
+container renders the engine inputs from the YAML and runs the engine itself —
+one self-contained command, no nested Docker. Override any field on the command
+line, e.g. `gtp $GENIE run --config examples/nu_argon.yaml --energy "5 GeV" -n 2000 -o out`.
 
 **Then analyze / validate / display / compare the output — same pattern, any
 image (the `gdmltp` tools ship in all of them):**
 
 ```bash
 # physics + schema sanity check (exit 0 = PASS)
-docker run --rm -v "$PWD:/run" -w /run $GEANT4 validate out/output.root
+gtp $GEANT4 validate out/output.root
 
 # summary report + plots (spectra, depth-dose, neutrino kinematics, ...)
-docker run --rm -v "$PWD:/run" -w /run $GEANT4 analyze out/output.root -o out/analysis
+gtp $GEANT4 analyze out/output.root -o out/analysis
 
 # event display: PNG stills + interactive WebGL + a Blender scene (see below)
-docker run --rm -v "$PWD:/run" -w /run $GEANT4 \
-    display out/output.root --gdml gdml/liquid_argon_1m3.gdml -o out/display
+gtp $GEANT4 display out/output.root --gdml gdml/liquid_argon_1m3.gdml -o out/display
 
 # overlay two runs (shower containment, and neutrino Q²/W/x/y across generators)
-docker run --rm -v "$PWD:/run" -w /run $GEANT4 \
-    compare a/output.root b/output.root --labels A,B -o cmp
+gtp $GEANT4 compare a/output.root b/output.root --labels A,B -o cmp
 
 # inspect any .root or .gdml
-docker run --rm -v "$PWD:/run" -w /run $GEANT4 info out/output.root
+gtp $GEANT4 info out/output.root
 ```
 
 ### Picking the event to display
@@ -104,13 +101,13 @@ event 0. To choose:
 
 ```bash
 # a specific event
-docker run --rm -v "$PWD:/run" -w /run $GEANT4 display out/output.root --event 12 -o out/display
+gtp $GEANT4 display out/output.root --event 12 -o out/display
 
 # a range (all embedded in the HTML / first N in the Blender scene)
-docker run --rm -v "$PWD:/run" -w /run $GEANT4 display out/output.root --events 0:20 -o out/display
+gtp $GEANT4 display out/output.root --events 0:20 -o out/display
 
 # overlay EVERY event into one scene (great for a whole neutrino slice at once)
-docker run --rm -v "$PWD:/run" -w /run $GEANT4 display out/output.root --all -o out/display
+gtp $GEANT4 display out/output.root --all -o out/display
 
 # turn outputs on/off: --no-blend / --no-png / --no-html
 ```
@@ -348,8 +345,9 @@ See `macros/README.md` for the full branch reference.
 ## Analysis & Event Display
 
 The `gdmltp` tool turns `output.root` into plots and 3D visualizations with **no
-ROOT dependency** (it reads the file with `uproot`). Run via Docker
-(`docker run --rm -v $PWD:/run -w /run $IMG <cmd> ...`) or directly if installed.
+ROOT dependency** (it reads the file with `uproot`). Run via Docker with the
+`gtp` wrapper from the top of this README (`gtp $GEANT4 <cmd> ...`, which runs
+as you so outputs aren't root-owned) or directly if installed.
 
 | Command | What it does |
 |---|---|

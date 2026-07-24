@@ -59,6 +59,24 @@ def _stage_gdml(cfg, outdir):
         shutil.copy(gsrc, outdir / gsrc.name)
 
 
+def _docker_user_args():
+    """Run the container as the invoking host user, so files written into the
+    mounted directory are owned by that user rather than root.
+
+    GDMLTP_DOCKER_USER overrides: unset -> the current uid:gid (POSIX); "" or
+    "root" -> the image default (root, the old behavior); "<uid>[:<gid>]" -> as
+    given. On non-POSIX hosts (no os.getuid) Docker Desktop maps ownership
+    itself, so nothing is added."""
+    val = os.environ.get("GDMLTP_DOCKER_USER")
+    if val is not None:
+        val = val.strip()
+        return [] if val in ("", "root") else ["--user", val]
+    getuid = getattr(os, "getuid", None)
+    if getuid is None:
+        return []
+    return ["--user", f"{getuid()}:{os.getgid()}"]
+
+
 def _local_cmd(argv):
     """The command to run an engine stage WITHOUT spawning a container -- either
     on a dev host (g4sim on PATH) or, crucially, INSIDE a generator image so a
@@ -93,8 +111,15 @@ def _exec_stage(argv, image, env, outdir, local, dry_run, label="", events=None)
         _stream_run(cmd, image=cmd[0], cwd=outdir, env=run_env,
                     events=events, is_docker=False)
     else:
-        cmd = ["docker", "run", "--rm", "--init", "-v", f"{outdir}:/run", "-w", "/run"]
-        for k, v in env.items():
+        user = _docker_user_args()
+        cmd = ["docker", "run", "--rm", "--init", *user,
+               "-v", f"{outdir}:/run", "-w", "/run"]
+        run_env = dict(env)
+        if user:
+            # a non-root uid has no home in the image; give caches (matplotlib,
+            # ROOT) a writable one so they don't warn/fail
+            run_env.setdefault("HOME", "/tmp")
+        for k, v in run_env.items():
             cmd += ["-e", f"{k}={v}"]
         cmd += [image, *argv]
         if dry_run:
