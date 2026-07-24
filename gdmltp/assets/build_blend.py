@@ -164,27 +164,38 @@ def add_track(coll, track, bev, frame_of):
     return obj
 
 
-def add_event_curve(coll, tracks, bev, name):
+def add_event_curve(coll, tracks, bev, name, prog=None):
     """All of an event's tracks as ONE curve object -- one POLY spline per
     track, colored per-track via spline.material_index. This is both the fast
     path (no per-object/ops overhead: thousands of tracks build in one
     datablock) and a single object you can select/move/parent as a unit.
-    Returns (object, n_splines)."""
+
+    Point coordinates are set in bulk with foreach_set (one C call per spline),
+    not a per-point Python assignment -- the difference between seconds and
+    minutes when tracks carry many step points. `prog`, if given, ticks once
+    per track so a single big event still shows progress. Returns (obj, count)."""
     cu = bpy.data.curves.new(name, "CURVE")
     cu.dimensions = "3D"
     cu.bevel_depth = bev
     slot = {}                      # particle name -> material slot index
     n_added = 0
     for tk in tracks:
+        if prog is not None:
+            prog.update()
         pts = tk["p"]
         n = len(pts) // 3
         if n < 2:
             continue
         sp = cu.splines.new("POLY")
         sp.points.add(n - 1)
+        # POLY point.co is (x, y, z, w); flatten to 4*n and set in one call
+        flat = [0.0] * (4 * n)
         for i in range(n):
-            sp.points[i].co = (pts[3 * i] * MM, pts[3 * i + 1] * MM,
-                               pts[3 * i + 2] * MM, 1.0)
+            flat[4 * i] = pts[3 * i] * MM
+            flat[4 * i + 1] = pts[3 * i + 1] * MM
+            flat[4 * i + 2] = pts[3 * i + 2] * MM
+            flat[4 * i + 3] = 1.0
+        sp.points.foreach_set("co", flat)
         nm = tk["n"]
         if nm not in slot:
             cu.materials.append(mat(f"p_{nm}", hex_rgba(tk["c"]), emission=True))
@@ -331,14 +342,13 @@ def main():
         print(f"[gdmltp] building one object per event ({n_tracks} track(s), "
               f"{n_verts} vertex marker(s)); static (add --animate for the "
               f"time-reveal).", flush=True)
-        tprog = Progress(len(scenes), "events")
+        tprog = Progress(n_tracks, "tracks")     # per-track: a single big event still shows progress
         for s in scenes:
             ev = new_collection(f"Event_{s['event_id']:02d}")
-            obj, _ = add_event_curve(ev, s["tracks"], bev,
-                                     f"Event_{s['event_id']:02d}_tracks")
+            add_event_curve(ev, s["tracks"], bev,
+                            f"Event_{s['event_id']:02d}_tracks", prog=tprog)
             add_event_vertices(ev, s["vertices"], vtx_size,
                                f"Event_{s['event_id']:02d}_vertices")
-            tprog.update()
 
     print(f"[gdmltp] saving {out_blend} ...", flush=True)
     bpy.ops.wm.save_as_mainfile(filepath=out_blend)
