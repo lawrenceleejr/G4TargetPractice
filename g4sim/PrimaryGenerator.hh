@@ -109,6 +109,7 @@ private:
     /// One hand-off interaction: a vertex plus its final-state particles.
     struct HandoffEvent {
         G4ThreeVector vertex;                                        ///< mm
+        G4double      time = 0.0;                                    ///< ns (optional)
         std::vector<std::pair<G4ParticleDefinition*, G4ThreeVector>> particles;  ///< MeV/c
     };
     std::vector<HandoffEvent> fEvents;   ///< non-empty => event-file replay mode

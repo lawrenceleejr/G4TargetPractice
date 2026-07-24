@@ -128,11 +128,14 @@ def _sample_energy_mev(energy, n, rng):
 
 
 def _mass_mev(beam):
+    if getattr(beam, "mass", None) is not None:
+        return _ene_mev(beam.mass)          # explicit override (BSM projectiles)
     pdg = beam.pdg_code()
     if pdg is None:
         raise ValueError(
             f"cannot convert energy->momentum for unknown particle "
-            f"{beam.identifier()!r}; specify beam.momentum (|p|) or a PDG id instead")
+            f"{beam.identifier()!r}; specify beam.mass, beam.momentum (|p|), "
+            f"or a PDG id instead")
     return masses.mass_mev(pdg)
 
 

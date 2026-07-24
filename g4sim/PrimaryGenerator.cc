@@ -259,6 +259,8 @@ void PrimaryGenerator::LoadEventFile(const G4String& path)
         }
         HandoffEvent evt;
         evt.vertex = G4ThreeVector(vx * mm, vy * mm, vz * mm);
+        G4double t0 = 0.0;                 // optional 5th value: vertex time [ns]
+        if (iss >> t0) evt.time = t0 * ns;
         for (int k = 0; k < nPart && std::getline(in, line); ++k) {
             std::istringstream pss(line);
             std::string token;
@@ -316,6 +318,7 @@ void PrimaryGenerator::GeneratePrimaries(G4Event* event)
         }
         const HandoffEvent& evt = fEvents[std::min(i, fEvents.size() - 1)];
         fParticleGun->SetParticlePosition(evt.vertex);
+        fParticleGun->SetParticleTime(evt.time);   // decay/interaction time (ns)
         for (const auto& [def, mom] : evt.particles) {
             fParticleGun->SetParticleDefinition(def);
             fParticleGun->SetParticleMomentum(mom);

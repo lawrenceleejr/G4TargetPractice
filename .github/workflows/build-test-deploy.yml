@@ -89,11 +89,11 @@ jobs:
       - name: Hand-off event-file smoke (/gun/eventFile)
         run: |
           cat > events.dat << 'EOF'
-          # E <nParticles> <vx> <vy> <vz> [mm]; then <pdg> <px> <py> <pz> [MeV/c]
+          # E <nParticles> <vx> <vy> <vz> [t] [mm, ns]; then <pdg> <px> <py> <pz> [MeV/c]
           E 2 0 0 -20
           13 0 0 900
           2212 50 0 300
-          E 3 1 0 -20
+          E 3 1 0 -20 166.8
           13 0 0 700
           211 -30 0 200
           2112 0 20 150
@@ -107,7 +107,17 @@ jobs:
           EOF
           ./build/g4sim transport.mac
           test -f output.root
-          python3 -c "import uproot,sys; n=uproot.open('output.root')['tree'].num_entries; print('events',n); sys.exit(0 if n==2 else 1)"
+          # 2 events; the optional vertex time (2nd event) must offset step times
+          python3 - << 'PY'
+          import sys, uproot
+          import awkward as ak
+          t = uproot.open('output.root')['tree']
+          assert t.num_entries == 2, f"events {t.num_entries}"
+          st = t['step_time'].array()
+          t0 = ak.min(st[1]) if len(st[1]) else 0.0
+          print('event 1 earliest step time:', t0)
+          assert t0 >= 166.8, "vertex time was not applied to the primaries"
+          PY
           rm -f output.root events.dat transport.mac
 
       - name: Particle-by-PDG smoke (/gun/particlePDG)

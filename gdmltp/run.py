@@ -76,7 +76,7 @@ def _exec_stage(argv, image, env, outdir, local, dry_run, label=""):
 
 
 def _wants_transport(cfg):
-    return cfg.generator in ("genie", "achilles") and \
+    return cfg.generator in ("genie", "achilles", "decay") and \
         bool(getattr(cfg, cfg.generator).get("transport"))
 
 
@@ -136,7 +136,12 @@ def run_config(cfg, image=None, outdir=".", local=False, dry_run=False):
         print(f"[gdmltp] generated {outdir / 'gdmltp_run.mac'}:\n"
               f"{(outdir / 'gdmltp_run.mac').read_text()}")
 
-    executed = _exec_stage(prep.argv, prep.image, prep.env, outdir, local, dry_run)
+    if backend.host:
+        # host backends (decay) generate their output in prepare(); there is
+        # no container stage to run
+        executed = True
+    else:
+        executed = _exec_stage(prep.argv, prep.image, prep.env, outdir, local, dry_run)
 
     if _wants_transport(cfg):
         _transport_stage(cfg, outdir, local, dry_run)

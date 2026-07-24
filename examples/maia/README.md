@@ -19,6 +19,7 @@ growing to 43 cm.
 | `nu_slice_numubar_muplus.yaml` | ν̄μ from the counter-propagating μ⁺ beam (−z nozzle) |
 | `nu_slice_numu_3tev.yaml` | the √s = 3 TeV collider stage (Eμ = 1.5 TeV, wider fan) |
 | `nu_slice_spectrum_only.yaml` | fixed vertex, native gevgen spectral flux — for large-N spectrum studies |
+| `hnl_decay.yaml` | a 1 GeV HNL decaying displaced inside MAIA (`decay` backend; see `docs/bsm.md`) |
 
 ## The physics inputs
 

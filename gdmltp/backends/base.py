@@ -32,6 +32,10 @@ class Backend:
     #: base image the CLI runs when the user does not pass --image
     default_image: str = ""
 
+    #: True for backends that generate on the host in prepare() and need no
+    #: container stage of their own (e.g. the decay backend)
+    host: bool = False
+
     def image_for(self, cfg) -> str:
         """Image to run for this config (may vary on backend-specific options)."""
         return self.default_image

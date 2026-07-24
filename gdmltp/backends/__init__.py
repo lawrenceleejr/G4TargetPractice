@@ -17,12 +17,14 @@ register(Geant4Backend())
 
 
 def get(name: str) -> Backend:
-    if name not in _REGISTRY and name in ("genie", "achilles"):
+    if name not in _REGISTRY and name in ("genie", "achilles", "decay"):
         try:
             if name == "genie":
                 from .genie import GenieBackend as _B
-            else:
+            elif name == "achilles":
                 from .achilles import AchillesBackend as _B
+            else:
+                from .decay import DecayBackend as _B
             register(_B())
         except ImportError as exc:  # pragma: no cover
             raise ValueError(f"{name} backend is not available: {exc}")

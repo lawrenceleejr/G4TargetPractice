@@ -122,6 +122,18 @@ def validate(path, strict=False, max_events=20000):
             else:
                 r.ok("energy: totalEdep <= primaryE (within tolerance)")
 
+    # --- optional decay-backend scalars ------------------------------------- #
+    if "eventWeight" in present:
+        w = t["eventWeight"].array(library="np", entry_stop=stop)
+        bad_w = (w <= 0) | (w > 1 + _REL_TOL)
+        r.check(not bad_w.any(),
+                "weight: eventWeight in (0, 1]",
+                f"weight: eventWeight outside (0, 1] in {_frac(bad_w)} events")
+    if "decayT" in present:
+        dt = t["decayT"].array(library="np", entry_stop=stop)
+        r.check(bool((dt >= 0).all()), "decay: decayT >= 0",
+                f"decay: negative decay time in {_frac(dt < 0)} events")
+
     # --- per-track / per-step positivity (streamed, capped) ---------------- #
     for branch, name in (("trk_startE", "track start kinetic energy"),
                          ("step_edep", "step energy deposit"),

@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 
-GENERATORS = ("geant4", "genie", "achilles")
+GENERATORS = ("geant4", "genie", "achilles", "decay")
 # mudecay_*: the neutrino energy spectrum from in-flight muon decay (the
 # neutrino-factory / muon-collider "neutrino slice" flux, angle-integrated over
 # the ~1/gamma cone; unpolarized). energy.value is the PARENT MUON energy E_mu:
@@ -104,6 +104,9 @@ class Twiss:
 class Beam:
     particle: str = "e-"     # Geant4 name, or str(pdg) when pdg-defined (display)
     pdg: Optional[int] = None  # set when the projectile is given by PDG id
+    mass: Optional[str] = None  # rest mass override, e.g. "1.0 GeV" -- required
+                                # for BSM projectiles whose PDG id is not in the
+                                # common mass table (HNLs, dark photons, ...)
     energy: Energy = field(default_factory=Energy)
     position: str = "0 0 -20 cm"
     direction: str = "0 0 1"     # "0 0 0" -> isotropic (geant4 only)
@@ -164,6 +167,7 @@ class RunConfig:
     geant4: dict = field(default_factory=dict)  # field, neutrino_mode, celeritas, physics_list
     genie: dict = field(default_factory=dict)   # tune, cross_sections, target, ...
     achilles: dict = field(default_factory=dict)  # nuclear_model, cascade, processes, run_card, ...
+    decay: dict = field(default_factory=dict)   # ctau, channels, fiducial, transport, ...
 
     def validate(self):
         if self.generator not in GENERATORS:
@@ -190,11 +194,52 @@ class RunConfig:
             raise ConfigError(
                 f"geant4.neutrino_mode must be auto/on/off, got {nm!r}")
         self._validate_beam_distributions()
+        if self.generator == "decay":
+            self._validate_decay()
         try:
             int(self.run.events)
         except (TypeError, ValueError):
             raise ConfigError(f"run.events must be an integer, got {self.run.events!r}")
         return self
+
+    def _validate_decay(self):
+        """Structural checks for the decay backend (physics checks -- mass vs
+        daughter sum, mass table coverage -- live in gdmltp/decay.py where the
+        masses are resolved)."""
+        d = self.decay
+        if not d.get("ctau") and not d.get("lifetime"):
+            raise ConfigError("the decay backend requires decay.ctau "
+                              "(e.g. \"10 m\") or decay.lifetime (e.g. \"1 ns\")")
+        channels = d.get("channels")
+        if not channels or not isinstance(channels, list):
+            raise ConfigError("the decay backend requires decay.channels: a list "
+                              "of {to: [pdg, ...], br: <fraction>} mappings")
+        for i, ch in enumerate(channels):
+            if not isinstance(ch, dict) or not isinstance(ch.get("to"), list) \
+                    or len(ch["to"]) < 2:
+                raise ConfigError(f"decay.channels[{i}] needs 'to': a list of >= 2 "
+                                  f"daughter PDG ids")
+            try:
+                [int(p) for p in ch["to"]]
+            except (TypeError, ValueError):
+                raise ConfigError(f"decay.channels[{i}].to must contain PDG ids")
+            if float(ch.get("br", 1.0)) <= 0:
+                raise ConfigError(f"decay.channels[{i}].br must be > 0")
+            model = ch.get("model", "phase_space")
+            if model not in ("phase_space", "vA"):
+                raise ConfigError(f"decay.channels[{i}].model must be "
+                                  f"'phase_space' or 'vA', got {model!r}")
+            if model == "vA" and len(ch["to"]) != 3:
+                raise ConfigError(f"decay.channels[{i}]: the 'vA' matrix element "
+                                  f"is defined for exactly 3 daughters")
+        fid = d.get("fiducial")
+        if fid is not None:
+            if not isinstance(fid, dict) or not ("z" in fid or "path" in fid):
+                raise ConfigError("decay.fiducial must be a mapping with 'z': "
+                                  "[min, max] and/or 'path': [min, max]")
+            for key in ("z", "path"):
+                if key in fid and (not isinstance(fid[key], list) or len(fid[key]) != 2):
+                    raise ConfigError(f"decay.fiducial.{key} must be [min, max]")
 
     def _validate_beam_distributions(self):
         b = self.beam
@@ -221,7 +266,7 @@ class RunConfig:
 # YAML front-end
 # --------------------------------------------------------------------------- #
 _TOP_KEYS = {"generator", "geometry", "beam", "projectile", "run",
-             "geant4", "genie", "achilles", "mac"}
+             "geant4", "genie", "achilles", "decay", "mac"}
 
 
 def _energy_from(raw) -> Energy:
@@ -368,6 +413,7 @@ def _beam_from(beam_raw: dict) -> Beam:
     return Beam(
         particle=particle,
         pdg=pdg,
+        mass=_opt_str(beam_raw.get("mass")),
         energy=_energy_from(beam_raw.get("energy")),
         position=pos_str,
         direction=dir_str,
@@ -401,6 +447,7 @@ def from_dict(data: dict) -> RunConfig:
         geant4=dict(data.get("geant4") or {}),
         genie=dict(data.get("genie") or {}),
         achilles=dict(data.get("achilles") or {}),
+        decay=dict(data.get("decay") or {}),
     )
     # YAML 1.1 parses `on`/`off` as booleans, so `neutrino_mode: off` arrives as
     # Python False; map it back to the auto/on/off vocabulary g4sim expects.

@@ -1,0 +1,46 @@
+# A heavy neutral lepton (HNL) decaying inside the MAIA detector.
+#
+# The `decay` backend flies a long-lived BSM parent along the beam, forces the
+# decay inside a fiducial window (recording the true occupation probability in
+# eventWeight), decays it -- exact two-body, V-A three-body -- and writes the
+# daughters as a displaced vertex in the common schema. Stage 1 runs entirely
+# on the host (no container); `transport: true` then pushes the daughters
+# through MAIA with Geant4 for the full detector response.
+#
+#   gdmltp run --config examples/maia/hnl_decay.yaml -o hnl
+#   gdmltp validate hnl/output.root
+#   gdmltp display hnl/output.root --gdml gdml/MAIA_v0.gdml --events 0:20
+#
+# Physics knobs: mass and ctau are free -- scan them; the decay-in-window
+# probability is carried per event in eventWeight so rates stay honest.
+# Pairs naturally with the neutrino-slice configs: an HNL mixing with nu_mu
+# would ride the same mu-decay flux down the same corridor.
+generator: decay
+
+geometry:
+  gdml: gdml/MAIA_v0.gdml
+
+beam:
+  pdg: 9900014                 # HNL PDG code (any integer id works everywhere)
+  mass: "1.0 GeV"
+  energy: {mode: mono, value: "500 GeV"}   # kinetic; any distribution/Twiss works
+  position: "0 0 -50 m"        # produced upstream, flying into the detector
+  direction: "0 0 1"
+
+decay:
+  ctau: "1 m"                  # proper decay length (or lifetime: "3.34 ns")
+  channels:
+    # N -> mu- pi+ (exact two-body, isotropic in the N rest frame)
+    - {to: [13, 211], br: 0.6}
+    # N -> nu_mu mu- mu+  (V-A three-body: |M|^2 ~ (p_N . p_2)(p_1 . p_3)
+    # with daughters listed [1, 2, 3] -- the muon-decay pairing)
+    - {to: [14, 13, -13], br: 0.4, model: vA}
+  # Force the decay into the detector volume (|z| < 2.5 m: the barrel).
+  # eventWeight = P(decay in window) = exp(-s0/lambda) - exp(-s1/lambda).
+  fiducial: {z: ["-2.5 m", "2.5 m"]}
+  # transport: true            # daughters through MAIA via Geant4 (two-stage)
+
+run:
+  events: 500
+  output: output.root
+  seed: 990014
