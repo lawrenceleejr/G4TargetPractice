@@ -27,71 +27,101 @@ std::vector<BSMSpec>& BSMPhysics::Registry()
 // and the custom particle was never created.
 BSMPhysics::BSMPhysics() : G4VPhysicsConstructor("BSMPhysics", 0) {}
 
+// --------------------------------------------------------------------------- //
+// Create the G4ParticleDefinition for one spec (idempotent).
+//
+// This is driven from the /bsm/define messenger command (PreInit) rather than
+// waiting for ConstructParticle(): in this build the physics list's
+// ConstructParticle() fires BEFORE the macro's /bsm/define runs (the registry
+// is still empty then -- the "defining 0 custom particle(s)" symptom), so
+// deferring particle creation to it never created the particle and
+// /gun/particlePDG aborted with "No particle for PDG id ...". Defining the
+// particle the moment the user declares it makes it exist regardless of when
+// physics construction happens. The particle self-registers in G4ParticleTable
+// and, being unstable (not short-lived), is picked up by G4DecayPhysics'
+// G4Decay process at /run/initialize.
+static void EnsureParticle(BSMSpec& spec)
+{
+    auto* table = G4ParticleTable::GetParticleTable();
+    if (spec.def) return;
+    if (auto* existing = table->FindParticle(spec.pdg)) {  // e.g. re-init
+        spec.def = existing;
+        return;
+    }
+    const G4double tau = spec.ctau / CLHEP::c_light;   // proper lifetime = ctau/c
+    spec.def = new G4ParticleDefinition(
+        spec.name, spec.mass, 0.0, spec.charge * eplus,
+        0, 0, 0,             // 2*spin, parity, C-conjugation (unpolarized use)
+        0, 0, 0,             // 2*isospin, 2*I3, G-parity
+        "custom", 0, 0, spec.pdg,
+        false,               // NOT stable: G4Decay picks it up
+        tau, nullptr, false);
+    G4cout << "BSMPhysics: defined " << spec.name << " (PDG " << spec.pdg
+           << ", m = " << spec.mass / MeV << " MeV, ctau = "
+           << spec.ctau / mm << " mm)" << G4endl;
+}
+
+// Build and attach the decay table for one spec. Runs from ConstructProcess()
+// (at /run/initialize), by which point every standard constructor has run its
+// ConstructParticle() so the daughter PDG ids resolve to real particles. Set
+// before /run/beamOn, so G4Decay uses it at tracking time.
+static void EnsureDecayTable(BSMSpec& spec)
+{
+    if (spec.decayBuilt || spec.channels.empty() || !spec.def) return;
+    auto* table = G4ParticleTable::GetParticleTable();
+    auto* decays = new G4DecayTable();
+    for (const auto& ch : spec.channels) {
+        std::vector<G4String> names;
+        for (G4int pdg : ch.daughters) {
+            auto* d = table->FindParticle(pdg);
+            if (!d) {
+                G4Exception("BSMPhysics::ConstructProcess", "BSMDaughter",
+                            FatalException,
+                            ("Unknown daughter PDG id: " + std::to_string(pdg)).c_str());
+                return;
+            }
+            names.push_back(d->GetParticleName());
+        }
+        switch (names.size()) {
+            case 2:
+                decays->Insert(new G4PhaseSpaceDecayChannel(
+                    spec.name, ch.br, 2, names[0], names[1]));
+                break;
+            case 3:
+                decays->Insert(new G4PhaseSpaceDecayChannel(
+                    spec.name, ch.br, 3, names[0], names[1], names[2]));
+                break;
+            case 4:
+                decays->Insert(new G4PhaseSpaceDecayChannel(
+                    spec.name, ch.br, 4, names[0], names[1], names[2], names[3]));
+                break;
+            default:
+                G4Exception("BSMPhysics::ConstructProcess", "BSMChannel",
+                            FatalException,
+                            "G4PhaseSpaceDecayChannel supports 2-4 daughters");
+        }
+    }
+    spec.def->SetDecayTable(decays);
+    spec.decayBuilt = true;
+    G4cout << "BSMPhysics: " << spec.name << " decay table with "
+           << spec.channels.size() << " channel(s)" << G4endl;
+}
+
 void BSMPhysics::ConstructParticle()
 {
-    // Registered after FTFP_BERT's constructors, so every standard particle
-    // already exists here -- daughter PDG ids can be resolved to names.
-    auto* table = G4ParticleTable::GetParticleTable();
-    G4cout << "BSMPhysics::ConstructParticle: defining "
-           << BSMPhysics::Registry().size() << " custom particle(s)." << G4endl;
+    // Safety net: create any spec not yet materialized by /bsm/define (e.g. if
+    // this runs after the macro). Normally the messenger has already done it.
+    G4cout << "BSMPhysics::ConstructParticle: " << BSMPhysics::Registry().size()
+           << " custom particle(s) registered." << G4endl;
+    for (auto& spec : BSMPhysics::Registry()) EnsureParticle(spec);
+}
 
-    for (const auto& spec : BSMPhysics::Registry()) {
-        if (table->FindParticle(spec.pdg)) {
-            G4Exception("BSMPhysics::ConstructParticle", "BSMDuplicate",
-                        FatalException,
-                        ("PDG id already exists: " + std::to_string(spec.pdg)).c_str());
-        }
-        // Proper lifetime tau = ctau / c.
-        const G4double tau = spec.ctau / CLHEP::c_light;
-
-        auto* particle = new G4ParticleDefinition(
-            spec.name, spec.mass, 0.0, spec.charge * eplus,
-            0, 0, 0,             // 2*spin, parity, C-conjugation (unpolarized use)
-            0, 0, 0,             // 2*isospin, 2*I3, G-parity
-            "custom", 0, 0, spec.pdg,
-            false,               // NOT stable: G4Decay picks it up
-            tau, nullptr, false);
-
-        if (!spec.channels.empty()) {
-            auto* decays = new G4DecayTable();
-            for (const auto& ch : spec.channels) {
-                std::vector<G4String> names;
-                for (G4int pdg : ch.daughters) {
-                    auto* d = table->FindParticle(pdg);
-                    if (!d) {
-                        G4Exception("BSMPhysics::ConstructParticle", "BSMDaughter",
-                                    FatalException,
-                                    ("Unknown daughter PDG id: " + std::to_string(pdg)).c_str());
-                        return;
-                    }
-                    names.push_back(d->GetParticleName());
-                }
-                switch (names.size()) {
-                    case 2:
-                        decays->Insert(new G4PhaseSpaceDecayChannel(
-                            spec.name, ch.br, 2, names[0], names[1]));
-                        break;
-                    case 3:
-                        decays->Insert(new G4PhaseSpaceDecayChannel(
-                            spec.name, ch.br, 3, names[0], names[1], names[2]));
-                        break;
-                    case 4:
-                        decays->Insert(new G4PhaseSpaceDecayChannel(
-                            spec.name, ch.br, 4, names[0], names[1], names[2], names[3]));
-                        break;
-                    default:
-                        G4Exception("BSMPhysics::ConstructParticle", "BSMChannel",
-                                    FatalException,
-                                    "G4PhaseSpaceDecayChannel supports 2-4 daughters");
-                }
-            }
-            particle->SetDecayTable(decays);
-        }
-
-        G4cout << "BSMPhysics: defined " << spec.name << " (PDG " << spec.pdg
-               << ", m = " << spec.mass / MeV << " MeV, ctau = "
-               << spec.ctau / mm << " mm, " << spec.channels.size()
-               << " channel(s))" << G4endl;
+void BSMPhysics::ConstructProcess()
+{
+    // Standard particles exist now -> resolve daughters and attach decay tables.
+    for (auto& spec : BSMPhysics::Registry()) {
+        EnsureParticle(spec);       // in case ConstructParticle ran while empty
+        EnsureDecayTable(spec);
     }
 }
 
@@ -136,6 +166,10 @@ void BSMMessenger::SetNewValue(G4UIcommand* command, G4String newValue)
         spec.mass = massMeV * MeV;
         spec.ctau = ctauMm * mm;
         BSMPhysics::Registry().push_back(spec);
+        // Materialize the particle now (PreInit) so it exists no matter when
+        // the physics list's ConstructParticle() fires; decay table is built
+        // later in BSMPhysics::ConstructProcess() when daughters exist.
+        EnsureParticle(BSMPhysics::Registry().back());
     } else if (command == fChannelCmd) {
         if (BSMPhysics::Registry().empty()) {
             G4Exception("BSMMessenger", "BSMChannelOrder", FatalException,

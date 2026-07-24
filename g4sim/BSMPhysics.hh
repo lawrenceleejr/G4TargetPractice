@@ -16,6 +16,8 @@ class G4UIcmdWithAString;
 /// G4Decay process then does the in-flight decay (exponential with time
 /// dilation) and its G4PhaseSpaceDecayChannel generates the daughters -- this
 /// framework defines the particle, Geant4 does the physics.
+class G4ParticleDefinition;
+
 struct BSMSpec {
     G4String name;
     G4int    pdg    = 0;
@@ -27,6 +29,8 @@ struct BSMSpec {
         std::vector<G4int> daughters;   ///< PDG ids, resolved at construction
     };
     std::vector<Channel> channels;
+    G4ParticleDefinition* def = nullptr;  ///< created by /bsm/define (PreInit)
+    bool decayBuilt = false;              ///< decay table attached yet?
 };
 
 class BSMPhysics : public G4VPhysicsConstructor {
@@ -35,7 +39,7 @@ public:
     ~BSMPhysics() override = default;
 
     void ConstructParticle() override;
-    void ConstructProcess() override {}
+    void ConstructProcess() override;
 
     /// Registry shared with the messenger (commands run before initialize).
     static std::vector<BSMSpec>& Registry();
