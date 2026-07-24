@@ -44,7 +44,9 @@ jobs:
       - name: Install HepMC3 (generator->Geant4 hand-off interchange)
         run: |
           HEPMC3_VERSION=3.3.0
-          wget -q https://gitlab.cern.ch/hepmc/HepMC3/-/archive/${HEPMC3_VERSION}/HepMC3-${HEPMC3_VERSION}.tar.gz
+          wget -q --tries=5 --retry-connrefused --waitretry=20 --timeout=30 \
+            --retry-on-http-error=429,500,502,503,504 \
+            https://gitlab.cern.ch/hepmc/HepMC3/-/archive/${HEPMC3_VERSION}/HepMC3-${HEPMC3_VERSION}.tar.gz
           tar xzf HepMC3-${HEPMC3_VERSION}.tar.gz
           cmake -S HepMC3-${HEPMC3_VERSION} -B hepmc3-build \
             -DCMAKE_INSTALL_PREFIX=/usr/local \

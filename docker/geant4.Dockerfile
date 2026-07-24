@@ -16,7 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # bespoke format. Header + ASCII reader only; no ROOT/Python components needed.
 ARG HEPMC3_VERSION=3.3.0
 RUN apt-get update && apt-get install -y --no-install-recommends cmake g++ make wget ca-certificates && \
-    wget -q https://gitlab.cern.ch/hepmc/HepMC3/-/archive/${HEPMC3_VERSION}/HepMC3-${HEPMC3_VERSION}.tar.gz && \
+    wget -q --tries=5 --retry-connrefused --waitretry=20 --timeout=30 \
+        --retry-on-http-error=429,500,502,503,504 \
+        https://gitlab.cern.ch/hepmc/HepMC3/-/archive/${HEPMC3_VERSION}/HepMC3-${HEPMC3_VERSION}.tar.gz && \
     tar xzf HepMC3-${HEPMC3_VERSION}.tar.gz && \
     cmake -S HepMC3-${HEPMC3_VERSION} -B hepmc3-build \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
