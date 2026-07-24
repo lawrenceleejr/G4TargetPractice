@@ -85,7 +85,7 @@ genie: { tune: G18_10a_00_000, transport: true }
 ```
 
 `gdmltp run` chains the two images: the generator makes vertex-level events,
-Geant4 replays each event's final-state particles (`/gun/eventFile`, one
+Geant4 replays each event's final-state particles (`/gun/hepmcFile`, one
 multi-particle vertex per event) through the GDML detector, and the
 generator's `nu_*` interaction record is grafted onto the transported file.
 The result carries generator-quality interaction physics **and** the full

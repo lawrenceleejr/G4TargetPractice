@@ -231,10 +231,11 @@ genie: { tune: G18_10a_00_000, transport: true }
 
 `gdmltp run` then executes two stages: (1) the generator image produces the
 vertex-level events; (2) the host writes each event's final-state particles to a
-hand-off file, the Geant4 image replays them with `/gun/eventFile` (one
-multi-particle vertex per event, full transport through the GDML detector), and
-the generator's `nu_*` interaction record + neutrino primary are grafted onto
-the transported file. The final `output.root` carries **both** the
+**HepMC3 file** (the standard interchange, via the official `pyhepmc` library),
+the Geant4 image reads it with `HepMC3::ReaderAscii` and replays each event via
+`/gun/hepmcFile` (one multi-particle vertex per event, full transport through
+the GDML detector), and the generator's `nu_*` interaction record + neutrino
+primary are grafted onto the transported file. The final `output.root` carries **both** the
 generator-quality interaction physics and the Geant4 `step_*`/`totalEdep`
 transport record — analyze/display/Blender all just work.
 

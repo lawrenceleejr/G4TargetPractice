@@ -18,6 +18,11 @@ find_package(Geant4 REQUIRED ui_all vis_all)
 include(${Geant4_USE_FILE})
 
 # --------------------
+# Find HepMC3 (the standard generator->Geant4 interchange the hand-off uses)
+# --------------------
+find_package(HepMC3 REQUIRED)
+
+# --------------------
 # Optional: Celeritas (offload e-/e+/gamma transport to GPU or CPU)
 # --------------------
 option(WITH_CELERITAS "Enable Celeritas offload of EM tracks" OFF)
@@ -54,9 +59,18 @@ target_compile_options(g4sim PRIVATE -Wno-shadow)
 # Link libraries. ROOT is linked via its imported targets, which carry the
 # ROOT include directories (ROOT_INCLUDE_DIRS is not reliably populated by
 # ROOT 6.26's CMake config under newer CMake versions).
+# HepMC3 exports either the modern imported target HepMC3::HepMC3 or the
+# ${HEPMC3_LIBRARIES} variable, depending on version -- prefer the target.
+if(TARGET HepMC3::HepMC3)
+  set(HEPMC3_LINK HepMC3::HepMC3)
+else()
+  set(HEPMC3_LINK ${HEPMC3_LIBRARIES})
+  include_directories(${HEPMC3_INCLUDE_DIR})
+endif()
+
 if(WITH_CELERITAS)
   target_compile_definitions(g4sim PRIVATE USE_CELERITAS)
-  celeritas_target_link_libraries(g4sim ROOT::RIO ROOT::Tree ROOT::Hist ${Geant4_LIBRARIES} Celeritas::G4)
+  celeritas_target_link_libraries(g4sim ROOT::RIO ROOT::Tree ROOT::Hist ${Geant4_LIBRARIES} ${HEPMC3_LINK} Celeritas::G4)
 else()
-  target_link_libraries(g4sim ROOT::RIO ROOT::Tree ROOT::Hist ${Geant4_LIBRARIES})
+  target_link_libraries(g4sim ROOT::RIO ROOT::Tree ROOT::Hist ${Geant4_LIBRARIES} ${HEPMC3_LINK})
 endif()

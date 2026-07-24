@@ -37,5 +37,5 @@ private:
     // Host-sampled beam file (distributions / Twiss); one primary per event
     G4UIcmdWithAString*        fBeamFileCmd;
     // Generator hand-off event file; one multi-particle vertex per event
-    G4UIcmdWithAString*        fEventFileCmd;
+    G4UIcmdWithAString*        fHepmcFileCmd;
 };

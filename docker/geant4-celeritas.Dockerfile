@@ -15,6 +15,17 @@ RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.29.6/cmake-3.2
     rm cmake-3.29.6-linux-x86_64.tar.gz
 ENV PATH=/opt/cmake-3.29.6-linux-x86_64/bin:$PATH
 
+# HepMC3 (the generator->Geant4 hand-off interchange g4sim links against)
+ARG HEPMC3_VERSION=3.3.0
+RUN wget -q https://gitlab.cern.ch/hepmc/HepMC3/-/archive/${HEPMC3_VERSION}/HepMC3-${HEPMC3_VERSION}.tar.gz && \
+    tar xzf HepMC3-${HEPMC3_VERSION}.tar.gz && \
+    cmake -S HepMC3-${HEPMC3_VERSION} -B hepmc3-build \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DHEPMC3_ENABLE_PYTHON=OFF -DHEPMC3_ENABLE_ROOTIO=OFF \
+        -DHEPMC3_ENABLE_TEST=OFF -DHEPMC3_BUILD_EXAMPLES=OFF && \
+    cmake --build hepmc3-build --target install -j"$(nproc)" && ldconfig && \
+    rm -rf HepMC3-${HEPMC3_VERSION}* hepmc3-build
+
 # Build Celeritas (CPU-only) against the base image's Geant4. Geant4 core-geo
 # means any user GDML geometry works without conversion.
 WORKDIR /opt

@@ -71,8 +71,42 @@ def _exec_stage(argv, image, env, outdir, local, dry_run, label=""):
         if dry_run:
             print(f"[gdmltp] (dry-run{label})", " ".join(cmd))
             return False
-        subprocess.run(cmd, check=True)
+        _docker_run(cmd, image)
     return True
+
+
+def _docker_run(cmd, image):
+    """Run a docker stage, turning docker's cryptic failures into clear ones."""
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError:
+        raise RuntimeError(
+            "docker was not found on PATH. Install Docker, or use --local to run "
+            "a g4sim already on PATH.")
+    out = getattr(proc, "stdout", "") or ""
+    if out:
+        print(out, end="")
+    if proc.returncode == 0:
+        return
+    err = (getattr(proc, "stderr", "") or "").strip()
+    low = err.lower()
+    # docker exits 125 when it never started the container -- almost always the
+    # image is missing or unreachable (unpublished tag, private package, typo).
+    if proc.returncode == 125 or "manifest unknown" in low or "not found" in low \
+            or "pull access denied" in low or "unauthorized" in low:
+        raise RuntimeError(
+            f"could not obtain the container image:\n    {image}\n"
+            f"docker said: {err.splitlines()[-1] if err else '(no output)'}\n"
+            f"This usually means the image tag is not published or the package is "
+            f"private. Try one of:\n"
+            f"  - authenticate:  docker login ghcr.io\n"
+            f"  - pick a tag that exists (branch builds are tagged by branch name), "
+            f"e.g.  --image <repo>:<tag>\n"
+            f"  - make the GHCR package public, or merge to the default branch so "
+            f"the ':main'/':latest' tag publishes")
+    # the engine ran but failed: surface its own error tail, not a Python trace
+    tail = "\n".join(err.splitlines()[-15:]) if err else "(no stderr)"
+    raise RuntimeError(f"the '{image}' stage exited with status {proc.returncode}:\n{tail}")
 
 
 def _wants_transport(cfg):
@@ -92,7 +126,7 @@ def _transport_stage(cfg, outdir, local, dry_run):
     g4 = Geant4Backend()
     if dry_run:
         print(f"[gdmltp] (dry-run:transport) would replay the generator events "
-              f"through {g4.image_for(cfg)} via /gun/eventFile and merge the "
+              f"through {g4.image_for(cfg)} via /gun/hepmcFile and merge the "
               f"nu_* block into {cfg.run.output}")
         return
 

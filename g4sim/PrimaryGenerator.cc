@@ -11,6 +11,12 @@
 #include "Randomize.hh"
 #include "CLHEP/Units/PhysicalConstants.h"
 
+#include "HepMC3/ReaderAscii.h"
+#include "HepMC3/GenEvent.h"
+#include "HepMC3/GenParticle.h"
+#include "HepMC3/GenVertex.h"
+#include "HepMC3/Units.h"
+
 #include "TTree.h"
 
 #include <cmath>
@@ -232,54 +238,47 @@ void PrimaryGenerator::LoadBeamFile(const G4String& path)
 // ---------------------------------------------------------------------------
 void PrimaryGenerator::LoadEventFile(const G4String& path)
 {
-    std::ifstream in(path.c_str());
-    if (!in) {
+    // Read the generator->Geant4 hand-off as HepMC3 (the standard interchange),
+    // via the official HepMC3 library -- no bespoke parser. Each event's
+    // status-1 particles are fired from the production vertex at its time.
+    HepMC3::ReaderAscii reader(path.c_str());
+    if (reader.failed()) {
         G4Exception("PrimaryGenerator::LoadEventFile", "NoEventFile", FatalException,
-                    ("Could not open event file: " + path).c_str());
+                    ("Could not open HepMC3 file: " + path).c_str());
         return;
     }
     fEvents.clear();
-    std::string line;
-    while (std::getline(in, line)) {
-        std::size_t s = line.find_first_not_of(" \t\r\n");
-        if (s == std::string::npos || line[s] == '#') continue;
-        std::istringstream iss(line);
-        std::string tag;
-        iss >> tag;
-        if (tag != "E") {
-            G4Exception("PrimaryGenerator::LoadEventFile", "BadEventLine", JustWarning,
-                        ("Expected an 'E' header, ignoring: " + line).c_str());
-            continue;
+    while (true) {
+        HepMC3::GenEvent evt(HepMC3::Units::MEV, HepMC3::Units::MM);
+        reader.read_event(evt);
+        if (reader.failed()) break;
+        evt.set_units(HepMC3::Units::MEV, HepMC3::Units::MM);  // normalize to ours
+
+        HandoffEvent h;
+        const auto& verts = evt.vertices();
+        if (!verts.empty()) {
+            const auto pos = verts.front()->position();
+            h.vertex = G4ThreeVector(pos.x() * mm, pos.y() * mm, pos.z() * mm);
+            // HepMC stores the position time as a length (c*t); recover ns.
+            h.time = (pos.t() * mm) / CLHEP::c_light;
         }
-        int nPart = 0;
-        G4double vx, vy, vz;
-        if (!(iss >> nPart >> vx >> vy >> vz)) {
-            G4Exception("PrimaryGenerator::LoadEventFile", "BadEventLine", FatalException,
-                        ("Malformed event header: " + line).c_str());
-        }
-        HandoffEvent evt;
-        evt.vertex = G4ThreeVector(vx * mm, vy * mm, vz * mm);
-        G4double t0 = 0.0;                 // optional 5th value: vertex time [ns]
-        if (iss >> t0) evt.time = t0 * ns;
-        for (int k = 0; k < nPart && std::getline(in, line); ++k) {
-            std::istringstream pss(line);
-            std::string token;
-            G4double px, py, pz;
-            if (!(pss >> token >> px >> py >> pz)) {
-                G4Exception("PrimaryGenerator::LoadEventFile", "BadParticleLine",
-                            FatalException, ("Malformed particle line: " + line).c_str());
-            }
-            auto* def = ResolveToken(token);
+        for (const auto& p : evt.particles()) {
+            if (p->status() != 1) continue;      // final state only
+            auto* def = ResolveByPDG(p->pid());
             if (!def) {
-                G4Exception("PrimaryGenerator::LoadEventFile", "NoParticle", FatalException,
-                            ("Event-file particle not found: " + token).c_str());
+                G4Exception("PrimaryGenerator::LoadEventFile", "NoParticle",
+                            FatalException,
+                            ("HepMC particle PDG not found: "
+                             + std::to_string(p->pid())).c_str());
             }
-            evt.particles.emplace_back(def, G4ThreeVector(px * MeV, py * MeV, pz * MeV));
+            const auto m = p->momentum();
+            h.particles.emplace_back(
+                def, G4ThreeVector(m.px() * MeV, m.py() * MeV, m.pz() * MeV));
         }
-        fEvents.push_back(std::move(evt));
+        fEvents.push_back(std::move(h));
     }
     G4cout << "PrimaryGenerator: loaded " << fEvents.size()
-           << " hand-off event(s) from " << path << G4endl;
+           << " HepMC3 hand-off event(s) from " << path << G4endl;
 }
 
 G4double PrimaryGenerator::SampleEnergy() const

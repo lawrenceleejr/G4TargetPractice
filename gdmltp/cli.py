@@ -41,7 +41,7 @@ examples:
 # Error types that mean "bad input", shown as one friendly line. Anything else
 # is a gdmltp bug and gets its full traceback so it can be reported.
 _USER_ERRORS = (FileNotFoundError, IsADirectoryError, NotADirectoryError,
-                PermissionError, ValueError, OSError)
+                PermissionError, ValueError, OSError, RuntimeError)
 
 
 def _build_parser():

@@ -69,6 +69,35 @@ def test_output_rename(repo_root, tmp_path, monkeypatch):
     assert not (outdir / "output.root").exists()
 
 
+def test_missing_image_gives_clear_error(repo_root, tmp_path, monkeypatch):
+    """docker's 'manifest unknown' (exit 125) becomes a clear, actionable
+    message naming the image, not a raw CalledProcessError traceback."""
+    def fake_run(cmd, **kw):
+        class R:  # noqa
+            returncode = 125
+            stdout = ""
+            stderr = "docker: Error response from daemon: manifest unknown\n"
+        return R()
+
+    monkeypatch.setattr(run.subprocess, "run", fake_run)
+    cfg = _geant4_cfg(repo_root)
+    with pytest.raises(RuntimeError, match="could not obtain the container image"):
+        run.run_config(cfg, outdir=str(tmp_path), image="ghcr.io/x/nope:main")
+
+
+def test_engine_failure_surfaces_stderr(repo_root, tmp_path, monkeypatch):
+    def fake_run(cmd, **kw):
+        class R:  # noqa
+            returncode = 1
+            stdout = ""
+            stderr = "G4 fatal: bad macro command\n"
+        return R()
+
+    monkeypatch.setattr(run.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="bad macro command"):
+        run.run_config(_geant4_cfg(repo_root), outdir=str(tmp_path), image="img")
+
+
 def test_local_uses_engine_binary(repo_root, tmp_path, monkeypatch):
     calls = {}
 

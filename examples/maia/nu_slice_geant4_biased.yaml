@@ -1,0 +1,46 @@
+# The neutrino slice simulated ENTIRELY in Geant4, with cross-section biasing
+# so an interaction is guaranteed in every event.
+#
+# Geant4's built-in neutrino processes have physical cross sections so tiny
+# that an unbiased run through even a kt detector records essentially nothing.
+# This config drives the geant4 backend with a single biasing factor of 1e10,
+# so the neutrino interacts inside MAIA and you see the shower -- one engine,
+# one stage, full transport and energy deposition (unlike the vertex-level
+# GENIE/Achilles backends, which stop at the interaction).
+#
+#   gdmltp run --config examples/maia/nu_slice_geant4_biased.yaml -o slice_g4
+#   gdmltp analyze slice_g4/output.root      # depth-dose, secondaries, CC/NC
+#   gdmltp display slice_g4/output.root --gdml gdml/MAIA_v0.gdml --events 0:10
+#
+# Caveats: this is Geant4's thin neutrino model, not a real neutrino event
+# generator -- use it to see energy deposition / detector response, and use
+# the genie/achilles slice configs for interaction-physics accuracy. The 1e10
+# bias enhances the interaction RATE; per-event kinematics are Geant4's.
+generator: geant4
+
+geometry:
+  gdml: gdml/MAIA_v0.gdml
+
+beam:
+  particle: nu_mu
+  # The muon-collider neutrino-slice spectrum (mu- beam, E_mu = 5 TeV), sampled
+  # host-side into a beam file and replayed through Geant4.
+  energy: {mode: mudecay_numu, value: "5 TeV"}
+  position: "0 0 -50 cm"       # just upstream of the detector body
+  direction: "0 0 1"
+
+geant4:
+  neutrino_mode: on            # populate the nu_* interaction block
+  # Single biasing factor of 1e10 applied to every neutrino channel (CC, NC,
+  # nucleus), so an interaction is forced without hand-tuning per channel.
+  neutrino_bias:
+    factor: 1.0e10
+    # To bias ONE process instead, set that channel and leave the others at 1:
+    #   cc_bias: 1.0e10        # nu-electron CC only
+    #   nc_bias: 1.0            # (nu-electron NC)
+    #   nucleus_bias: 1.0       # (nu-nucleus)
+
+run:
+  events: 200
+  output: output.root
+  seed: 20241417

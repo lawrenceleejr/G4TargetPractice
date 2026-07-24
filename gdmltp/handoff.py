@@ -4,16 +4,14 @@ GENIE and Achilles generate the interaction and its nuclear exit state but do
 not transport anything through the detector. This module bridges the two:
 
   1. `write_event_file`  -- turn a vertex-level `output.root` (from
-     genie_convert / achilles_convert / the decay backend, which record every
-     final-state particle's momentum in trk_px/py/pz) into a g4sim hand-off
-     event file:
-         E <nParticles> <vx> <vy> <vz> [t]   [mm, ns]
-         <pdg> <px> <py> <pz>                [MeV/c]
-     g4sim replays it with `/gun/eventFile` (one multi-particle vertex per
-     event, primaries stamped with t) and fills step_*, totalEdep, and real
-     trk_end* by transport. The vertex comes from nu_vertex* when present
-     (neutrino generators) else primaryEnd* (the decay backend records the
-     decay point there); the time from decayT when present.
+     genie_convert / achilles_convert / the external backend, which record
+     every final-state particle's momentum in trk_px/py/pz) into a HepMC3
+     ASCII event file, written with the official library (pyhepmc). HepMC3 is
+     the single generator->Geant4 interchange format; g4sim reads it back with
+     HepMC3::ReaderAscii and replays one multi-particle vertex per event
+     (primaries stamped with the vertex time), filling step_*, totalEdep, and
+     real trk_end* by transport. The vertex comes from nu_vertex* when present
+     (neutrino generators) else primaryEnd*; the time from decayT when present.
 
   2. `merge_nu_block`   -- graft the generator's record (the nu_* block when
      present, the primary identity, the vertex-level primaryEnd*, and any
@@ -30,8 +28,10 @@ import uproot
 from . import io
 
 TRANSPORT_MACRO = "gdmltp_transport.mac"
-EVENT_FILE = "events.dat"
+EVENT_FILE = "events.hepmc"          # HepMC3 ASCII: the standard interchange
 VERTEX_FILE = "vertex_level.root"
+
+C_MM_PER_NS = 299.792458
 
 # Branches replaced on the transported file by the generator's values: the
 # interaction record, the primary identity (probe/parent -- matching what a
@@ -50,55 +50,77 @@ _MERGE_OPTIONAL = ["eventWeight", "decayT"]
 
 
 def write_event_file(vertex_root, path, tree="tree"):
-    """Write the hand-off event file from a vertex-level ntuple."""
+    """Write the generator -> Geant4 hand-off as a HepMC3 ASCII file.
+
+    HepMC3 is the standard interchange, written with the official library
+    (pyhepmc), not a bespoke format: one GenEvent per ntuple entry, units
+    MEV/MM (lossless with the schema), a single production vertex at the
+    interaction/decay point carrying its time, the primary as an incoming
+    status-4 beam particle (provenance), and every final-state trk_* as an
+    outgoing status-1 particle. The event weight (eventWeight) becomes the
+    HepMC weight. g4sim reads it back with HepMC3::ReaderAscii.
+    """
+    import pyhepmc
+    from . import masses
+
     with uproot.open(vertex_root) as f:
         t = f[tree]
         names = {k.split(";")[0] for k in t.keys()}
         pdg = t["trk_pdg"].array()
-        px = t["trk_px"].array()
-        py = t["trk_py"].array()
-        pz = t["trk_pz"].array()
+        px, py, pz = (t[f"trk_p{a}"].array() for a in "xyz")
+        kin = t["trk_startE"].array()
+        p0pdg = t["primaryPDG"].array(library="np")
+        p0 = {a: t[f"primaryStart{a.upper()}"].array(library="np") for a in "xyz"}
+        p0p = {a: t[f"primaryStartP{a}"].array(library="np") for a in "xyz"}
+        p0e = t["primaryE"].array(library="np")
         if "nu_vertexX" in names:
-            vx = t["nu_vertexX"].array(library="np")
-            vy = t["nu_vertexY"].array(library="np")
-            vz = t["nu_vertexZ"].array(library="np")
+            vx, vy, vz = (t[f"nu_vertex{a}"].array(library="np") for a in "XYZ")
         else:
-            vx = t["primaryEndX"].array(library="np")
-            vy = t["primaryEndY"].array(library="np")
-            vz = t["primaryEndZ"].array(library="np")
+            vx, vy, vz = (t[f"primaryEnd{a}"].array(library="np") for a in "XYZ")
         tns = t["decayT"].array(library="np") if "decayT" in names else None
+        wgt = t["eventWeight"].array(library="np") if "eventWeight" in names else None
 
-        lines = ["# gdmltp hand-off event file:",
-                 "#   E <nParticles> <vx> <vy> <vz> [t]   [mm, ns]",
-                 "#   <pdg> <px> <py> <pz>                [MeV/c]"]
-        n_events = len(vx)
+    n_events = len(vx)
+    with pyhepmc.open(path, "w") as writer:
         for i in range(n_events):
-            ids = [int(v) for v in pdg[i]]
-            head = f"E {len(ids)} {vx[i]:.6g} {vy[i]:.6g} {vz[i]:.6g}"
-            if tns is not None:
-                head += f" {float(tns[i]):.6g}"
-            lines.append(head)
-            for k, p in enumerate(ids):
-                lines.append(f"{p} {float(px[i][k]):.6g} {float(py[i][k]):.6g} "
-                             f"{float(pz[i][k]):.6g}")
-    with open(path, "w") as f:
-        f.write("\n".join(lines) + "\n")
+            ev = pyhepmc.GenEvent(pyhepmc.Units.MEV, pyhepmc.Units.MM)
+            ev.event_number = i
+            t_len = float(tns[i]) * C_MM_PER_NS if tns is not None else 0.0
+            vtx = pyhepmc.GenVertex((float(vx[i]), float(vy[i]), float(vz[i]), t_len))
+            m0 = masses.mass_mev(int(p0pdg[i]))
+            beam = pyhepmc.GenParticle(
+                (float(p0p["x"][i]), float(p0p["y"][i]), float(p0p["z"][i]),
+                 float(p0e[i])), int(p0pdg[i]), 4)
+            beam.generated_mass = m0
+            vtx.add_particle_in(beam)
+            for k in range(len(pdg[i])):
+                pid = int(pdg[i][k])
+                m = masses.mass_mev(pid)
+                etot = float(kin[i][k]) + m
+                fs = pyhepmc.GenParticle(
+                    (float(px[i][k]), float(py[i][k]), float(pz[i][k]), etot), pid, 1)
+                fs.generated_mass = m
+                vtx.add_particle_out(fs)
+            ev.add_vertex(vtx)
+            if wgt is not None:
+                ev.weights = [float(wgt[i])]
+            writer.write(ev)
     return n_events
 
 
 def read_event_file(path):
-    """Parse an event file back into [(vertex(3,), [(pdg,(px,py,pz)), ...])]."""
+    """Read the hand-off HepMC3 file back into
+    [(vertex(x,y,z) mm, [(pdg, (px,py,pz) MeV/c), ...])] -- the final-state
+    (status-1) particles per event. Uses pyhepmc (the official reader)."""
+    import pyhepmc
     events = []
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            t = line.split()
-            if t[0] == "E":
-                events.append((tuple(float(v) for v in t[2:5]), []))
-            else:
-                events[-1][1].append((int(t[0]), tuple(float(v) for v in t[1:4])))
+    with pyhepmc.open(str(path)) as reader:
+        for ev in reader:
+            v = ev.vertices[0].position if ev.vertices else None
+            vertex = (v.x, v.y, v.z) if v is not None else (0.0, 0.0, 0.0)
+            parts = [(p.pid, (p.momentum.px, p.momentum.py, p.momentum.pz))
+                     for p in ev.particles if p.status == 1]
+            events.append((vertex, parts))
     return events
 
 
@@ -113,7 +135,7 @@ def build_transport_macro(gdml_name, n_events, event_file=EVENT_FILE, seed=None,
         lines.append(f"/random/setSeeds {int(seed)} {int(seed) + 1}")
     if field:
         lines.append(f"/detector/setGlobalField {field}")
-    lines += [f"/gun/eventFile {event_file}",
+    lines += [f"/gun/hepmcFile {event_file}",
               f"/run/printProgress {max(1, int(n_events) // 10)}",
               f"/run/beamOn {int(n_events)}"]
     return "\n".join(lines) + "\n"
@@ -134,7 +156,7 @@ def merge_nu_block(transported_root, vertex_root, out_path, tree="tree"):
         if n_t != n_v:
             raise ValueError(
                 f"transported file has {n_t} events but vertex-level has {n_v}; "
-                f"did the transport run use /gun/eventFile with beamOn {n_v}?")
+                f"did the transport run use /gun/hepmcFile with beamOn {n_v}?")
         vnames = {k.split(";")[0] for k in tv.keys()}
         for name in list(vnames):
             if name.startswith("nu_"):

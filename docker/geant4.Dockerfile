@@ -11,6 +11,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libqt6core6 libqt6gui6 libqt6widgets6 libqt6opengl6 \
     && rm -rf /var/lib/apt/lists/*
 
+# HepMC3: the standard generator->Geant4 interchange the hand-off reads. Built
+# from source (pinned) so g4sim links the real library rather than parsing a
+# bespoke format. Header + ASCII reader only; no ROOT/Python components needed.
+ARG HEPMC3_VERSION=3.3.0
+RUN apt-get update && apt-get install -y --no-install-recommends cmake g++ make wget ca-certificates && \
+    wget -q https://gitlab.cern.ch/hepmc/HepMC3/-/archive/${HEPMC3_VERSION}/HepMC3-${HEPMC3_VERSION}.tar.gz && \
+    tar xzf HepMC3-${HEPMC3_VERSION}.tar.gz && \
+    cmake -S HepMC3-${HEPMC3_VERSION} -B hepmc3-build \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DHEPMC3_ENABLE_PYTHON=OFF -DHEPMC3_ENABLE_ROOTIO=OFF \
+        -DHEPMC3_ENABLE_TEST=OFF -DHEPMC3_BUILD_EXAMPLES=OFF && \
+    cmake --build hepmc3-build --target install -j"$(nproc)" && \
+    ldconfig && \
+    rm -rf HepMC3-${HEPMC3_VERSION}* hepmc3-build /var/lib/apt/lists/*
+
 # Build the g4sim engine
 COPY g4sim/ /app/g4sim/
 RUN mkdir -p /app/build && cd /app/build && cmake /app/g4sim/ && cmake --build .

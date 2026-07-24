@@ -41,6 +41,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install HepMC3 (generator->Geant4 hand-off interchange)
+        run: |
+          HEPMC3_VERSION=3.3.0
+          wget -q https://gitlab.cern.ch/hepmc/HepMC3/-/archive/${HEPMC3_VERSION}/HepMC3-${HEPMC3_VERSION}.tar.gz
+          tar xzf HepMC3-${HEPMC3_VERSION}.tar.gz
+          cmake -S HepMC3-${HEPMC3_VERSION} -B hepmc3-build \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DHEPMC3_ENABLE_PYTHON=OFF -DHEPMC3_ENABLE_ROOTIO=OFF \
+            -DHEPMC3_ENABLE_TEST=OFF -DHEPMC3_BUILD_EXAMPLES=OFF
+          cmake --build hepmc3-build --target install -j"$(nproc)"
+          ldconfig
+
       - name: Configure & build g4sim
         run: |
           mkdir -p build && cd build
@@ -86,39 +98,49 @@ jobs:
           python3 -c "import uproot,sys; n=uproot.open('output.root')['tree'].num_entries; print('events',n); sys.exit(0 if n==3 else 1)"
           rm -f output.root beam.dat beam.mac
 
-      - name: Hand-off event-file smoke (/gun/eventFile)
+      - name: Hand-off HepMC3 smoke (/gun/hepmcFile)
         run: |
-          cat > events.dat << 'EOF'
-          # E <nParticles> <vx> <vy> <vz> [t] [mm, ns]; then <pdg> <px> <py> <pz> [MeV/c]
-          E 2 0 0 -20
-          13 0 0 900
-          2212 50 0 300
-          E 3 1 0 -20 166.8
-          13 0 0 700
-          211 -30 0 200
-          2112 0 20 150
-          EOF
+          # Write the hand-off with the official library (pyhepmc), then g4sim
+          # reads it back with HepMC3::ReaderAscii -- the real interchange, both
+          # ends. Second event carries a vertex time that must reach step times.
+          python3 - << 'PY'
+          import pyhepmc
+          C = 299.792458  # mm/ns
+          specs = [([(13,0,0,900),(2212,50,0,300)], (0,0,-20), 0.0),
+                   ([(13,0,0,700),(211,-30,0,200),(2112,0,20,150)], (1,0,-20), 166.8)]
+          with pyhepmc.open("events.hepmc", "w") as w:
+              for i,(parts,v,tns) in enumerate(specs):
+                  ev = pyhepmc.GenEvent(pyhepmc.Units.MEV, pyhepmc.Units.MM)
+                  ev.event_number = i
+                  vtx = pyhepmc.GenVertex((v[0],v[1],v[2], tns*C))
+                  vtx.add_particle_in(pyhepmc.GenParticle((0,0,1000,1000), 14, 4))
+                  for pid,px,py,pz in parts:
+                      import math
+                      vtx.add_particle_out(pyhepmc.GenParticle(
+                          (px,py,pz, math.sqrt(px*px+py*py+pz*pz)+140.0), pid, 1))
+                  ev.add_vertex(vtx)
+                  w.write(ev)
+          print("wrote events.hepmc")
+          PY
           cat > transport.mac << 'EOF'
           /detector/readGDML gdml/liquid_argon_1m3.gdml
           /run/initialize
           /analysis/neutrinoMode off
-          /gun/eventFile events.dat
+          /gun/hepmcFile events.hepmc
           /run/beamOn 2
           EOF
           ./build/g4sim transport.mac
           test -f output.root
-          # 2 events; the optional vertex time (2nd event) must offset step times
           python3 - << 'PY'
-          import sys, uproot
-          import awkward as ak
+          import uproot, awkward as ak
           t = uproot.open('output.root')['tree']
           assert t.num_entries == 2, f"events {t.num_entries}"
           st = t['step_time'].array()
           t0 = ak.min(st[1]) if len(st[1]) else 0.0
           print('event 1 earliest step time:', t0)
-          assert t0 >= 166.8, "vertex time was not applied to the primaries"
+          assert t0 >= 166.8, "HepMC vertex time was not applied to the primaries"
           PY
-          rm -f output.root events.dat transport.mac
+          rm -f output.root events.hepmc transport.mac
 
       - name: BSM decay smoke (/bsm/define -> G4Decay)
         # Geant4 does the decay: define a 1 GeV neutral with a short sampled

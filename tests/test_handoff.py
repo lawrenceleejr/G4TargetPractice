@@ -19,7 +19,7 @@ def vertex_root(synth_gst, tmp_path):
 
 # --- event file --------------------------------------------------------------
 def test_write_event_file_roundtrip(vertex_root, tmp_path):
-    path = tmp_path / "events.dat"
+    path = tmp_path / "events.hepmc"
     n = handoff.write_event_file(vertex_root, path)
     assert n == 25
     events = handoff.read_event_file(path)
@@ -35,7 +35,7 @@ def test_write_event_file_roundtrip(vertex_root, tmp_path):
 def test_transport_macro():
     mac = handoff.build_transport_macro("lar.gdml", 25, seed=3, field="0 0 2 tesla")
     assert "/detector/readGDML lar.gdml" in mac
-    assert "/gun/eventFile events.dat" in mac
+    assert "/gun/hepmcFile events.hepmc" in mac
     assert "/run/beamOn 25" in mac
     assert "/analysis/neutrinoMode off" in mac       # nu block comes from the merge
     assert "/random/setSeeds 3 4" in mac
@@ -89,7 +89,7 @@ def test_run_config_transport_two_stages(repo_root, synth_gst, tmp_path, monkeyp
             genie_convert.convert(synth_gst, tmp_path / "output.root")
         else:                          # transport stage: emit transported output
             write_synthetic(tmp_path / "output.root", n_events=25, seed=6)
-        return type("R", (), {"returncode": 0})()
+        return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
 
     monkeypatch.setattr(run.subprocess, "run", fake_run)
     cfg = config.RunConfig(

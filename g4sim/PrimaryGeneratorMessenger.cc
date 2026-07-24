@@ -85,13 +85,13 @@ PrimaryGeneratorMessenger::PrimaryGeneratorMessenger(PrimaryGenerator* gun)
         "Overrides the /gun energy/position/direction sampling above.");
     fBeamFileCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
 
-    fEventFileCmd = new G4UIcmdWithAString("/gun/eventFile", this);
-    fEventFileCmd->SetGuidance(
-        "Transport a generator hand-off event file (one interaction per event,\n"
-        "all final-state particles fired from a common vertex):\n"
-        "  E <nParticles> <vx> <vy> <vz>   [mm]\n"
-        "  <name|pdg> <px> <py> <pz>       [MeV/c]");
-    fEventFileCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+    fHepmcFileCmd = new G4UIcmdWithAString("/gun/hepmcFile", this);
+    fHepmcFileCmd->SetGuidance(
+        "Transport a generator hand-off given as a HepMC3 ASCII file: one event\n"
+        "per interaction, all final-state (status 1) particles fired from the\n"
+        "production vertex at its time. This is the standard generator->Geant4\n"
+        "interchange (read with the HepMC3 library).");
+    fHepmcFileCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
 }
 
 void PrimaryGeneratorMessenger::SetNewValue(G4UIcommand* command, G4String newValue)
@@ -158,7 +158,7 @@ void PrimaryGeneratorMessenger::SetNewValue(G4UIcommand* command, G4String newVa
     else if (command == fBeamFileCmd) {
         fGun->LoadBeamFile(newValue);
     }
-    else if (command == fEventFileCmd) {
+    else if (command == fHepmcFileCmd) {
         fGun->LoadEventFile(newValue);
     }
 }

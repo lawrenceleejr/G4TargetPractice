@@ -293,9 +293,9 @@ def test_external_transport_handoff(synth_nuhepmc, tmp_path):
     from gdmltp import handoff
     out = tmp_path / "output.root"
     external.convert(synth_nuhepmc, str(out))
-    n = handoff.write_event_file(str(out), tmp_path / "events.dat")
+    n = handoff.write_event_file(str(out), tmp_path / "events.hepmc")
     assert n == 6
-    parsed = handoff.read_event_file(tmp_path / "events.dat")
+    parsed = handoff.read_event_file(tmp_path / "events.hepmc")
     assert len(parsed) == 6 and len(parsed[0][1]) == 3    # 3 FS particles/event
 
 
