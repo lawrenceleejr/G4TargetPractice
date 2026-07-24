@@ -73,3 +73,7 @@ jobs:
           # smoke lands once the base image + baked splines are pinned)
           docker run --rm -v "$PWD/run":/run -w /run --entrypoint python3 "$IMG" \
             -c "from gdmltp.backends import genie_convert; import gdmltp; print('genie image OK', gdmltp.__version__)"
+          # the GENIE toolchain itself must be on PATH and fully linked --
+          # "image builds but gevgen can't run" must be red here, not at a user
+          docker run --rm --entrypoint bash "$IMG" -c \
+            'set -e; for b in gevgen gntpc gmkspl; do command -v "$b"; done; ! ldd "$(command -v gevgen)" | grep "not found"'

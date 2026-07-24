@@ -281,8 +281,9 @@ ROOT dependency** (it reads the file with `uproot`). Run via Docker
 |---|---|
 | `gdmltp run` | Run a simulation (`--config run.yaml`, or flags). `--display` opens an event display after; `--field "0 0 5 tesla"` adds a field (auto-sets `CELER_DISABLE=1`). |
 | `gdmltp display` | Event display from `output.root` and/or `--gdml`: self-contained **WebGL HTML**, **PNG stills**, optional **Blender** scene (`--blend`). |
-| `gdmltp analyze` | Summary report + plots: primary spectrum, total Edep, depth-dose, energy leakage, secondary counts, neutrino CC/NC if present. |
-| `gdmltp compare` | Overlay two runs: longitudinal shower profile, containment vs depth (d90/d95/d99), per-event leakage. |
+| `gdmltp analyze` | Summary report + plots: primary spectrum, total Edep, depth-dose, energy leakage, secondary counts; for neutrino files also interacted/CC fractions, ⟨Q²⟩/⟨W⟩, and a Q²/W/x/y kinematics panel. |
+| `gdmltp compare` | Overlay two runs: longitudinal shower profile, containment vs depth (d90/d95/d99), per-event leakage. For neutrino files it also overlays Q²/W/x/y — the cross-generator check (GENIE vs Achilles vs Geant4 on the same target). |
+| `gdmltp validate` | Schema + physics sanity checks on any backend's `output.root` (branch completeness, count/energy bookkeeping, nu-block invariants like y∈[0,1], CC lepton flavor, q0=Eν−Eℓ). Exit code 0 = PASS; `--strict` also fails on warnings — CI-friendly. |
 | `gdmltp info` | Inspect a `.root` (branches, events, nu block) or `.gdml` (solids, bounding box). |
 
 **Large files**: `analyze`/`compare`/`info` stream in batches and read only the
@@ -322,7 +323,7 @@ pip install -e .[dev]
 pytest
 ```
 
-CI runs the unit suite across Python 3.9/3.11/3.12, builds `g4sim` and runs a
+CI runs the unit suite across Python 3.10/3.11/3.12, builds `g4sim` and runs a
 full YAML→macro→engine→analyze integration, and publishes the Geant4 image only
 if both pass. The GENIE image and the Celeritas image build in separate
 workflows.

@@ -72,3 +72,6 @@ jobs:
           # smoke lands once the base image + run-card template are pinned)
           docker run --rm -v "$PWD/run":/run -w /run --entrypoint python3 "$IMG" \
             -c "from gdmltp.backends import achilles_convert; import gdmltp; print('achilles image OK', gdmltp.__version__)"
+          # the generator binary itself must be on PATH and fully linked
+          docker run --rm --entrypoint bash "$IMG" -c \
+            'set -e; command -v achilles; ! ldd "$(command -v achilles)" | grep "not found"'

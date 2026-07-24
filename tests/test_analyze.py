@@ -57,7 +57,28 @@ def test_summarize_no_plots(synth_root, tmp_path):
 
 def test_summarize_nu(synth_nu, tmp_path):
     out = analyze.summarize(synth_nu, outdir=tmp_path / "nu", make_plots=False)
-    assert "neutrino: CC=" in (out / "summary.txt").read_text()
+    text = (out / "summary.txt").read_text()
+    assert "neutrino: interacted 30/30" in text
+    assert "CC fraction" in text
+    assert "<Q2>" in text and "<W>" in text
+
+
+def test_summarize_nu_writes_kinematics_panel(synth_nu, tmp_path):
+    out = analyze.summarize(synth_nu, outdir=tmp_path / "nuplots")
+    assert (out / "nu_kinematics.png").exists()
+
+
+def test_summarize_vertex_level_generator_file(synth_gst, tmp_path):
+    """A GENIE/Achilles vertex-level file has no steps: no depth-dose, but the
+    neutrino panel and summary must still come out."""
+    from gdmltp.backends import genie_convert
+    r = tmp_path / "genie.root"
+    genie_convert.convert(synth_gst, str(r))
+    out = analyze.summarize(str(r), outdir=tmp_path / "ana")
+    text = (out / "summary.txt").read_text()
+    assert "neutrino: interacted" in text
+    assert (out / "nu_kinematics.png").exists()
+    assert not (out / "depth_dose.png").exists()
 
 
 def test_summarize_empty(empty_root, tmp_path):

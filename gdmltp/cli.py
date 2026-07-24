@@ -31,6 +31,10 @@ examples:
 examples:
   gdmltp info output.root                                # events, branches, nu block
   gdmltp info gdml/water_phantom_30cm.gdml               # solids + bounding box""",
+    "validate": """\
+examples:
+  gdmltp validate output.root                            # schema + physics sanity checks
+  gdmltp validate output.root --strict                   # warnings also fail (CI gating)""",
 }
 
 # Error types that mean "bad input", shown as one friendly line. Anything else
@@ -139,6 +143,14 @@ def _build_parser():
     i = _sub("info", "inspect a .root or .gdml file")
     i.add_argument("file")
 
+    # validate
+    v = _sub("validate", "check an output.root for schema + physics sanity")
+    v.add_argument("root", nargs="?", default="output.root")
+    v.add_argument("--strict", action="store_true",
+                   help="treat warnings as failures (exit 1)")
+    v.add_argument("--events", type=int, default=20000,
+                   help="max events to validate (default 20000)")
+
     return p, parsers
 
 
@@ -198,6 +210,13 @@ def _dispatch(args):
     if args.cmd == "info":
         _require_files(args.file)
         return _info(args)
+    if args.cmd == "validate":
+        _require_files(args.root)
+        from . import validate as valmod
+        report, code = valmod.validate(args.root, strict=args.strict,
+                                       max_events=args.events)
+        print(report)
+        return code
     return 1
 
 

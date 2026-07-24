@@ -133,12 +133,14 @@ jobs:
           export PATH="$PWD/build:$PATH"
           python3 -m gdmltp run --config examples/water_proton.yaml --local -n 5 -o run_out
           test -f run_out/output.root
+          python3 -m gdmltp validate run_out/output.root
           python3 -m gdmltp analyze run_out/output.root -o run_out/analysis
           test -f run_out/analysis/summary.txt
           # Twiss phase-space beam end to end (host samples -> beam.dat -> /gun/beamFile)
           python3 -m gdmltp run --config examples/twiss_muon.yaml --local -n 20 -o twiss_out
           test -f twiss_out/beam.dat
           test -f twiss_out/output.root
+          python3 -m gdmltp validate twiss_out/output.root
           echo "Geant4 YAML + Twiss integration OK"
 
       - name: Upload build artifacts

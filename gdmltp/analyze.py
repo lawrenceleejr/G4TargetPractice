@@ -18,6 +18,68 @@ from . import io, particles
 # appears, then rebin to the requested nbins for plotting.
 _W_FINE = 0.1
 
+# Neutrino kinematics: (branch, axis label, branch-unit -> plot-unit scale).
+# Branch units are MeV/MeV^2 (schema contract); plots use GeV/GeV^2.
+NU_KIN = [("nu_Q2", r"$Q^2$ [GeV$^2$]", 1e-6),
+          ("nu_W", r"$W$ [GeV]", 1e-3),
+          ("nu_x", r"Bjorken $x$", 1.0),
+          ("nu_y", r"inelasticity $y$", 1.0)]
+
+
+def read_nu_scalars(path):
+    """The nu_* scalars needed for kinematics reports/plots, or None when the
+    file has no (complete enough) neutrino block."""
+    names = [k for k, _, _ in NU_KIN] + ["nu_isCC", "nu_isNC", "nu_outLeptonE"]
+    sc = io.read_scalars(path, names)
+    if "nu_isCC" not in sc or "nu_isNC" not in sc:
+        return None
+    return sc
+
+
+def nu_kinematics_panel(plt, datasets, out_path):
+    """2x2 Q2/W/x/y overlay over interacting events (CC or NC).
+
+    datasets: [(label, nu_scalars_dict, color)]. With one dataset the panel
+    shows raw event counts; with several it normalizes (density) so different
+    sample sizes overlay. Returns True when a figure was saved.
+    """
+    overlay = len(datasets) > 1
+    fig, axes = plt.subplots(2, 2, figsize=(9, 7))
+    drew = False
+    for ax, (br, xlabel, scale) in zip(axes.ravel(), NU_KIN):
+        vals = []
+        for lab, s, c in datasets:
+            if br not in s:
+                continue
+            act = np.asarray(s["nu_isCC"], bool) | np.asarray(s["nu_isNC"], bool)
+            v = np.asarray(s[br], float)[act] * scale
+            if len(v):
+                vals.append((lab, v, c))
+        if not vals:
+            ax.set_visible(False)
+            continue
+        lo = min(v.min() for _, v, _ in vals)
+        hi = max(v.max() for _, v, _ in vals)
+        hi = hi + 0.05 * max(hi - lo, 1e-9)
+        bins = np.linspace(min(0.0, lo), hi, 31)
+        for lab, v, c in vals:
+            ax.hist(v, bins=bins, histtype="step", lw=2, color=c,
+                    label=lab, density=overlay)
+            drew = True
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel("normalized events" if overlay else "events")
+        ax.grid(alpha=0.3)
+        if overlay:
+            ax.legend(fontsize=8)
+    if not drew:
+        plt.close(fig)
+        return False
+    fig.suptitle("Neutrino interaction kinematics (interacting events)")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=140)
+    plt.close(fig)
+    return True
+
 
 def leakage(E0arr, tEarr):
     """Per-event energy leakage from the scalar branches alone.
@@ -159,7 +221,7 @@ def summarize(path, outdir="gdmltp_analysis", make_plots=True, depth_axis="z"):
         print("\n".join(lines))
         return outdir
 
-    sc = io.read_scalars(path, ["primaryE", "totalEdep", "nSteps", "primaryPDG", "nu_isCC"])
+    sc = io.read_scalars(path, ["primaryE", "totalEdep", "nSteps", "primaryPDG"])
     # Report only branches actually present: a zeros placeholder would fabricate
     # statements like "totalEdep mean 0.000" / "leakage 100%" on trimmed files.
     primE = np.asarray(sc["primaryE"], float) if "primaryE" in sc else None
@@ -192,9 +254,18 @@ def summarize(path, outdir="gdmltp_analysis", make_plots=True, depth_axis="z"):
         lines.append("particles (all tracks, summed): " +
                      ", ".join(f"{k}={v}" for k, v in sec.most_common(15)))
 
-    if "nu_isCC" in sc:
-        cc = int(np.sum(np.asarray(sc["nu_isCC"], dtype=bool)))
-        lines.append(f"neutrino: CC={cc}/{n} ({100*cc/n:.0f}%)")
+    nu = read_nu_scalars(path)
+    if nu is not None:
+        cc = np.asarray(nu["nu_isCC"], bool)
+        nc = np.asarray(nu["nu_isNC"], bool)
+        act = cc | nc
+        lines.append(f"neutrino: interacted {int(act.sum())}/{n}; "
+                     f"CC={int(cc.sum())} NC={int(nc.sum())} "
+                     f"(CC fraction {100*cc.sum()/max(1, act.sum()):.1f}% of interactions)")
+        if act.any() and "nu_Q2" in nu and "nu_W" in nu:
+            q2 = np.asarray(nu["nu_Q2"], float)[act] * 1e-6
+            w = np.asarray(nu["nu_W"], float)[act] * 1e-3
+            lines.append(f"          <Q2> {q2.mean():.3f} GeV^2   <W> {w.mean():.3f} GeV")
 
     (outdir / "summary.txt").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
@@ -222,21 +293,27 @@ def _plots(path, primE, edep, outdir, depth_axis):
         fig.tight_layout(); fig.savefig(outdir / fname, dpi=130); plt.close(fig)
         wrote.append(fname)
 
-    # Depth-dose along the beam (streamed; skipped if there is no step data).
+    # Depth-dose along the beam (streamed; skipped if there is no step data --
+    # vertex-level generator files still get the neutrino panel below).
     try:
         centers, dEdz, _, _ = longitudinal_profile(path, axis=depth_axis, verbose=False)
     except ValueError as e:
         print(f"[gdmltp] no depth-dose plot: {e}")
-        return wrote
-    fig, ax = plt.subplots(figsize=(5, 4))
-    ax.plot(centers, dEdz, lw=2)
-    ax.set_xlabel(f"depth along beam ({depth_axis}) [cm]")
-    ax.set_ylabel("dE/dz per incident particle [MeV/cm]")
-    ax.set_title("depth-dose")
-    ax.set_xlim(left=0)
-    ax.grid(alpha=0.3)
-    fig.tight_layout()
-    fig.savefig(outdir / "depth_dose.png", dpi=130)
-    plt.close(fig)
-    wrote.append("depth_dose.png")
+    else:
+        fig, ax = plt.subplots(figsize=(5, 4))
+        ax.plot(centers, dEdz, lw=2)
+        ax.set_xlabel(f"depth along beam ({depth_axis}) [cm]")
+        ax.set_ylabel("dE/dz per incident particle [MeV/cm]")
+        ax.set_title("depth-dose")
+        ax.set_xlim(left=0)
+        ax.grid(alpha=0.3)
+        fig.tight_layout()
+        fig.savefig(outdir / "depth_dose.png", dpi=130)
+        plt.close(fig)
+        wrote.append("depth_dose.png")
+
+    nu = read_nu_scalars(path)
+    if nu is not None and nu_kinematics_panel(plt, [(Path(path).name, nu, "C0")],
+                                              outdir / "nu_kinematics.png"):
+        wrote.append("nu_kinematics.png")
     return wrote
