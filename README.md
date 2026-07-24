@@ -301,6 +301,16 @@ ROOT dependency** (it reads the file with `uproot`). Run via Docker
 **Large files**: `analyze`/`compare`/`info` stream in batches and read only the
 branches they need; `display` loads only the requested events.
 
+**GDML parsing**: geometry for the display/`info` is read with
+[pyg4ometry](https://github.com/g4edge/pyg4ometry) (the standard tool —
+accurate solids, transforms, and mesh bounding boxes) when it is installed
+(`pip install gdmltp[geometry]`; it ships in the Geant4 image). Without it, a
+built-in lightweight parser handles the common solids and falls back to a
+coarse bounding box for the rest. Force either with
+`GDMLTP_GDML_PARSER=pyg4ometry|lightweight`. Physics generators and the
+generator→Geant4 hand-off use **HepMC3** (via `pyhepmc` / the HepMC3 library)
+as the interchange format — no bespoke event formats.
+
 ## Repository structure
 
 ```

@@ -23,6 +23,11 @@ dependencies = ["uproot>=5.4", "awkward>=2.5", "numpy", "matplotlib", "pyyaml>=5
 
 [project.optional-dependencies]
 dev = ["pytest"]
+# pyg4ometry is the standard GDML reader (accurate solids/transforms + real
+# mesh bounding boxes for the display); optional because it pulls in vtk. When
+# installed, parse_gdml uses it automatically; otherwise the built-in
+# lightweight parser is used. Force either with GDMLTP_GDML_PARSER.
+geometry = ["pyg4ometry>=1.3"]
 
 [project.urls]
 Homepage = "https://github.com/lawrenceleejr/G4TargetPractice"

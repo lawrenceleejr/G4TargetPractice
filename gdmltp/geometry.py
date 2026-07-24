@@ -1,8 +1,20 @@
-"""Lightweight GDML parser -> placed primitives in mm.
+"""GDML -> placed primitives in mm.
 
-Supports the simple example geometries (box, orb, tube, trd) with nested inline
-<physvol> placements and unit conversion to mm. Unsupported solids fall back to
-a bounding box; very large files (e.g. MAIA) switch to a coarse bbox-only mode.
+Two parsers behind one `parse_gdml`:
+
+  * pyg4ometry (preferred when installed): the standard GDML tool. It resolves
+    the full volume tree, transforms, and every solid type -- and gives an
+    accurate mesh bounding box for solids the display can't draw natively
+    (polycones, polyhedra, ...), instead of the crude heuristics below. Used
+    automatically when importable.
+  * a built-in lightweight XML parser (fallback): handles the simple example
+    geometries (box, orb, tube, trd) with nested inline <physvol> placements;
+    unsupported solids get a coarse bbox; very large files switch to bbox-only.
+    Keeps the display working with no heavy dependency (pyg4ometry pulls in vtk).
+
+Both emit the same Primitive contract (type/params in mm, 4x4 transform, ...),
+so scene/render/info are parser-agnostic. Force one with the env var
+GDMLTP_GDML_PARSER=pyg4ometry|lightweight.
 """
 import os
 import math
@@ -188,8 +200,107 @@ def _bbox_of_solid(solidtype, el):
     return None
 
 
+def _use_pyg4ometry(path):
+    """Which parser to use. Honor GDMLTP_GDML_PARSER; else prefer pyg4ometry
+    when it imports."""
+    choice = os.environ.get("GDMLTP_GDML_PARSER", "").lower()
+    if choice == "lightweight":
+        return False
+    if choice == "pyg4ometry":
+        return True
+    try:
+        import pyg4ometry  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
 def parse_gdml(path, include_world=False, max_bytes=DEFAULT_MAX_BYTES):
-    """Parse a GDML file into a list[Primitive] in mm."""
+    """Parse a GDML file into a list[Primitive] in mm, via pyg4ometry when
+    available (accurate) else the built-in lightweight parser."""
+    if _use_pyg4ometry(path):
+        try:
+            return _parse_pyg4ometry(path, include_world=include_world)
+        except Exception as e:
+            warnings.warn(f"pyg4ometry parse failed ({e}); falling back to the "
+                          f"lightweight parser.")
+    return _parse_lightweight(path, include_world=include_world, max_bytes=max_bytes)
+
+
+# --------------------------------------------------------------------------- #
+# pyg4ometry-backed parser (the standard tool; accurate mesh extents)
+# --------------------------------------------------------------------------- #
+# Solids whose axis-aligned extent we take from parameters (verified: Box
+# pX/pY/pZ are FULL lengths, Orb pRMax is the radius) -- no meshing, so the
+# common fast case stays fast. Every other solid is meshed for a true AABB
+# (pyg4ometry's per-solid pDz etc. are not consistent across solid types).
+_MESH_CAP_DEFAULT = 600
+
+
+def _parse_pyg4ometry(path, include_world=False, mesh_cap=_MESH_CAP_DEFAULT):
+    import pyg4ometry as pg
+    from pyg4ometry import transformation as _T
+
+    reg = pg.gdml.Reader(str(path), skipMaterials=True).getRegistry()
+    world = reg.getWorldVolume()
+    prims = []
+    meshed = [0]
+    capped = [False]
+
+    def solid_prim(s):
+        t = type(s).__name__
+
+        def g(a):
+            return float(s.evaluateParameterWithUnits(a))
+
+        if t == "Box":
+            return "box", {"sx": g("pX"), "sy": g("pY"), "sz": g("pZ")}, (0.0, 0.0, 0.0)
+        if t in ("Orb", "Sphere"):
+            return "orb", {"r": g("pRMax")}, (0.0, 0.0, 0.0)
+        if meshed[0] >= mesh_cap:
+            capped[0] = True
+            return None, None, None
+        meshed[0] += 1
+        v = np.asarray(s.mesh().toVerticesAndPolygons()[0], float)
+        lo, hi = v.min(axis=0), v.max(axis=0)
+        ext = hi - lo
+        center = tuple(0.5 * (lo + hi))
+        if t in ("Tubs", "CutTubs"):
+            # render as a cylinder from the AABB (rmin dropped for display)
+            return "tube", {"rmin": 0.0, "rmax": 0.5 * ext[0], "z": ext[2]}, center
+        return "bbox", {"sx": ext[0], "sy": ext[1], "sz": ext[2]}, center
+
+    def matname(lv):
+        m = getattr(lv, "material", None)
+        return getattr(m, "name", "") if m is not None else ""
+
+    def recurse(lv, transform, is_world, depth):
+        if depth > 25:
+            return
+        solid = getattr(lv, "solid", None)          # AssemblyVolume has none
+        if solid is not None and (not is_world or include_world):
+            ptype, params, off = solid_prim(solid)
+            if ptype is not None:
+                tr = transform.copy()
+                tr[:3, 3] = tr[:3, 3] + tr[:3, :3] @ np.asarray(off, float)
+                prims.append(Primitive(ptype, params, tr, matname(lv), lv.name, is_world))
+        for pv in getattr(lv, "daughterVolumes", []):
+            pos = np.asarray(pv.position.eval(), float)
+            rot = pv.rotation.eval() if getattr(pv, "rotation", None) is not None else [0, 0, 0]
+            local = np.eye(4)
+            local[:3, :3] = _T.tbxyz2matrix(rot)
+            local[:3, 3] = pos
+            recurse(pv.logicalVolume, transform @ local, False, depth + 1)
+
+    recurse(world, np.eye(4), True, 0)
+    if capped[0]:
+        warnings.warn(f"{os.path.basename(str(path))}: meshed the first {mesh_cap} "
+                      f"complex solids for display; further ones were skipped.")
+    return prims
+
+
+def _parse_lightweight(path, include_world=False, max_bytes=DEFAULT_MAX_BYTES):
+    """Parse a GDML file into a list[Primitive] in mm (built-in fallback)."""
     size = os.path.getsize(path)
     bbox_only = size > max_bytes
     if bbox_only:

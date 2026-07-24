@@ -286,3 +286,12 @@ def empty_root(tmp_path_factory):
 def repo_root():
     from pathlib import Path
     return Path(__file__).resolve().parent.parent
+
+
+@pytest.fixture(autouse=True)
+def _force_lightweight_gdml(monkeypatch):
+    """Keep the suite fast and parser-deterministic on any machine: the general
+    tests use the built-in lightweight GDML parser regardless of whether
+    pyg4ometry happens to be installed. The pyg4ometry path has its own
+    dedicated test (test_geometry_pyg4ometry.py)."""
+    monkeypatch.setenv("GDMLTP_GDML_PARSER", "lightweight")

@@ -36,14 +36,16 @@ RUN if [ -f /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 ]; then strip --remove-sec
 RUN if [ -f /lib/x86_64-linux-gnu/libQt6Core.so.6 ]; then strip --remove-section=.note.ABI-tag /lib/x86_64-linux-gnu/libQt6Core.so.6; fi
 
 # gdmltp tooling: config frontend + analysis + event display (pure Python, no ROOT).
-# Both the gdmltp package and the deprecated g4tp shim are installed.
+# The [geometry] extra pulls in pyg4ometry so the in-image display uses the
+# standard GDML reader (accurate solids + mesh bounding boxes). Both the gdmltp
+# package and the deprecated g4tp shim are installed.
 RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
     python3 -m pip install --no-cache-dir uproot awkward numpy matplotlib pyyaml
 COPY gdmltp/ /app/pysrc/gdmltp/
 COPY g4tp/ /app/pysrc/g4tp/
 COPY pyproject.toml README.md /app/pysrc/
-RUN python3 -m pip install --no-cache-dir /app/pysrc && \
-    python3 -c "import gdmltp; from gdmltp.backends import genie_convert, achilles_convert; print('gdmltp', gdmltp.__version__)"
+RUN python3 -m pip install --no-cache-dir "/app/pysrc[geometry]" && \
+    python3 -c "import gdmltp, pyg4ometry; from gdmltp.backends import genie_convert, achilles_convert; print('gdmltp', gdmltp.__version__)"
 
 COPY g4sim/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
