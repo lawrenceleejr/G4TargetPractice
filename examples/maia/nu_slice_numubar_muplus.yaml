@@ -11,14 +11,14 @@ geometry:
 beam:
   particle: anti_nu_mu
   energy: {mode: mudecay_numu, value: "5 TeV"}   # same shape as nu_mu
-  # Same direct-injection slice (ZX plane, y ~ 0, whole negative-x half); the
-  # mu+ beam counter-propagates, so the neutrinos travel along -z.
+  # Same slice, mirrored: the mu+ beam counter-propagates, so this ribbon comes
+  # from far upstream on the OTHER side (+z) and flies along -z into MAIA.
   position:
-    x: {dist: uniform, min: "-600 cm", max: "0 cm"}    # whole negative-x half
-    y: {dist: gauss, sigma: "1 cm"}                     # thin: near y = 0
-    z: {dist: uniform, min: "-600 cm", max: "600 cm"}   # full detector length
+    x: {dist: uniform, min: "-600 cm", max: "0 cm"}    # multi-meter x spread
+    y: {dist: gauss, sigma: "5 mm"}                     # very small y spread
+    z: "2500 cm"                                         # far upstream (+z side)
   direction:
-    central: "0 0 -1"
+    central: "0 0 -1"                                    # downstream (-z), into MAIA
     xprime: {dist: gauss, sigma: "10 mrad"}
     yprime: {dist: gauss, sigma: "0.1 mrad"}
 

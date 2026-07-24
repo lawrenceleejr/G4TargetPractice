@@ -26,16 +26,19 @@ beam:
   # The muon-collider neutrino-slice spectrum (mu- beam, E_mu = 5 TeV), sampled
   # host-side into a beam file and replayed through Geant4.
   energy: {mode: mudecay_numu, value: "5 TeV"}
-  # Direct-injection slice: neutrinos sprayed as a thin sheet in the ZX plane
-  # at y ~ 0 across the whole negative-x half of MAIA, then transported and
-  # (biased) forced to interact by Geant4 -- so the showers spray across the
-  # negative-x region.
+  # The slice launched from far upstream in z (~25 m back), a multi-meter-wide
+  # ribbon in x across the negative-x half, very thin in y, flying downstream
+  # (+z). Geant4 transports each neutrino from the source plane and the 1e10
+  # bias forces it to interact -- so the showers appear across MAIA. (With a
+  # bias this large some neutrinos may interact in the upstream air before
+  # reaching the detector; shorten z to sit just upstream of the body if you
+  # want every interaction inside MAIA.)
   position:
-    x: {dist: uniform, min: "-600 cm", max: "0 cm"}    # whole negative-x half
-    y: {dist: gauss, sigma: "1 cm"}                     # thin: near y = 0
-    z: {dist: uniform, min: "-600 cm", max: "600 cm"}   # full detector length
+    x: {dist: uniform, min: "-600 cm", max: "0 cm"}    # multi-meter x spread
+    y: {dist: gauss, sigma: "5 mm"}                     # very small y spread
+    z: "-2500 cm"                                        # far upstream (~25 m)
   direction:
-    central: "0 0 1"
+    central: "0 0 1"                                     # downstream, into MAIA
     xprime: {dist: gauss, sigma: "10 mrad"}
     yprime: {dist: gauss, sigma: "0.1 mrad"}
 

@@ -12,12 +12,17 @@ The target here is the real thing: `gdml/MAIA_v0.gdml`, the MAIA detector
 concept export, whose detector body reaches ~±600 cm in each dimension.
 
 **Injection geometry.** Rather than simulating the parent muons, these configs
-**inject the neutrinos directly** as a *slice*: a thin sheet in the **ZX plane
-at y ≈ 0** that cuts across the **whole negative-x half** of the detector
-(x ∈ [−600, 0] cm, z ∈ [−600, 600] cm). Each event's vertex is sampled
-uniformly over that sheet, so interactions spray across the negative-x region.
-The neutrino *energy* still follows the exact muon-decay spectrum (the physical
-origin of the flux); only the spatial model is the direct-injection slice.
+**inject the neutrinos directly** as a *slice* that comes **from far upstream in
+z** (the muon-decay straight sits many meters back) and flies downstream into
+MAIA: a **multi-meter-wide ribbon in x** across the negative-x half, **very thin
+in y** (x ∈ [−600, 0] cm, y ≈ 0 with a 5 mm spread, launched at z = −25 m).
+The `geant4` backend transports the neutrinos from that source plane and the
+biased interaction fires inside the detector. The vertex-only `genie`/`achilles`
+backends place the interaction *at* the source point (25 m upstream) — the
+interaction *kinematics* are unaffected, but to see the interactions **inside**
+MAIA use `nu_slice_geant4_biased.yaml` or add `transport: true`. The neutrino
+*energy* still follows the exact muon-decay spectrum (the physical origin of the
+flux); only the spatial model is the direct-injection slice.
 
 | Config | What it is |
 |---|---|
@@ -39,11 +44,11 @@ origin of the flux); only the spatial model is the direct-injection slice.
   the host samples them into the per-event beam file; without it the genie
   backend hands gevgen the exact functional flux.
 - **Slice geometry** is a direct-injection approximation (until geometry-aware
-  vertex sampling lands): neutrinos are injected across a thin sheet in the ZX
-  plane at y ≈ 0 covering the whole negative-x half, kept in-plane by a
-  ring-plane (x-z) fan of the size the paper quotes (0.1°–2.5° at 10 TeV,
-  0.6°–6° at 3 TeV) with negligible out-of-plane (y) spread. Interaction
-  *rates per component* are not reproduced — you choose the struck nucleus with
+  vertex sampling lands): neutrinos launch from a source plane ~25 m upstream,
+  spread over multiple meters in x (the negative-x half) and mm-thin in y,
+  flying downstream with a ring-plane (x-z) crossing fan of the size the paper
+  quotes (0.1°–2.5° at 10 TeV, 0.6°–6° at 3 TeV). Interaction *rates per
+  component* are not reproduced — you choose the struck nucleus with
   `genie.target` (W-184 for the tungsten nozzles/shielding, which dominate the
   rate; switch to `1000260560` for iron/yoke studies).
 

@@ -33,10 +33,10 @@ geometry:
 beam:
   particle: nu_mu
   energy: {mode: mudecay_numu, value: "5 TeV"}   # E_mu = 5 TeV, <E_nu> ~ 1.75 TeV
-  # Fixed vertex in the negative-x half of the ZX plane (y = 0): keeps the
+  # Fixed source point far upstream (negative x, y = 0, ~25 m back): keeps the
   # single native-flux gevgen call (per-event replay of the full slice would
   # re-run gmkhedissf + gevgen per event -- prohibitive for HEDIS).
-  position: "-300 0 0 cm"
+  position: "-300 0 -2500 cm"
   direction: "0 0 1"
 
 run:
