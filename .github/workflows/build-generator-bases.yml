@@ -5,6 +5,12 @@ name: Build Generator Base Images
 # LHAPDF + GENIE), so they run only when the base recipes change or on manual
 # dispatch -- the per-push app images just layer gdmltp on top of the published
 # bases. Failures are real failures.
+#
+# The GENIE base is built WITH HEDIS support by default (enable_hedis=1): it
+# adds APFEL, installs the GHE19 tune's LHAPDF grid, and bakes the HEDIS
+# structure-function tables, so the multi-TeV muon-collider slice (GHE19 tunes)
+# runs on the published image with no manual setup. Dispatch with
+# enable_hedis=0 to skip it for a leaner/faster base.
 on:
   push:
     paths:
@@ -24,7 +30,7 @@ on:
       enable_hedis:
         description: "Build HEDIS support (APFEL + GHE19 tune inputs) into the GENIE base"
         required: false
-        default: "0"
+        default: "1"
       achilles_ref:
         description: "Achilles git ref"
         required: false
@@ -88,7 +94,7 @@ jobs:
           build-args: |
             GENIE_VERSION=${{ env.GENIE_VERSION }}
             ROOT_VERSION=${{ env.ROOT_VERSION }}
-            ENABLE_HEDIS=${{ github.event.inputs.enable_hedis || '0' }}
+            ENABLE_HEDIS=${{ github.event.inputs.enable_hedis || '1' }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
