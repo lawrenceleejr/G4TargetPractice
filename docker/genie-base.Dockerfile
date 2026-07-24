@@ -137,6 +137,9 @@ ENV LD_LIBRARY_PATH=${GENIE}/lib:${LD_LIBRARY_PATH}
 # QrkSF_LO_* table set.) LO needs no NLO structure functions; APFEL is still
 # built above so a correct NLO PDF could be dropped in and the tune switched.
 ARG HEDIS_TUNE=GHE19_00c_00_000
+# The tune's config lives in $GENIE/config/<HEDIS_TUNE_CONFIG>/ -- that dir is
+# named for the model (GHE19_00c), NOT the full tune string (GHE19_00c_00_000).
+ARG HEDIS_TUNE_CONFIG=GHE19_00c
 ARG HEDIS_PDF=cteq6l1
 ARG LHAPDF_SETS_URL=https://lhapdfsets.web.cern.ch/current
 # gmkhedissf writes the QrkSF tables under $HEDIS_SF_DATA_PATH/<tune>/; the
@@ -152,8 +155,8 @@ RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
       test -e "$DD/${HEDIS_PDF}/${HEDIS_PDF}.info" \
         || { echo "ERROR: LHAPDF set ${HEDIS_PDF} missing after download"; ls -la "$DD"; exit 1; } && \
       sed -i 's/>[[:space:]]*cteq6[[:space:]]*</> '"${HEDIS_PDF}"' </' \
-        "${GENIE}/config/${HEDIS_TUNE}/CommonParam.xml" && \
-      grep -n "LHAPDF-set" "${GENIE}/config/${HEDIS_TUNE}/CommonParam.xml" && \
+        "${GENIE}/config/${HEDIS_TUNE_CONFIG}/CommonParam.xml" && \
+      grep -n "LHAPDF-set" "${GENIE}/config/${HEDIS_TUNE_CONFIG}/CommonParam.xml" && \
       mkdir -p "$HEDIS_SF_DATA_PATH" && cd "$HEDIS_SF_DATA_PATH" && \
       gmkhedissf --tune "${HEDIS_TUNE}" && \
       echo "HEDIS SF tables built:" && find "$HEDIS_SF_DATA_PATH" -name 'QrkSF*' | head ; \
