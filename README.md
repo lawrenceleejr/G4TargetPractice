@@ -19,7 +19,8 @@ just Docker.
   - `geant4` — full particle transport (the `g4sim` engine). *Default.*
   - `genie` — neutrino event generation on the GDML target. *Vertex-level (v1).*
   - `achilles` — theory-driven lepton-nucleus generation ([Achilles](https://github.com/AchillesGen/Achilles)); neutrino **and** `e∓` beams. *Vertex-level (v1).*
-  - `decay` — long-lived **BSM projectiles** (HNLs, dark photons, ALPs): fly, decay in flight (forced-fiducial with honest weights), displaced vertex in the detector. See [docs/bsm.md](docs/bsm.md).
+  - `decay` — long-lived **BSM projectiles** (HNLs, dark photons, ALPs), decayed **by Geant4** (`G4DecayTable`/`G4Decay`) with lifetime-importance reweighting: displaced vertex + full detector response in one stage. See [docs/bsm.md](docs/bsm.md).
+  - `external` — bring **HepMC3 events from a real generator** (Pythia8, MadGraph) into the same schema/transport pipeline. See [docs/bsm.md](docs/bsm.md).
   - `fluka` (via flugg) — *planned, not yet available.*
 
 Every backend writes the **same** `output.root` schema, so `analyze`, `display`,
@@ -178,7 +179,8 @@ gdmltp run --generator genie --gdml liquid_argon_1m3.gdml --particle nu_mu --ene
 | `geant4` | `ghcr.io/lawrenceleejr/g4targetpractice` | full transport |
 | `genie` | `ghcr.io/lawrenceleejr/g4targetpractice-genie` | neutrino vertices (v1) |
 | `achilles` | `ghcr.io/lawrenceleejr/g4targetpractice-achilles` | ν / e∓ vertices (v1) |
-| `decay` | *(none — runs on the host)* | BSM decay-in-flight vertices; `transport: true` uses the geant4 image |
+| `decay` | the geant4 image | BSM decay-in-flight **by Geant4** (G4DecayTable + G4Decay), one stage incl. transport |
+| `external` | *(none — host conversion)* | HepMC3 events from Pythia8/MadGraph etc.; `transport: true` uses the geant4 image |
 
 `gdmltp run` picks the image automatically from the `generator`; override with
 `--image`. (Image repositories keep the `g4targetpractice` name until the GitHub

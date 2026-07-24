@@ -63,7 +63,7 @@ def parse_nuhepmc(path):
             if tag == "E":
                 if cur is not None:
                     events.append(cur)
-                cur = {"particles": [], "vertex": None,
+                cur = {"particles": [], "vertex": None, "weight": None,
                        "e_scale": e_scale, "l_scale": l_scale}
                 # optional event position shift: "E n nvtx npart @ x y z t"
                 if "@" in line:
@@ -87,6 +87,13 @@ def parse_nuhepmc(path):
                         cur["vertex"] = tuple(pos)
                     except ValueError:
                         pass
+            elif tag == "W":
+                # event weight(s): keep the first (the external backend stores
+                # it as eventWeight; Achilles conversion ignores it)
+                try:
+                    cur["weight"] = float(line.split()[1])
+                except (IndexError, ValueError):
+                    pass
             elif tag == "P":
                 t = line.split()
                 # P id parent pdg px py pz e m status

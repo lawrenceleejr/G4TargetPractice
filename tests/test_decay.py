@@ -1,12 +1,10 @@
-"""The decay backend: BSM projectiles decayed in flight on the host.
-
-Physics is validated against exact results: two-body momenta, N-body
-conservation and mass shells, the Michel spectrum from the vA matrix element
-(muon decay is the closure test -- same |M|^2 pairing), exponential decay
-lengths, and the truncated-exponential forced-fiducial weights.
+"""The decay backend delegates to GEANT4: this framework renders /bsm/* macro
+commands and reweights Geant4's output -- it generates nothing itself. These
+tests cover the macro contract, the config validation, and the exact
+lifetime-importance arithmetic (against analytic values on a fabricated file).
+The C++ side (/bsm/define -> G4DecayTable -> G4Decay) is exercised against the
+real engine by the CI geant4 job's BSM smoke.
 """
-import math
-
 import numpy as np
 import pytest
 import yaml
@@ -31,133 +29,72 @@ beam:
   position: "0 0 -50 m"
   direction: "0 0 1"
 decay:
-  ctau: "1 m"
+  ctau: "1 km"
+  ctau_sample: "10 cm"
   channels:
     - {to: [13, 211], br: 0.6}
-    - {to: [14, 13, -13], br: 0.4, model: vA}
-  fiducial: {z: ["-2.5 m", "2.5 m"]}
+    - {to: [14, 13, -13], br: 0.4}
 run: {events: 500, seed: 7}
 """
 
 
-# --- rest-frame kinematics ---------------------------------------------------- #
+# --- macro contract (what we hand to Geant4) -------------------------------- #
 
-def test_two_body_exact():
-    rng = np.random.default_rng(2)
-    M, m1, m2 = 1000.0, 105.658, 139.570
-    p4 = decay.two_body(M, m1, m2, 3000, rng)
-    tot = p4.sum(axis=1)
-    assert np.allclose(tot[:, 0], M)
-    assert np.abs(tot[:, 1:]).max() < 1e-9
-    pstar = math.sqrt((M**2 - (m1 + m2)**2) * (M**2 - (m1 - m2)**2)) / (2 * M)
-    assert np.allclose(np.linalg.norm(p4[:, 0, 1:], axis=1), pstar)
-    # isotropy: <cos theta> ~ 0
-    cz = p4[:, 0, 3] / pstar
-    assert abs(cz.mean()) < 0.06
+def test_bsm_macro_lines():
+    cfg = _cfg(HNL)
+    lines = decay.bsm_macro_lines(cfg)
+    assert lines[0] == "/bsm/define bsm9900014 9900014 1000 0 100"
+    assert lines[1] == "/bsm/channel 0.6 13 211"
+    assert lines[2] == "/bsm/channel 0.4 14 13 -13"
 
 
-@pytest.mark.parametrize("M,ms", [
-    (1000.0, [0.0, 0.0, 0.0]),                       # all massless (HNL -> 3nu)
-    (1000.0, [0.0, 105.658, 105.658]),               # N -> nu mu mu
-    (1968.0, [493.677, 139.57, 139.57, 139.57]),     # 4-body
-])
-def test_nbody_conservation_and_mass_shells(M, ms):
-    rng = np.random.default_rng(3)
-    ch = decay.Channel(pdgs=[0] * len(ms), br=1.0, model="phase_space",
-                       masses=list(ms))
-    p4 = decay.rest_frame_decay(M, ch, 5000, rng)
-    tot = p4.sum(axis=1)
-    assert np.abs(tot[:, 0] - M).max() < 1e-6 * M
-    assert np.abs(tot[:, 1:]).max() < 1e-6 * M
-    for i, m in enumerate(ms):
-        m2 = p4[:, i, 0] ** 2 - (p4[:, i, 1:] ** 2).sum(axis=1)
-        assert np.abs(np.sqrt(np.abs(m2)) - m).max() < 1e-3
+def test_bsm_macro_custom_name_and_charge():
+    cfg = _cfg(HNL)
+    cfg.decay["name"] = "N1"
+    cfg.decay["charge"] = -1
+    assert decay.bsm_macro_lines(cfg)[0].startswith("/bsm/define N1 9900014 1000 -1 ")
 
 
-def test_vA_reproduces_michel_spectrum():
-    """Muon decay [e, nu_e-bar, nu_mu] through the generic vA weight must give
-    the Michel spectrum x^2(3-2x): the pairing convention closure test."""
-    rng = np.random.default_rng(4)
-    M = 105.658
-    ch = decay.Channel(pdgs=[11, -12, 14], br=1.0, model="vA",
-                       masses=[0.511, 0.0, 0.0])
-    p4 = decay.rest_frame_decay(M, ch, 60000, rng)
-    x = 2 * p4[:, 0, 0] / M
-    assert x.mean() == pytest.approx(0.7, rel=0.01)          # <x> = 7/10
-    # shape at quantiles of the exact CDF (x^3 - x^4/2, normalized to 1/2)
-    cdf = lambda q: 2 * (q**3 - q**4 / 2)
-    for q in (0.3, 0.5, 0.7, 0.9):
-        assert (x < q).mean() == pytest.approx(cdf(q), abs=0.01)
+def test_branching_ratios_normalized():
+    cfg = _cfg(HNL)
+    cfg.decay["channels"] = [{"to": [13, 211], "br": 3.0},
+                             {"to": [14, 13, -13], "br": 1.0}]
+    chans = decay.resolve_channels(cfg.decay, 1000.0)
+    assert [br for _, br in chans] == pytest.approx([0.75, 0.25])
 
 
-def test_phase_space_differs_from_vA():
-    """Flat 3-body phase space with (near-)massless daughters: the Dalitz
-    density gives pdf(x) = 2x, so <x> = 2/3 and P(x < 0.5) = 1/4 -- distinct
-    from the vA Michel shape (<x> = 0.7, P(x < 0.5) ~ 0.19)."""
-    rng = np.random.default_rng(5)
-    M = 105.658
-    ps = decay.Channel(pdgs=[11, -12, 14], br=1.0, model="phase_space",
-                       masses=[0.511, 0.0, 0.0])
-    x_ps = 2 * decay.rest_frame_decay(M, ps, 30000, rng)[:, 0, 0] / M
-    assert x_ps.mean() == pytest.approx(2.0 / 3.0, abs=0.01)
-    assert (x_ps < 0.5).mean() == pytest.approx(0.25, abs=0.01)
+def test_backend_prepare_renders_single_stage_macro(tmp_path):
+    from gdmltp.backends.decay import DecayBackend, DECAY_MACRO
+    cfg = _cfg(HNL)
+    gdml = tmp_path / "g.gdml"
+    gdml.write_text("<gdml/>")
+    cfg.gdml = str(gdml)
+    prep = DecayBackend().prepare(cfg, tmp_path)
+    mac = (tmp_path / DECAY_MACRO).read_text()
+    # /bsm/* must precede /run/initialize (PreInit commands)
+    assert mac.index("/bsm/define") < mac.index("/run/initialize")
+    assert "/gun/particlePDG 9900014" in mac
+    assert "/run/beamOn 500" in mac
+    assert prep.argv == [DECAY_MACRO]
+    assert "g4targetpractice" in prep.image      # the geant4 image, a real tool
+    assert prep.post is not None
 
 
-# --- flight and vertex --------------------------------------------------------- #
-
-def test_free_decay_length_is_exponential():
-    rng = np.random.default_rng(6)
-    n = 20000
-    pos = np.zeros((n, 3))
-    mom = np.tile([0.0, 0.0, 5e5], (n, 1))          # 500 GeV/c
-    mass, ctau = 1000.0, 1000.0                     # 1 GeV, 1 m
-    lam = (5e5 / mass) * ctau                       # 500 m
-    v, t, w = decay.sample_flight(pos, mom, mass, ctau, None, rng)
-    s = v[:, 2]
-    assert np.all(w == 1.0)
-    assert s.mean() == pytest.approx(lam, rel=0.02)
-    assert s.std() == pytest.approx(lam, rel=0.03)  # exponential: std = mean
-    # time: s = beta*c*t
-    beta = 5e5 / math.sqrt(5e5**2 + mass**2)
-    assert np.allclose(s, beta * decay.C_MM_PER_NS * t)
+def test_backend_with_sampled_beam_writes_beam_file(tmp_path):
+    from gdmltp.backends.decay import DecayBackend, DECAY_MACRO
+    cfg = _cfg(HNL.replace('position: "0 0 -50 m"', """position:
+    x: {dist: gauss, sigma: "1 cm"}
+    y: {dist: gauss, sigma: "1 cm"}
+    z: {dist: fixed, value: "-50 m"}"""))
+    gdml = tmp_path / "g.gdml"
+    gdml.write_text("<gdml/>")
+    cfg.gdml = str(gdml)
+    DecayBackend().prepare(cfg, tmp_path)
+    assert (tmp_path / "beam.dat").exists()
+    assert "/gun/beamFile" in (tmp_path / DECAY_MACRO).read_text()
 
 
-def test_forced_fiducial_weight_matches_analytic():
-    rng = np.random.default_rng(7)
-    n = 5000
-    pos = np.tile([0.0, 0.0, -50000.0], (n, 1))     # start at z = -50 m
-    mom = np.tile([0.0, 0.0, 5e5], (n, 1))
-    mass, ctau = 1000.0, 1000.0
-    lam = (5e5 / mass) * ctau
-    fid = {"z": ["-2.5 m", "2.5 m"]}
-    v, t, w = decay.sample_flight(pos, mom, mass, ctau, fid, rng)
-    assert v[:, 2].min() >= -2500.0 - 1e-6
-    assert v[:, 2].max() <= 2500.0 + 1e-6
-    expect = math.exp(-47500.0 / lam) - math.exp(-52500.0 / lam)
-    assert np.allclose(w, expect)
-
-
-def test_fiducial_never_crossed_is_an_error():
-    rng = np.random.default_rng(8)
-    pos = np.zeros((10, 3))
-    mom = np.tile([0.0, 0.0, 5e5], (10, 1))         # +z beam
-    with pytest.raises(ConfigError, match="never cross"):
-        decay.sample_flight(pos, mom, 1000.0, 1000.0,
-                            {"z": ["-2 m", "-1 m"]}, rng)   # window behind the beam
-
-
-def test_transverse_beam_needs_path_fiducial():
-    rng = np.random.default_rng(9)
-    pos = np.zeros((10, 3))
-    mom = np.tile([5e5, 0.0, 0.0], (10, 1))         # +x beam
-    with pytest.raises(ConfigError, match="path"):
-        decay.sample_flight(pos, mom, 1000.0, 1000.0, {"z": ["0 m", "1 m"]}, rng)
-    v, _, w = decay.sample_flight(pos, mom, 1000.0, 1000.0,
-                                  {"path": ["1 m", "2 m"]}, rng)
-    assert (v[:, 0] >= 1000.0 - 1e-6).all() and (v[:, 0] <= 2000.0 + 1e-6).all()
-
-
-# --- config validation ---------------------------------------------------------- #
+# --- config validation -------------------------------------------------------- #
 
 def test_decay_requires_ctau_and_channels():
     with pytest.raises(ConfigError, match="ctau"):
@@ -176,15 +113,33 @@ decay: {ctau: "1 m"}
 """)
 
 
-def test_vA_needs_three_daughters():
-    with pytest.raises(ConfigError, match="3 daughters"):
+def test_removed_knobs_are_rejected_with_pointers():
+    base = """
+generator: decay
+geometry: {gdml: g.gdml}
+beam: {pdg: 9900014, mass: "1 GeV"}
+decay:
+  ctau: "1 m"
+  channels: [{to: [13, 211]%s}]
+%s
+"""
+    with pytest.raises(ConfigError, match="external"):
+        _cfg(base % (", model: vA", ""))
+    with pytest.raises(ConfigError, match="ctau_sample"):
+        _cfg(base % ("", "  fiducial: {z: [\"-1 m\", \"1 m\"]}"))
+    with pytest.raises(ConfigError, match="single"):
+        _cfg(base % ("", "  transport: true"))
+
+
+def test_five_body_rejected():
+    with pytest.raises(ConfigError, match="2-4"):
         _cfg("""
 generator: decay
 geometry: {gdml: g.gdml}
 beam: {pdg: 9900014, mass: "1 GeV"}
 decay:
   ctau: "1 m"
-  channels: [{to: [13, 211], model: vA}]
+  channels: [{to: [11, -11, 11, -11, 22]}]
 """)
 
 
@@ -196,10 +151,9 @@ beam: {pdg: 9900014, mass: "0.2 GeV"}
 decay:
   ctau: "1 m"
   channels: [{to: [13, -13]}]
-run: {events: 10, seed: 1}
 """)
     with pytest.raises(ConfigError, match="parent mass"):
-        decay.generate(cfg, 10, seed=1)
+        decay.bsm_macro_lines(cfg)
 
 
 def test_unknown_parent_mass_rejected():
@@ -210,123 +164,143 @@ beam: {pdg: 9900014}
 decay:
   ctau: "1 m"
   channels: [{to: [13, 211]}]
-run: {events: 10, seed: 1}
 """)
     with pytest.raises(ConfigError, match="beam.mass"):
-        decay.generate(cfg, 10, seed=1)
+        decay.bsm_macro_lines(cfg)
 
 
 def test_lifetime_alternative_to_ctau():
-    cfg = _cfg("""
-generator: decay
-geometry: {gdml: g.gdml}
-beam: {pdg: 9900014, mass: "1 GeV", energy: {mode: mono, value: "500 GeV"}}
-decay:
-  lifetime: "3.335640952 ns"
-  channels: [{to: [13, 211]}]
-run: {events: 10, seed: 1}
-""")
-    assert decay._ctau_mm(cfg.decay, 1000.0) == pytest.approx(1000.0, rel=1e-6)
+    assert decay.ctau_mm({"lifetime": "3.335640952 ns"}) == pytest.approx(1000.0, rel=1e-6)
+    assert decay.ctau_mm({"ctau": "1 m"}) == 1000.0
 
 
-# --- end to end ----------------------------------------------------------------- #
+# --- post-run reweighting (arithmetic on Geant4's branches) -------------------- #
 
-def test_generate_and_validate(tmp_path):
-    from gdmltp import validate as val
+def _fake_decay_output(path, s_mm, decayed, p_mev=5e5, n_extra_tracks=1):
+    """A minimal-but-schema-shaped file imitating what g4sim records for a
+    decay run: primary flying +z from origin, ending at s (decay or exit)."""
+    import awkward as ak
+    import uproot
+    n = len(s_mm)
+    s_mm = np.asarray(s_mm, float)
+    trk_parent, trk_proc = [], []
+    for d in decayed:
+        trk_parent.append([1, 1] if d else [1])
+        trk_proc.append(["Decay", "Decay"] if d else ["Transportation"])
+    data = {
+        "eventID": np.arange(n, dtype=np.int32),
+        "primaryPDG": np.full(n, 9900014, np.int32),
+        "primaryE": np.full(n, p_mev),
+        "primaryStartX": np.zeros(n), "primaryStartY": np.zeros(n),
+        "primaryStartZ": np.zeros(n),
+        "primaryStartPx": np.zeros(n), "primaryStartPy": np.zeros(n),
+        "primaryStartPz": np.full(n, p_mev),
+        "primaryEndE": np.zeros(n),
+        "primaryEndX": np.zeros(n), "primaryEndY": np.zeros(n),
+        "primaryEndZ": s_mm,
+        "primaryEndPx": np.zeros(n), "primaryEndPy": np.zeros(n),
+        "primaryEndPz": np.zeros(n),
+        "totalEdep": np.zeros(n),
+        "nSteps": np.zeros(n, np.int32),
+        "nTracks": np.array([len(p) for p in trk_parent], np.int32),
+        "trk_parentID": ak.Array(trk_parent),
+        "trk_creatorProcess": ak.Array(trk_proc),
+    }
+    with uproot.recreate(path) as f:
+        f["tree"] = data
+    return str(path)
+
+
+def test_postprocess_weights_match_analytic(tmp_path):
+    cfg = _cfg(HNL)          # true ctau 1 km, sampled 10 cm, m 1 GeV, p 500 GeV
+    m, p = 1000.0, 5e5
+    lam_t = (p / m) * 1e6                 # betagamma * 1 km  [mm]
+    lam_g = (p / m) * 100.0               # betagamma * 10 cm [mm]
+    s = np.array([10.0, 5000.0, 60000.0])
+    decayed = [True, True, False]
+    path = _fake_decay_output(tmp_path / "out.root", s, decayed, p_mev=p)
+    decay.postprocess(path, cfg)
+
+    import uproot
+    with uproot.open(path) as f:
+        t = f["tree"]
+        w = t["eventWeight"].array(library="np")
+        dt = t["decayT"].array(library="np")
+    expect = np.exp(s / lam_g - s / lam_t)
+    expect[:2] *= lam_g / lam_t           # decayed events get the density ratio
+    assert np.allclose(w, expect, rtol=1e-12)
+    beta = p / np.sqrt(p * p + m * m)
+    assert np.allclose(dt, s / (beta * decay.C_MM_PER_NS))
+
+
+def test_postprocess_without_sampling_gives_unit_weights(tmp_path):
     cfg = _cfg(HNL)
-    ev = decay.generate(cfg, 500, seed=7)
+    del cfg.decay["ctau_sample"]
+    path = _fake_decay_output(tmp_path / "out.root", [100.0, 200.0], [True, False])
+    decay.postprocess(path, cfg)
+    import uproot
+    with uproot.open(path) as f:
+        w = f["tree"]["eventWeight"].array(library="np")
+    assert np.all(w == 1.0)
+
+
+# --- external backend (real-generator events in) ------------------------------ #
+
+def test_external_convert_and_validate(synth_nuhepmc, tmp_path):
+    """Any HepMC3 ASCII file converts to a schema-complete vertex-level file
+    (the NuHepMC fixture doubles as a generic HepMC3 sample)."""
+    from gdmltp.backends import external
+    from gdmltp import validate as val
     out = tmp_path / "output.root"
-    decay.write_output(ev, out)
+    n = external.convert(synth_nuhepmc, str(out))
+    assert n == 6
     report, code = val.validate(str(out), strict=True)
     assert code == 0, report
-    assert "eventWeight in (0, 1]" in report
 
 
-def test_generate_determinism_and_channel_mix():
-    cfg = _cfg(HNL)
-    a = decay.generate(cfg, 400, seed=9)
-    b = decay.generate(cfg, 400, seed=9)
-    assert np.array_equal(a["vertex"], b["vertex"])
-    assert a["daughters_pdg"] == b["daughters_pdg"]
-    two = np.mean([len(p) == 2 for p in a["daughters_pdg"]])
-    assert two == pytest.approx(0.6, abs=0.08)
-    # daughters conserve the parent four-momentum (vertex-level exactness)
-    for i in range(20):
-        p4 = np.asarray(a["daughters_p4"][i])
-        e_parent = a["e_parent"][i]
-        assert p4[:, 0].sum() == pytest.approx(e_parent, rel=1e-9)
-        assert np.allclose(p4[:, 1:].sum(axis=0), a["mom"][i], rtol=1e-9, atol=1e-6)
-
-
-def test_run_config_host_backend(tmp_path):
-    """The decay backend runs entirely on the host: a full (non-dry) run needs
-    no Docker and lands output.root in the outdir."""
+def test_external_backend_end_to_end(synth_nuhepmc, tmp_path):
+    """generator: external runs host-side through run_config (no Docker) and
+    the result carries the beam particle as primary + weights/time."""
     from gdmltp import run as runmod
+    import uproot
     gdml = tmp_path / "g.gdml"
     gdml.write_text("<gdml/>")
-    cfg = _cfg(HNL)
+    cfg = _cfg(f"""
+generator: external
+geometry: {{gdml: g.gdml}}
+external: {{file: {synth_nuhepmc}}}
+""")
     cfg.gdml = str(gdml)
     runmod.run_config(cfg, outdir=tmp_path)
-    assert (tmp_path / "output.root").exists()
-
-
-def test_handoff_event_file_from_decay(tmp_path):
-    """The transport hand-off must take the vertex from primaryEnd* and carry
-    the decay time on the E lines."""
-    from gdmltp import handoff
-    cfg = _cfg(HNL)
-    ev = decay.generate(cfg, 50, seed=3)
-    out = tmp_path / "output.root"
-    decay.write_output(ev, out)
-    n = handoff.write_event_file(str(out), tmp_path / "events.dat")
-    assert n == 50
-    text = (tmp_path / "events.dat").read_text()
-    first_e = next(l for l in text.splitlines() if l.startswith("E "))
-    assert len(first_e.split()) == 6          # E n vx vy vz t
-    parsed = handoff.read_event_file(tmp_path / "events.dat")
-    assert len(parsed) == 50
-    vx, vy, vz = parsed[0][0]
-    assert vz == pytest.approx(ev["vertex"][0][2], rel=1e-5)
-
-
-def test_merge_grafts_decay_scalars(tmp_path):
-    """merge_nu_block on a decay vertex file grafts primary identity,
-    primaryEnd (decay vertex), eventWeight, and decayT onto the transported
-    tree."""
-    from gdmltp import handoff
-    from conftest import write_synthetic
-    cfg = _cfg(HNL)
-    ev = decay.generate(cfg, 30, seed=4)
-    vertex = tmp_path / "vertex.root"
-    decay.write_output(ev, vertex)
-    transported = write_synthetic(tmp_path / "transported.root", n_events=30, seed=5)
-    merged = tmp_path / "merged.root"
-    handoff.merge_nu_block(str(transported), str(vertex), str(merged))
-    import uproot
-    with uproot.open(merged) as f:
+    with uproot.open(tmp_path / "output.root") as f:
         t = f["tree"]
-        assert t["primaryPDG"].array(library="np")[0] == 9900014
+        assert t["primaryPDG"].array(library="np")[0] == 14
         assert "eventWeight" in {k.split(";")[0] for k in t.keys()}
-        assert np.allclose(t["primaryEndZ"].array(library="np"),
-                           ev["vertex"][:, 2])
-        assert np.allclose(t["decayT"].array(library="np"), ev["t_ns"])
 
 
-def test_cli_generator_choice():
+def test_external_requires_file():
+    with pytest.raises(ConfigError, match="external.file"):
+        _cfg("""
+generator: external
+geometry: {gdml: g.gdml}
+""")
+
+
+def test_external_transport_handoff(synth_nuhepmc, tmp_path):
+    """external + transport: the hand-off event file must come out of the
+    converted file (vertex, momenta, time) ready for the Geant4 stage."""
+    from gdmltp.backends import external
+    from gdmltp import handoff
+    out = tmp_path / "output.root"
+    external.convert(synth_nuhepmc, str(out))
+    n = handoff.write_event_file(str(out), tmp_path / "events.dat")
+    assert n == 6
+    parsed = handoff.read_event_file(tmp_path / "events.dat")
+    assert len(parsed) == 6 and len(parsed[0][1]) == 3    # 3 FS particles/event
+
+
+def test_cli_generator_choices():
     from gdmltp import cli
     p, _ = cli._build_parser()
-    args = p.parse_args(["run", "--generator", "decay", "--gdml", "g.gdml"])
-    assert args.generator == "decay"
-
-
-def test_display_scene_from_decay_file(tmp_path):
-    """Displaced-decay events display through the existing vertex-level path
-    (momentum rays from the decay point)."""
-    from gdmltp import io, scene
-    cfg = _cfg(HNL)
-    ev = decay.generate(cfg, 5, seed=11)
-    out = tmp_path / "output.root"
-    decay.write_output(ev, out)
-    events = io.load_events(str(out), entry_start=0, entry_stop=1)
-    sc = scene.build_scene([], events[0])
-    assert sc.tracks, "daughter tracks should be drawable"
+    for gen in ("decay", "external"):
+        assert p.parse_args(["run", "--generator", gen, "--gdml", "g.gdml"]).generator == gen

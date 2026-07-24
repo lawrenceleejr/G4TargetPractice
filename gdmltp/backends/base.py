@@ -19,11 +19,15 @@ class Prepared:
     image   -- the container image to run (backends encode their own default).
     output  -- the file the engine writes; the orchestrator renames it to the
                user-requested run.output when they differ.
+    post    -- optional callable run after a successful (non-dry) stage, for
+               derived bookkeeping on the produced file (e.g. the decay
+               backend's decayT/eventWeight).
     """
     argv: list
     image: str
     env: dict = field(default_factory=dict)
     output: str = "output.root"
+    post: Optional[object] = None
 
 
 class Backend:

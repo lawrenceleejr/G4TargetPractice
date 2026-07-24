@@ -1,20 +1,24 @@
 # A heavy neutral lepton (HNL) decaying inside the MAIA detector.
 #
-# The `decay` backend flies a long-lived BSM parent along the beam, forces the
-# decay inside a fiducial window (recording the true occupation probability in
-# eventWeight), decays it -- exact two-body, V-A three-body -- and writes the
-# daughters as a displaced vertex in the common schema. Stage 1 runs entirely
-# on the host (no container); `transport: true` then pushes the daughters
-# through MAIA with Geant4 for the full detector response.
+# The decay is done by GEANT4, not by this framework: the `decay` backend
+# hands the particle definition (mass, ctau, channels) to g4sim via /bsm/*
+# macro commands, and Geant4's own G4Decay + G4PhaseSpaceDecayChannel fly it,
+# decay it in flight, and transport the daughters -- displaced vertex, timing,
+# and energy deposits all in ONE Geant4 stage.
 #
 #   gdmltp run --config examples/maia/hnl_decay.yaml -o hnl
 #   gdmltp validate hnl/output.root
 #   gdmltp display hnl/output.root --gdml gdml/MAIA_v0.gdml --events 0:20
 #
-# Physics knobs: mass and ctau are free -- scan them; the decay-in-window
-# probability is carried per event in eventWeight so rates stay honest.
-# Pairs naturally with the neutrino-slice configs: an HNL mixing with nu_mu
-# would ride the same mu-decay flux down the same corridor.
+# Lifetime importance sampling: the physical ctau below (1 km) would put
+# almost every decay far outside MAIA, so Geant4 GENERATES with ctau_sample
+# (10 cm proper -> lab decay length betagamma*ctau ~ 50 m at 500 GeV), and
+# after the run each event gets the exact analytic weight back to the true
+# ctau in the eventWeight branch. Weight your histograms by it.
+#
+# Decay distributions are Geant4 phase space (unpolarized). For V-A matrix
+# elements / polarization, generate the decays with Pythia8 or MadGraph and
+# feed the HepMC3 file in via `generator: external` (see docs/bsm.md).
 generator: decay
 
 geometry:
@@ -28,19 +32,14 @@ beam:
   direction: "0 0 1"
 
 decay:
-  ctau: "1 m"                  # proper decay length (or lifetime: "3.34 ns")
+  name: N1                     # Geant4 particle name (cosmetic)
+  ctau: "1 km"                 # TRUE proper decay length (or lifetime: "...ns")
+  ctau_sample: "10 cm"         # generation value; eventWeight reweights to ctau
   channels:
-    # N -> mu- pi+ (exact two-body, isotropic in the N rest frame)
-    - {to: [13, 211], br: 0.6}
-    # N -> nu_mu mu- mu+  (V-A three-body: |M|^2 ~ (p_N . p_2)(p_1 . p_3)
-    # with daughters listed [1, 2, 3] -- the muon-decay pairing)
-    - {to: [14, 13, -13], br: 0.4, model: vA}
-  # Force the decay into the detector volume (|z| < 2.5 m: the barrel).
-  # eventWeight = P(decay in window) = exp(-s0/lambda) - exp(-s1/lambda).
-  fiducial: {z: ["-2.5 m", "2.5 m"]}
-  # transport: true            # daughters through MAIA via Geant4 (two-stage)
+    - {to: [13, 211], br: 0.6}        # N -> mu- pi+
+    - {to: [14, 13, -13], br: 0.4}    # N -> nu_mu mu- mu+ (phase space)
 
 run:
-  events: 500
+  events: 200
   output: output.root
   seed: 990014

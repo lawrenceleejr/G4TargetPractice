@@ -120,7 +120,40 @@ jobs:
           PY
           rm -f output.root events.dat transport.mac
 
-      - name: Particle-by-PDG smoke (/gun/particlePDG)
+      - name: BSM decay smoke (/bsm/define -> G4Decay)
+        # Geant4 does the decay: define a 1 GeV neutral with a short sampled
+        # ctau, fire it into the LAr cube, and require in-flight decays with
+        # "Decay"-created daughters in the output.
+        run: |
+          cat > bsm.mac << 'EOF'
+          /bsm/define N1 9900014 1000.0 0 50.0
+          /bsm/channel 0.6 13 211
+          /bsm/channel 0.4 14 13 -13
+          /detector/readGDML gdml/liquid_argon_1m3.gdml
+          /run/initialize
+          /analysis/neutrinoMode off
+          /random/setSeeds 41 42
+          /gun/particlePDG 9900014
+          /gun/energy 10 GeV
+          /gun/position 0 0 -60 cm
+          /gun/direction 0 0 1
+          /run/beamOn 20
+          EOF
+          ./build/g4sim bsm.mac
+          test -f output.root
+          python3 - << 'PY'
+          import uproot, awkward as ak
+          t = uproot.open('output.root')['tree']
+          assert t.num_entries == 20
+          pdg = t['primaryPDG'].array(library='np')
+          assert (pdg == 9900014).all(), pdg[:5]
+          proc = t['trk_creatorProcess'].array()
+          parent = t['trk_parentID'].array()
+          decayed = ak.sum(ak.any((parent == 1) & (proc == 'Decay'), axis=1))
+          print('events with an in-flight decay:', decayed, '/ 20')
+          assert decayed > 0, "no G4Decay daughters found"
+          PY
+          rm -f output.root bsm.mac
         run: |
           cat > pdg.mac << 'EOF'
           /detector/readGDML gdml/silicon_slab_1mm.gdml

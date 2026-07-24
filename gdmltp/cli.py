@@ -13,7 +13,7 @@ examples:
   gdmltp run --gdml my.gdml --field "0 0 5 tesla" --display
   gdmltp run --config run.yaml                            # YAML frontend (any backend)
   gdmltp run --config run.yaml --energy "200 MeV"         # flag overrides one YAML field
-  gdmltp run --config examples/maia/hnl_decay.yaml        # BSM decay-in-flight (host-run)""",
+  gdmltp run --config examples/maia/hnl_decay.yaml        # BSM decay-in-flight (Geant4)""",
     "display": """\
 examples:
   gdmltp display output.root --gdml my_detector.gdml     # WebGL html + PNG stills
@@ -78,7 +78,7 @@ def _build_parser():
     r.add_argument("--config", help="YAML run config (common frontend for any backend); "
                                      "flags below override individual fields")
     r.add_argument("--generator", default="geant4",
-                   choices=["geant4", "genie", "achilles", "decay"],
+                   choices=["geant4", "genie", "achilles", "decay", "external"],
                    help="physics backend (default: geant4)")
     r.add_argument("--mac", help="existing macro; if omitted, one is generated from the flags below")
     r.add_argument("--gdml", help="geometry file (required if no --mac references one)")

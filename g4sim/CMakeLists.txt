@@ -32,6 +32,7 @@ endif()
 # Sources
 # --------------------
 set(SOURCES
+    BSMPhysics.cc
     DetectorConstruction.cc
     DetectorMessenger.cc
     PrimaryGenerator.cc

@@ -10,6 +10,7 @@
 #include "G4UIExecutive.hh"
 #include "G4PhysListFactory.hh"
 
+#include "BSMPhysics.hh"
 #include "DetectorConstruction.hh"
 #include "PrimaryGenerator.hh"
 #include "RunAction.hh"
@@ -61,6 +62,11 @@ int main(int argc, char** argv) {
 
     G4VModularPhysicsList* physics = factory.GetReferencePhysList("FTFP_BERT");
     physics->RegisterPhysics(new G4NeutrinoPhysics());
+    // User-defined long-lived particles (/bsm/define, /bsm/channel in PreInit);
+    // registered LAST so every standard particle exists when it constructs.
+    physics->RegisterPhysics(new BSMPhysics());
+    auto* bsmMessenger = new BSMMessenger();
+    (void)bsmMessenger;   // owned for the program lifetime (macro-driven)
 #ifdef USE_CELERITAS
     auto& celerIntegration = celeritas::TrackingManagerIntegration::Instance();
     physics->RegisterPhysics(

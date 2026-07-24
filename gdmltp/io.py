@@ -21,8 +21,9 @@ TRK_BRANCHES = [
 # generator converters (GENIE/Achilles) so displays can draw momentum rays for
 # tracks that were never transported; g4sim does not (yet) write these.
 TRK_OPTIONAL_BRANCHES = ["trk_px", "trk_py", "trk_pz"]
-# Optional per-event scalars written by the decay backend (and grafted onto the
-# transported file): the forced-decay occupation weight and the decay time [ns].
+# Optional per-event scalars added by the decay backend's post-processing and
+# the external converter (and grafted onto transported files): the lifetime
+# importance weight / HepMC event weight, and the decay/vertex time [ns].
 SCALAR_OPTIONAL_BRANCHES = ["eventWeight", "decayT"]
 STEP_BRANCHES = [
     "step_trackID", "step_pdg", "step_x", "step_y", "step_z",
