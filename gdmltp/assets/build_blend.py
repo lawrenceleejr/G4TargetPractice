@@ -512,7 +512,17 @@ def main():
 
     scenes = json.load(open(scenes_json))
     clear_scene()
-    bpy.context.scene.render.fps = fps
+    sc = bpy.context.scene
+    sc.render.fps = fps
+    sc.render.use_motion_blur = True             # motion blur on by default
+    # Cycles by default with a 1-minute render time cap (adaptive sampling stops
+    # at the limit) -- also the engine whose path tracing lights the emissive
+    # environment sphere correctly.
+    try:
+        sc.render.engine = "CYCLES"
+        sc.cycles.time_limit = 60.0              # seconds; 0 = unlimited
+    except Exception as e:
+        print(f"[gdmltp] (Cycles time-limit not set: {e})", flush=True)
 
     geo_coll = new_collection("Geometry")
     if scenes:
