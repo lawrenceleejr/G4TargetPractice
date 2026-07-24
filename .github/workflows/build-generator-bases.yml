@@ -98,8 +98,18 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:buildcache
-          cache-to: type=registry,ref=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:buildcache,mode=max
+          # buildcache2: the original :buildcache was poisoned -- it held a
+          # compiled GENIE `make` layer from before the HEDISStrucFunc
+          # setprecision(15) source patch, and BuildKit kept restoring that
+          # stale layer even after the patch RUN changed (the shipped binary's
+          # operator<< still truncated MassZ 90.34202->90.342, breaking the
+          # HEDIS SF metafile round-trip at the 1e-10 tolerance -> gevgen
+          # assert). Pointing at a fresh, empty cache ref makes the first build
+          # rebuild every layer from scratch (so the patched GENIE is actually
+          # compiled in); it then repopulates buildcache2 and later edits are
+          # incremental again.
+          cache-from: type=registry,ref=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:buildcache2
+          cache-to: type=registry,ref=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:buildcache2,mode=max
 
   achilles-base:
     runs-on: ubuntu-latest
