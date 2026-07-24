@@ -126,6 +126,9 @@ RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
       lhapdf install ${HEDIS_PDF} && \
       gmkhedissf --tune ${HEDIS_TUNE} ; \
     fi
+# Runtime marker: the gdmltp genie driver checks this before running gmkhedissf
+# so a HEDIS tune on a non-HEDIS image fails with a clear message, not SIGABRT.
+ENV GDMLTP_HEDIS=${ENABLE_HEDIS}
 
 # Sanity: the generator toolchain must resolve.
 RUN gevgen --help >/dev/null 2>&1 || gevgen -h >/dev/null 2>&1 || \

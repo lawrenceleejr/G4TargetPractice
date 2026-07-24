@@ -41,12 +41,32 @@ def _is_hedis(job):
     return tune.startswith("GHE19") or "HEDIS" in egl.upper()
 
 
+_HEDIS_HELP = (
+    "This is a HEDIS high-energy-DIS tune ({tune}), which needs a GENIE image "
+    "built WITH HEDIS support -- APFEL and the tune's LHAPDF grid -- plus the "
+    "structure-function tables that gmkhedissf builds from them. This image was "
+    "not built that way (no GDMLTP_HEDIS marker), so gmkhedissf aborts.\n"
+    "How to proceed:\n"
+    "  * HEDIS image: rebuild the genie base with --build-arg ENABLE_HEDIS=1\n"
+    "    (docker/genie-base.Dockerfile; see docs/neutrino.md 'HEDIS'). It bakes\n"
+    "    in APFEL, the NNPDF31sx LHAPDF set, and the SF tables.\n"
+    "  * Or use a standard tune (e.g. tune: G18_10a_00_000) for E_nu up to ~1 TeV.\n"
+    "  * For a first genie smoke test, examples/nu_argon.yaml runs out of the box."
+)
+
+
+def _hedis_provisioned():
+    """True only for an image built with HEDIS support. The base Dockerfile sets
+    GDMLTP_HEDIS=1 in that case (ENABLE_HEDIS=1); default images leave it unset/0."""
+    return os.environ.get("GDMLTP_HEDIS", "0") == "1"
+
+
 def _ensure_hedis_sf(job, workdir):
     """HEDIS reads pre-tabulated structure-function grids (QrkSF_*.dat) from
     $HEDIS_SF_DATA_PATH, produced once by gmkhedissf --tune <tune>. Generate
     them on demand if absent (requires GENIE built with APFEL + the tune's
-    LHAPDF set installed -- see docs/neutrino.md; without them GENIE errors
-    clearly). Cached by a stamp file so it runs at most once per tune."""
+    LHAPDF set installed -- see docs/neutrino.md). Cached by a stamp file so it
+    runs at most once per tune."""
     tune = job.get("tune", "GHE19_00a_00_000")
     sf_dir = Path(os.environ.get("HEDIS_SF_DATA_PATH",
                                  str(Path(os.environ.get("GENIE", "/opt/genie"))
@@ -54,10 +74,20 @@ def _ensure_hedis_sf(job, workdir):
     stamp = sf_dir / f".gdmltp_hedis_sf_{tune}.done"
     if stamp.exists() or (sf_dir.exists() and any(sf_dir.glob("QrkSF*.dat"))):
         return
+    # Preflight: gmkhedissf aborts (SIGABRT, "Assertion `0'") on an image without
+    # APFEL/LHAPDF -- turn that into a clear, actionable message up front.
+    if not _hedis_provisioned():
+        raise RuntimeError(_HEDIS_HELP.format(tune=tune))
     print(f"[run_genie] building HEDIS structure-function tables (gmkhedissf "
-          f"--tune {tune}); slow, one-time, needs APFEL + the tune's LHAPDF "
-          f"set. See docs/neutrino.md if this fails.", flush=True)
-    subprocess.run(["gmkhedissf", "--tune", tune], cwd=workdir, check=True)
+          f"--tune {tune}); slow, one-time.", flush=True)
+    try:
+        subprocess.run(["gmkhedissf", "--tune", tune], cwd=workdir, check=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(
+            f"gmkhedissf --tune {tune} failed ({e}). The image reports HEDIS "
+            f"support but the tables could not be built -- check that the tune's "
+            f"LHAPDF set is installed (lhapdf ls --installed) and APFEL is on "
+            f"LD_LIBRARY_PATH. See docs/neutrino.md 'HEDIS'.") from e
     try:
         sf_dir.mkdir(parents=True, exist_ok=True)
         stamp.write_text("ok\n")
