@@ -74,6 +74,9 @@ jobs:
             type=raw,value=${{ env.GENIE_VERSION }}
 
       - name: Build and push the GENIE base image
+        # Registry-backed build cache: the GHA cache backend rejects layers this
+        # large (the first run built GENIE fine in ~60 min, then died with
+        # "exporting to GitHub Actions Cache: not_found", cancelling the push).
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -84,8 +87,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=genie-base
-          cache-to: type=gha,mode=max,scope=genie-base
+          cache-from: type=registry,ref=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:buildcache
+          cache-to: type=registry,ref=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:buildcache,mode=max
 
   achilles-base:
     runs-on: ubuntu-latest
