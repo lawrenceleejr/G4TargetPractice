@@ -1,13 +1,14 @@
 #include "NeutrinoBiasMessenger.hh"
 
-#include "G4EmParameters.hh"
+#include "G4NeutrinoPhysics.hh"
 #include "G4UIdirectory.hh"
 #include "G4UIcommand.hh"
 #include "G4UIparameter.hh"
 
 #include <sstream>
 
-NeutrinoBiasMessenger::NeutrinoBiasMessenger()
+NeutrinoBiasMessenger::NeutrinoBiasMessenger(G4NeutrinoPhysics* nuPhysics)
+    : fNuPhysics(nuPhysics)
 {
     fDir = new G4UIdirectory("/gdmltp/");
     fDir->SetGuidance("GDMLTargetPractice engine controls.");
@@ -16,8 +17,9 @@ NeutrinoBiasMessenger::NeutrinoBiasMessenger()
     fBiasCmd->SetGuidance(
         "Enable + bias Geant4's built-in neutrino interactions (before "
         "/run/initialize). Args: ccBias ncBias nucleusBias detectorRegion. "
-        "Uses the G4EmParameters API directly, so it works in builds that do "
-        "not register the /physics_lists/em/Nu* UI commands.");
+        "Sets the bias factors on the registered G4NeutrinoPhysics instance, "
+        "so it works in builds that do not register the /physics_lists/em/Nu* "
+        "UI commands.");
     for (const char* name : {"ccBias", "ncBias", "nucleusBias"}) {
         auto* p = new G4UIparameter(name, 'd', false);
         p->SetParameterRange(std::string(name) + " >= 1.");
@@ -35,20 +37,24 @@ NeutrinoBiasMessenger::~NeutrinoBiasMessenger()
 
 void NeutrinoBiasMessenger::SetNewValue(G4UIcommand* command, G4String newValue)
 {
-    if (command != fBiasCmd) return;
+    if (command != fBiasCmd || fNuPhysics == nullptr) return;
     std::istringstream iss(newValue);
     G4double cc = 1.0, nc = 1.0, nuc = 1.0;
     G4String region = "DefaultRegionForTheWorld";
     iss >> cc >> nc >> nuc;
     if (iss >> region) { /* optional region token consumed */ }
 
-    auto* emp = G4EmParameters::Instance();
-    emp->SetNeutrinoActivation(true);
-    emp->SetNuDetectorName(region);
-    emp->SetNuElectronCcBias(cc);
-    emp->SetNuElectronNcBias(nc);
-    emp->SetNuNucleusBias(nuc);
-    G4cout << "NeutrinoBiasMessenger: neutrino interactions enabled; bias "
-           << "CC=" << cc << " NC=" << nc << " nucleus=" << nuc
-           << " in region '" << region << "'." << G4endl;
+    // These setters live on G4NeutrinoPhysics (verified against the Geant4
+    // source); they only store members, consumed in ConstructProcess() at
+    // /run/initialize. NuETotXscActivated(true) is required for the nucleus
+    // bias to be applied (and switches the nu-e process to a single max(cc,nc)
+    // total-cross-section factor).
+    fNuPhysics->SetNuDetectorName(region);
+    fNuPhysics->SetNuEleCcBias(cc);
+    fNuPhysics->SetNuEleNcBias(nc);
+    fNuPhysics->SetNuNucleusBias(nuc);
+    fNuPhysics->NuETotXscActivated(true);
+    G4cout << "NeutrinoBiasMessenger: neutrino interactions biased CC=" << cc
+           << " NC=" << nc << " nucleus=" << nuc << " in region '" << region
+           << "'." << G4endl;
 }
