@@ -231,6 +231,22 @@ def add_event_curve(coll, tracks, bev, name, prog=None):
     return obj, n_added
 
 
+def _keyframe_grow(curve, f0, f1):
+    """Reveal a whole curve object (all its splines) from nothing to full over
+    [f0, f1] by keyframing bevel_factor_end, so hitting Play draws the tracks
+    out. All splines grow together (a single per-object property); for a
+    per-track, physical-time-ordered reveal use --animate. Needs bevel_depth>0
+    (set by the caller) so the drawn portion is a visible tube."""
+    curve.bevel_factor_end = 0.0
+    curve.keyframe_insert("bevel_factor_end", frame=f0)
+    curve.bevel_factor_end = 1.0
+    curve.keyframe_insert("bevel_factor_end", frame=f1)
+    if curve.animation_data and curve.animation_data.action:
+        for fc in curve.animation_data.action.fcurves:
+            for kp in fc.keyframe_points:
+                kp.interpolation = "LINEAR"
+
+
 # unit cube (verts + quad faces) for building many vertex markers into one mesh
 _CUBE_V = [(-.5, -.5, -.5), (.5, -.5, -.5), (.5, .5, -.5), (-.5, .5, -.5),
            (-.5, -.5, .5), (.5, -.5, .5), (.5, .5, .5), (-.5, .5, .5)]
@@ -359,15 +375,24 @@ def main():
             add_event_vertices(vtx_coll, s["vertices"], vtx_size,
                                f"Event_{s['event_id']:02d}_vertices")
     else:
-        # Fast, single-object-per-event build (default).
+        # Fast, single-object-per-event build (default) -- and still animated:
+        # each event's curve reveals over the timeline (bevel_factor_end 0->1)
+        # so hitting Play grows the tracks out from their origins. One object
+        # per event (thousands of tracks stay fast); --animate gives the richer
+        # per-track, physical-time-ordered reveal (one object per track).
+        max_frame = max(2, int(round(max_seconds * fps)))
+        bpy.context.scene.frame_start = 1
+        bpy.context.scene.frame_end = max_frame
         print(f"[gdmltp] building one object per event ({n_tracks} track(s), "
-              f"{n_verts} vertex marker(s)); static (add --animate for the "
-              f"time-reveal).", flush=True)
+              f"{n_verts} vertex marker(s)); tracks reveal over {max_frame} "
+              f"frames ({max_seconds:g}s @ {fps}fps) on Play (--animate for the "
+              f"per-track time-ordered reveal).", flush=True)
         tprog = Progress(n_tracks, "tracks")     # per-track: a single big event still shows progress
         for s in scenes:
             ev = new_collection(f"Event_{s['event_id']:02d}")
-            add_event_curve(ev, s["tracks"], bev,
-                            f"Event_{s['event_id']:02d}_tracks", prog=tprog)
+            obj, _ = add_event_curve(ev, s["tracks"], bev,
+                                     f"Event_{s['event_id']:02d}_tracks", prog=tprog)
+            _keyframe_grow(obj.data, 1, max_frame)
             add_event_vertices(ev, s["vertices"], vtx_size,
                                f"Event_{s['event_id']:02d}_vertices")
 
