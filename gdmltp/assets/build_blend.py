@@ -197,6 +197,32 @@ def add_lighting_environment(center_m, radius_m):
         _aim(o, (cx, cy, cz))
 
 
+def add_camera(center_m, radius_m):
+    """Add a default wide-angle camera aimed at the system, with a shallow
+    depth of field focused on the origin. Sits well inside the environment
+    sphere and is sized to the scene radius so the framing works at any scale.
+
+    - 18 mm lens (wide angle, dramatic perspective).
+    - Depth of field ON at f/1.0 (very shallow) focused on the scene center, so
+      the interaction sits sharp against a softly blurred warm backdrop.
+    Set as the scene's active camera so the viewport/render use it immediately."""
+    R = max(radius_m, MM)
+    cx, cy, cz = center_m
+    cam_data = bpy.data.cameras.new("Camera")
+    cam_data.lens = 18.0                      # wide angle
+    cam_data.dof.use_dof = True
+    cam_data.dof.aperture_fstop = 1.0         # very shallow depth of field
+    cam = bpy.data.objects.new("Camera", cam_data)
+    loc = (cx + 1.3 * R, cy - 1.6 * R, cz + 0.9 * R)   # inside the 14R sphere
+    cam.location = loc
+    _aim(cam, (cx, cy, cz))
+    cam_data.dof.focus_distance = math.dist(loc, (cx, cy, cz))   # focus on origin
+    coll = bpy.data.collections.get("Lighting") or bpy.context.scene.collection
+    coll.objects.link(cam)
+    bpy.context.scene.camera = cam
+    return cam
+
+
 MM = 0.001  # mm -> Blender meters
 
 # Track-tube radius and vertex-marker size are fractions of the scene's bounding
@@ -464,8 +490,10 @@ def main():
     n_tracks = sum(len(s["tracks"]) for s in scenes)
     n_verts = sum(len(s["vertices"]) for s in scenes)
 
-    # Always light the scene and wrap it in a large warm sphere (never a void).
+    # Always light the scene, wrap it in a large warm sphere (never a void),
+    # and point a wide-angle depth-of-field camera at the system.
     add_lighting_environment(center_m, radius_m)
+    add_camera(center_m, radius_m)
 
     if animate:
         frame_of, max_frame, t0, span = _build_frame_mapper(scenes, fps, max_seconds, log_time)
