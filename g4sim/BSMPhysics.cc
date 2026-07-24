@@ -20,13 +20,20 @@ std::vector<BSMSpec>& BSMPhysics::Registry()
     return registry;
 }
 
-BSMPhysics::BSMPhysics() : G4VPhysicsConstructor("BSMPhysics") {}
+// Physics type 0 is special-cased by G4VModularPhysicsList::RegisterPhysics:
+// it bypasses the "same type already registered -> skip this one" dedup and is
+// ALWAYS added. With the default type this constructor collided with another
+// (G4NeutrinoPhysics) and was silently dropped, so ConstructParticle never ran
+// and the custom particle was never created.
+BSMPhysics::BSMPhysics() : G4VPhysicsConstructor("BSMPhysics", 0) {}
 
 void BSMPhysics::ConstructParticle()
 {
     // Registered after FTFP_BERT's constructors, so every standard particle
     // already exists here -- daughter PDG ids can be resolved to names.
     auto* table = G4ParticleTable::GetParticleTable();
+    G4cout << "BSMPhysics::ConstructParticle: defining "
+           << BSMPhysics::Registry().size() << " custom particle(s)." << G4endl;
 
     for (const auto& spec : BSMPhysics::Registry()) {
         if (table->FindParticle(spec.pdg)) {
