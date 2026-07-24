@@ -16,8 +16,10 @@ BEAM_FILE = "beam.dat"
 
 
 def _progress(events):
+    # print progress often enough for a smooth host-side bar (~100 updates),
+    # but never every-single-event on very large runs
     try:
-        return max(1, int(events) // 10)
+        return max(1, int(events) // 100)
     except (TypeError, ValueError):
         return 100
 

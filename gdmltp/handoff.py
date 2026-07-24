@@ -136,7 +136,7 @@ def build_transport_macro(gdml_name, n_events, event_file=EVENT_FILE, seed=None,
     if field:
         lines.append(f"/detector/setGlobalField {field}")
     lines += [f"/gun/hepmcFile {event_file}",
-              f"/run/printProgress {max(1, int(n_events) // 10)}",
+              f"/run/printProgress {max(1, int(n_events) // 100)}",
               f"/run/beamOn {int(n_events)}"]
     return "\n".join(lines) + "\n"
 

@@ -7,6 +7,21 @@ import pytest
 from gdmltp import run, config
 
 
+def _fake_popen(lines=(), returncode=0, on_call=None):
+    """A stand-in for subprocess.Popen: streams `lines`, then exits with
+    `returncode`. `on_call(cmd, kw)` fires at construction (side effects)."""
+    class P:
+        def __init__(self, cmd, **kw):
+            if on_call is not None:
+                on_call(cmd, kw)
+            self.stdout = iter(list(lines))
+            self.returncode = returncode
+
+        def wait(self):
+            return self.returncode
+    return P
+
+
 def _geant4_cfg(repo_root, **geant4_block):
     return config.RunConfig(
         gdml=str(repo_root / "gdml" / "bpe_slab.gdml"),
@@ -54,14 +69,9 @@ def test_dry_run_genie_dispatch(repo_root, tmp_path, capsys):
 def test_output_rename(repo_root, tmp_path, monkeypatch):
     """The engine always writes output.root; run.output != output.root renames it."""
     outdir = tmp_path
-
-    def fake_run(cmd, **kw):
-        (outdir / "output.root").write_text("fake")
-        class R:  # noqa
-            returncode = 0
-        return R()
-
-    monkeypatch.setattr(run.subprocess, "run", fake_run)
+    monkeypatch.setattr(run.subprocess, "Popen", _fake_popen(
+        lines=["--> Event 0 starts.", "--> Event 1 starts."],
+        on_call=lambda cmd, kw: (outdir / "output.root").write_text("fake")))
     cfg = _geant4_cfg(repo_root)
     cfg.run.output = "custom.root"
     run.run_config(cfg, outdir=str(outdir), image="img")
@@ -71,29 +81,18 @@ def test_output_rename(repo_root, tmp_path, monkeypatch):
 
 def test_missing_image_gives_clear_error(repo_root, tmp_path, monkeypatch):
     """docker's 'manifest unknown' (exit 125) becomes a clear, actionable
-    message naming the image, not a raw CalledProcessError traceback."""
-    def fake_run(cmd, **kw):
-        class R:  # noqa
-            returncode = 125
-            stdout = ""
-            stderr = "docker: Error response from daemon: manifest unknown\n"
-        return R()
-
-    monkeypatch.setattr(run.subprocess, "run", fake_run)
+    message naming the image, not a raw traceback."""
+    monkeypatch.setattr(run.subprocess, "Popen", _fake_popen(
+        lines=["docker: Error response from daemon: manifest unknown"],
+        returncode=125))
     cfg = _geant4_cfg(repo_root)
     with pytest.raises(RuntimeError, match="could not obtain the container image"):
         run.run_config(cfg, outdir=str(tmp_path), image="ghcr.io/x/nope:main")
 
 
 def test_engine_failure_surfaces_stderr(repo_root, tmp_path, monkeypatch):
-    def fake_run(cmd, **kw):
-        class R:  # noqa
-            returncode = 1
-            stdout = ""
-            stderr = "G4 fatal: bad macro command\n"
-        return R()
-
-    monkeypatch.setattr(run.subprocess, "run", fake_run)
+    monkeypatch.setattr(run.subprocess, "Popen", _fake_popen(
+        lines=["G4 fatal: bad macro command"], returncode=1))
     with pytest.raises(RuntimeError, match="bad macro command"):
         run.run_config(_geant4_cfg(repo_root), outdir=str(tmp_path), image="img")
 
@@ -101,15 +100,13 @@ def test_engine_failure_surfaces_stderr(repo_root, tmp_path, monkeypatch):
 def test_local_uses_engine_binary(repo_root, tmp_path, monkeypatch):
     calls = {}
 
-    def fake_run(cmd, **kw):
+    def on_call(cmd, kw):
         calls["cmd"] = cmd
         calls["cwd"] = kw.get("cwd")
         (tmp_path / "output.root").write_text("fake")
-        class R:  # noqa
-            returncode = 0
-        return R()
 
-    monkeypatch.setattr(run.subprocess, "run", fake_run)
+    monkeypatch.setattr(run.subprocess, "Popen",
+                        _fake_popen(lines=["--> Event 0 starts."], on_call=on_call))
     run.run_config(_geant4_cfg(repo_root), outdir=str(tmp_path), local=True)
     assert "docker" not in calls["cmd"][0]
     assert calls["cmd"][-1] == "gdmltp_run.mac"

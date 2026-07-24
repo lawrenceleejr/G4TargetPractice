@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
 ]
 dependencies = ["uproot>=5.4", "awkward>=2.5", "numpy", "matplotlib", "pyyaml>=5",
-                "pyhepmc>=2.13"]
+                "pyhepmc>=2.13", "tqdm>=4.60"]
 
 [project.optional-dependencies]
 dev = ["pytest"]

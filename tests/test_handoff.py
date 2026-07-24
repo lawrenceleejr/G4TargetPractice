@@ -83,15 +83,21 @@ def test_run_config_transport_two_stages(repo_root, synth_gst, tmp_path, monkeyp
     from conftest import write_synthetic
     calls = []
 
-    def fake_run(cmd, **kw):
+    def fake_popen(cmd, **kw):
         calls.append(cmd)
         if len(calls) == 1:           # generator stage: emit vertex-level output
             genie_convert.convert(synth_gst, tmp_path / "output.root")
         else:                          # transport stage: emit transported output
             write_synthetic(tmp_path / "output.root", n_events=25, seed=6)
-        return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
 
-    monkeypatch.setattr(run.subprocess, "run", fake_run)
+        class P:  # noqa
+            stdout = iter(["--> Event 0 starts."])
+            returncode = 0
+            def wait(self):  # noqa
+                return 0
+        return P()
+
+    monkeypatch.setattr(run.subprocess, "Popen", fake_popen)
     cfg = config.RunConfig(
         generator="genie",
         gdml=str(repo_root / "gdml" / "liquid_argon_1m3.gdml"),
