@@ -121,6 +121,7 @@ def test_driver_hedis_tune(repo_root, tmp_path, monkeypatch):
     mod = _load_driver(repo_root)
     monkeypatch.delenv("GENIE_XSEC_FILE", raising=False)
     monkeypatch.setenv("HEDIS_SF_DATA_PATH", str(tmp_path / "sf"))  # empty -> build
+    monkeypatch.setenv("GDMLTP_HEDIS", "1")   # a HEDIS-provisioned image
     calls = []
 
     def fake_run(cmd, **kw):
@@ -147,3 +148,24 @@ def test_driver_hedis_tune(repo_root, tmp_path, monkeypatch):
     assert gmkspl[gmkspl.index("-e") + 1] == "5000"      # TeV spline reach
     gevgen = next(c for c in calls if c[0] == "gevgen")
     assert gevgen[gevgen.index("--event-generator-list") + 1] == "HEDIS"
+
+
+def test_driver_hedis_tune_unprovisioned_errors(repo_root, tmp_path, monkeypatch):
+    """A HEDIS tune on an image NOT built with HEDIS (no GDMLTP_HEDIS marker)
+    fails with a clear, actionable message before gmkhedissf can SIGABRT."""
+    mod = _load_driver(repo_root)
+    monkeypatch.delenv("GENIE_XSEC_FILE", raising=False)
+    monkeypatch.delenv("GDMLTP_HEDIS", raising=False)          # non-HEDIS image
+    monkeypatch.setenv("HEDIS_SF_DATA_PATH", str(tmp_path / "sf"))  # empty -> would build
+
+    def fake_run(cmd, **kw):                                  # must NOT be reached
+        raise AssertionError(f"subprocess should not run for {cmd}")
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    job = _write_job(tmp_path, tune="GHE19_00a_00_000",
+                     event_generator_list="HEDIS",
+                     flux={"mode": "mono", "value": "5 TeV", "min": None,
+                           "max": None, "bins": []},
+                     flux_emax_gev=5000.0)
+    with pytest.raises(RuntimeError, match="HEDIS"):
+        mod.run(str(job))
