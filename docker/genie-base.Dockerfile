@@ -83,6 +83,8 @@ ENV PATH=${LHAPDF_DIR}/bin:${PATH}
 ARG ENABLE_HEDIS=0
 ARG APFEL_VERSION=3.0.6
 RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
+      command -v python >/dev/null 2>&1 || \
+        ln -sf "$(command -v python3)" /usr/local/bin/python && \
       wget -q https://github.com/scarrazza/apfel/archive/refs/tags/${APFEL_VERSION}.tar.gz \
         -O apfel.tar.gz && tar -xzf apfel.tar.gz && rm apfel.tar.gz && \
       cd apfel-${APFEL_VERSION} && ./configure --prefix=/opt/apfel && \
