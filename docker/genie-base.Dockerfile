@@ -104,6 +104,18 @@ ENV PATH=${APFEL_DIR}/bin:${PATH}
 # files are required at run time. With ENABLE_HEDIS=1, --enable-apfel is added
 # so the high-energy-DIS (GHE19/HEDIS) tunes are available too.
 ENV GENIE=/opt/genie
+# Patch a GENIE HEDIS metafile round-trip bug: HEDISStrucFunc's operator<<
+# writes the SF Inputs.txt at default (~6 sig-fig) precision, but operator==
+# compares the re-read metafile against the tune config at 1e-10. Tunes whose
+# masses/couplings carry more digits (e.g. GHE19_00c: MassW=79.177...) then
+# fail the "Info from MetaFile and Tune doesnt match" assertion in gevgen even
+# though the SF tables are valid. Write full precision so the round-trip is
+# exact. (Verified: this is exactly what blocks GHE19_00c event generation.)
+RUN sed -i '/#include <fstream>/a #include <iomanip>' \
+      ${GENIE}/src/Physics/HEDIS/XSection/HEDISStrucFunc.h && \
+    sed -i 's/return os <</return os << std::setprecision(15) <</' \
+      ${GENIE}/src/Physics/HEDIS/XSection/HEDISStrucFunc.h && \
+    grep -n "setprecision" ${GENIE}/src/Physics/HEDIS/XSection/HEDISStrucFunc.h
 RUN cd ${GENIE} && \
     HEDIS_CFG="" && \
     if [ "$ENABLE_HEDIS" = "1" ]; then \
