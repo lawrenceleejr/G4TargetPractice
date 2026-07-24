@@ -30,11 +30,12 @@ DEFAULT_NU_BIAS = 5.0e12          # matches the repo's hand-written neutrino mac
 
 def _neutrino_bias_lines(cfg):
     """Geant4's built-in neutrino processes have cross sections so small that
-    unbiased runs record essentially no interactions; the stock
-    /physics_lists/em/Nu* commands scale them up. Emitted before
-    /run/initialize (as the hand-written macros do), wrapped in
-    /control/suppressAbortion because some Geant4 builds do not register these
-    commands -- a missing command then warns instead of aborting the batch.
+    unbiased runs record essentially no interactions; g4sim's /gdmltp/neutrinoBias
+    command enables them and scales the cross sections via the G4EmParameters C++
+    API. (Earlier this emitted the /physics_lists/em/Nu* UI commands, but those
+    are not registered in every Geant4 build -- and an unknown command aborts the
+    batch regardless of /control/suppressAbortion -- so we drive the API through
+    our own always-present command instead.)
 
     geant4.neutrino_bias: auto (default: on when the primary is a neutrino),
     on/off, or a mapping {enable, factor, cc_bias, nc_bias, nucleus_bias,
@@ -63,15 +64,7 @@ def _neutrino_bias_lines(cfg):
     nc = float(raw.get("nc_bias", factor))
     nuc = float(raw.get("nucleus_bias", factor))
     det = raw.get("detector_name", "DefaultRegionForTheWorld")
-    return [
-        "/control/suppressAbortion 2",
-        f"/physics_lists/em/NuDetectorName {det}",
-        "/physics_lists/em/NeutrinoActivation true",
-        f"/physics_lists/em/NuEleCcBias {cc:g}",
-        f"/physics_lists/em/NuEleNcBias {nc:g}",
-        f"/physics_lists/em/NuNucleusBias {nuc:g}",
-        "/control/suppressAbortion 0",
-    ]
+    return [f"/gdmltp/neutrinoBias {cc:g} {nc:g} {nuc:g} {det}"]
 
 
 def build_macro(cfg, beam_file=None) -> str:

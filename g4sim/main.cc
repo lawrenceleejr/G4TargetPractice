@@ -11,6 +11,7 @@
 #include "G4PhysListFactory.hh"
 
 #include "BSMPhysics.hh"
+#include "NeutrinoBiasMessenger.hh"
 #include "DetectorConstruction.hh"
 #include "PrimaryGenerator.hh"
 #include "RunAction.hh"
@@ -67,6 +68,8 @@ int main(int argc, char** argv) {
     physics->RegisterPhysics(new BSMPhysics());
     auto* bsmMessenger = new BSMMessenger();
     (void)bsmMessenger;   // owned for the program lifetime (macro-driven)
+    auto* nuBiasMessenger = new NeutrinoBiasMessenger();
+    (void)nuBiasMessenger;   // /gdmltp/neutrinoBias, PreInit
 #ifdef USE_CELERITAS
     auto& celerIntegration = celeritas::TrackingManagerIntegration::Instance();
     physics->RegisterPhysics(

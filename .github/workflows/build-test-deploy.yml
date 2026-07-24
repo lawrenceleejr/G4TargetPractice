@@ -176,6 +176,30 @@ jobs:
           assert decayed > 0, "no G4Decay daughters found"
           PY
           rm -f output.root bsm.mac
+
+      - name: Neutrino-bias smoke (/gdmltp/neutrinoBias -> G4EmParameters)
+        # The bias command must be registered and drive the neutrino cross
+        # sections via the C++ API -- it must NOT abort the batch the way the
+        # optional /physics_lists/em/Nu* UI commands do in this Geant4 build.
+        run: |
+          cat > nubias.mac << 'EOF'
+          /gdmltp/neutrinoBias 1e10 1e10 1e10 DefaultRegionForTheWorld
+          /detector/readGDML gdml/liquid_argon_1m3.gdml
+          /run/initialize
+          /analysis/neutrinoMode on
+          /random/setSeeds 7 8
+          /gun/particle nu_mu
+          /gun/energy 5 GeV
+          /gun/position 0 0 -60 cm
+          /gun/direction 0 0 1
+          /run/beamOn 20
+          EOF
+          ./build/g4sim nubias.mac
+          test -f output.root
+          python3 -c "import uproot,sys; t=uproot.open('output.root')['tree']; n=t.num_entries; nu='nu_isCC' in [k.split(';')[0] for k in t.keys()]; print('events',n,'nu block',nu); sys.exit(0 if (n==20 and nu) else 1)"
+          rm -f output.root nubias.mac
+
+      - name: Particle-by-PDG smoke (/gun/particlePDG)
         run: |
           cat > pdg.mac << 'EOF'
           /detector/readGDML gdml/silicon_slab_1mm.gdml

@@ -83,27 +83,29 @@ def test_macro_arb_emits_bins():
 
 
 def test_macro_neutrino_bias_auto():
-    """A neutrino primary auto-enables the biasing block before /run/initialize
-    (unbiased Geant4 neutrino runs record essentially no interactions)."""
+    """A neutrino primary auto-enables biasing before /run/initialize via our own
+    /gdmltp/neutrinoBias command (unbiased Geant4 neutrino runs record almost no
+    interactions), driving the G4EmParameters API rather than the /physics_lists/
+    em/Nu* UI commands that some Geant4 builds don't register."""
     mac = geant4.build_macro(config.RunConfig(
         gdml="g.gdml", beam=config.Beam(particle="nu_mu")))
-    assert "/physics_lists/em/NeutrinoActivation true" in mac
-    assert "/physics_lists/em/NuNucleusBias 5e+12" in mac
-    assert mac.index("NeutrinoActivation") < mac.index("/run/initialize")
-    # guarded so builds lacking the commands warn instead of aborting the batch
-    assert mac.index("/control/suppressAbortion 2") < mac.index("NeutrinoActivation")
+    assert "/gdmltp/neutrinoBias 5e+12 5e+12 5e+12 DefaultRegionForTheWorld" in mac
+    assert mac.index("/gdmltp/neutrinoBias") < mac.index("/run/initialize")
+    # no dependence on optional UI commands that abort the batch when absent
+    assert "/physics_lists/em/Nu" not in mac
+    assert "/control/suppressAbortion" not in mac
 
 
 def test_macro_neutrino_bias_off_and_custom():
     off = geant4.build_macro(config.RunConfig(
         gdml="g.gdml", beam=config.Beam(particle="nu_mu"),
         geant4={"neutrino_bias": "off"}))
-    assert "/physics_lists" not in off
+    assert "/gdmltp/neutrinoBias" not in off
     custom = geant4.build_macro(config.RunConfig(
         gdml="g.gdml", beam=config.Beam(particle="nu_e"),
         geant4={"neutrino_bias": {"factor": 1e10, "nc_bias": 3e9}}))
-    assert "/physics_lists/em/NuEleCcBias 1e+10" in custom
-    assert "/physics_lists/em/NuEleNcBias 3e+09" in custom
+    # cc/nucleus take the factor, nc overridden: "cc nc nuc region"
+    assert "/gdmltp/neutrinoBias 1e+10 3e+09 1e+10 DefaultRegionForTheWorld" in custom
 
 
 def test_macro_no_bias_for_charged_primaries():

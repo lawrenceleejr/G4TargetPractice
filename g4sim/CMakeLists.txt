@@ -38,6 +38,7 @@ endif()
 # --------------------
 set(SOURCES
     BSMPhysics.cc
+    NeutrinoBiasMessenger.cc
     DetectorConstruction.cc
     DetectorMessenger.cc
     PrimaryGenerator.cc
