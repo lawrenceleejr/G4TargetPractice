@@ -9,7 +9,7 @@ A shared timeline animates the time-ordered reveal of every track (respecting
 each step's global time and the particle's speed), so showers grow in time.
 """
 import bpy, bmesh, json, sys, math, time
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 
 
 def argv_after_dd():
@@ -84,6 +84,114 @@ def mat(name, rgba, emission=False):
 def hex_rgba(h, a=1.0):
     h = h.lstrip("#")
     return (int(h[0:2], 16) / 255, int(h[2:4], 16) / 255, int(h[4:6], 16) / 255, a)
+
+
+def kelvin_to_rgb(kelvin):
+    """Approximate blackbody RGB for a Kelvin value (fallback for Blender builds
+    without native per-light temperature)."""
+    t = kelvin / 100.0
+    if t <= 66:
+        r = 255.0
+    else:
+        r = 329.698727446 * ((t - 60) ** -0.1332047592)
+    if t <= 66:
+        g = 99.4708025861 * math.log(t) - 161.1195681661 if t > 0 else 0.0
+    else:
+        g = 288.1221695283 * ((t - 60) ** -0.0755148492)
+    if t >= 66:
+        b = 255.0
+    elif t <= 19:
+        b = 0.0
+    else:
+        b = 138.5177312231 * math.log(t - 10) - 305.0447927307
+    c = lambda x: max(0.0, min(255.0, x)) / 255.0
+    return (c(r), c(g), c(b))
+
+
+def _set_temperature(light, kelvin):
+    """Native Kelvin control on Blender 4.2+/5.x; RGB fallback on older builds."""
+    if hasattr(light, "use_temperature"):
+        light.use_temperature = True
+        light.temperature = kelvin
+    else:
+        light.color = kelvin_to_rgb(kelvin)
+
+
+def _aim(obj, target):
+    d = Vector(target) - Vector(obj.location)
+    if d.length > 0:
+        obj.rotation_euler = d.to_track_quat("-Z", "Y").to_euler()
+
+
+WARM_K = 2700.0   # color temperature of the environment + key lights (warm)
+
+
+def add_lighting_environment(center_m, radius_m):
+    """Always add a warm, soft lighting rig and a very large enclosing sphere so
+    the scene is lit and never floats in a black void.
+
+    - A huge inside-out emissive sphere (warm, 2700 K) is the visible backdrop.
+    - A dim warm world gives ambient fill in ANY engine (an emissive mesh alone
+      does not light other objects in EEVEE without light probes).
+    - A few big soft 2700 K area lights give gentle directional shape.
+
+    Everything is sized to the scene's bounding radius, so it looks right from
+    millimetre (silicon tracker) to metre (MAIA) scale. Area-light power scales
+    with distance^2 -> roughly scale-invariant irradiance."""
+    R = max(radius_m, MM)
+    cx, cy, cz = center_m
+    warm = kelvin_to_rgb(WARM_K)
+    coll = new_collection("Lighting")
+
+    # --- enclosing environment sphere: very large, inside-out, warm emissive ---
+    bm = bmesh.new()
+    _uvsphere(bm, R * 14.0, Matrix.Translation((cx, cy, cz)))
+    bmesh.ops.reverse_faces(bm, faces=list(bm.faces))   # normals face inward
+    me = bpy.data.meshes.new("Environment")
+    bm.to_mesh(me)
+    bm.free()
+    em = bpy.data.materials.new("environment")
+    em.use_nodes = True
+    bsdf = em.node_tree.nodes.get("Principled BSDF")
+    if bsdf:
+        # Black base so the area lights don't light up the sphere's diffuse
+        # interior (that blew the whole backdrop out); it's a PURE emitter.
+        bsdf.inputs["Base Color"].default_value = (0.0, 0.0, 0.0, 1.0)
+        for k in ("Emission Color", "Emission"):
+            if k in bsdf.inputs:
+                bsdf.inputs[k].default_value = (*warm, 1.0)
+                break
+        if "Emission Strength" in bsdf.inputs:
+            bsdf.inputs["Emission Strength"].default_value = 0.15   # soft warm backdrop
+    env = bpy.data.objects.new("Environment", me)
+    env.data.materials.append(em)
+    coll.objects.link(env)
+
+    # --- warm world ambient fill (lights the scene in EEVEE and Cycles) ---
+    world = bpy.context.scene.world or bpy.data.worlds.new("World")
+    bpy.context.scene.world = world
+    world.use_nodes = True
+    bg = world.node_tree.nodes.get("Background")
+    if bg:
+        bg.inputs["Color"].default_value = (*warm, 1.0)
+        bg.inputs["Strength"].default_value = 0.05
+
+    # --- a few big soft warm 2700 K area lights for shape ---
+    specs = [("Key",  (2.5, -3.0, 3.0),  8.0, 1.0),
+             ("Fill", (-3.0, -1.5, 2.0), 12.0, 0.45),
+             ("Rim",  (0.0, 3.5, 3.5),   6.0, 0.7)]
+    for name, (dx, dy, dz), sz, pw in specs:
+        d = bpy.data.lights.new(name, "AREA")
+        d.shape = "DISK"
+        d.size = sz * R                 # large area = soft shadows
+        _set_temperature(d, WARM_K)
+        loc = (cx + dx * R, cy + dy * R, cz + dz * R)
+        dist = math.dist(loc, (cx, cy, cz)) or R
+        d.energy = pw * 150.0 * dist * dist   # ~scale-invariant irradiance
+        o = bpy.data.objects.new(name, d)
+        coll.objects.link(o)
+        o.location = loc
+        _aim(o, (cx, cy, cz))
 
 
 MM = 0.001  # mm -> Blender meters
@@ -346,10 +454,14 @@ def main():
         add_geometry(geo_coll, scenes[0]["geometry"])
 
     radius_m = (scenes[0]["radius"] * MM) if scenes else MM
+    center_m = tuple(v * MM for v in scenes[0]["center"]) if scenes else (0.0, 0.0, 0.0)
     bev = radius_m * TRACK_RADIUS_FRAC
     vtx_size = radius_m * VERTEX_EDGE_FRAC
     n_tracks = sum(len(s["tracks"]) for s in scenes)
     n_verts = sum(len(s["vertices"]) for s in scenes)
+
+    # Always light the scene and wrap it in a large warm sphere (never a void).
+    add_lighting_environment(center_m, radius_m)
 
     if animate:
         frame_of, max_frame, t0, span = _build_frame_mapper(scenes, fps, max_seconds, log_time)
