@@ -217,10 +217,45 @@ def add_camera(center_m, radius_m):
     cam.location = loc
     _aim(cam, (cx, cy, cz))
     cam_data.dof.focus_distance = math.dist(loc, (cx, cy, cz))   # focus on origin
-    coll = bpy.data.collections.get("Lighting") or bpy.context.scene.collection
-    coll.objects.link(cam)
-    bpy.context.scene.camera = cam
+    _camera_collection().objects.link(cam)
+    bpy.context.scene.camera = cam                               # the default view
     return cam
+
+
+def _camera_collection():
+    c = bpy.data.collections.get("Cameras")
+    if c is None:
+        c = new_collection("Cameras")
+    return c
+
+
+def add_ortho_cameras(center_m, radius_m):
+    """Add three orthographic cameras showing the simple axis projections:
+    looking down -X (the Y-Z plane), -Y (X-Z), and -Z (X-Y, top). Orthographic
+    scale 15 and a shallow-ish f/3.0 depth of field focused on the origin, as
+    requested. They sit inside the environment sphere; switch to one in the
+    camera picker for a clean projection view. The perspective camera stays the
+    active default."""
+    R = max(radius_m, MM)
+    cx, cy, cz = center_m
+    coll = _camera_collection()
+    d = 6.0 * R                       # viewpoint distance (inside the 14R sphere)
+    axes = [("Camera_X", (cx + d, cy, cz)),   # looks -X -> Y-Z projection
+            ("Camera_Y", (cx, cy - d, cz)),   # looks +Y -> X-Z projection
+            ("Camera_Z", (cx, cy, cz + d))]   # looks -Z -> X-Y (top) projection
+    for name, loc in axes:
+        cd = bpy.data.cameras.new(name)
+        cd.type = "ORTHO"
+        cd.ortho_scale = 15.0
+        cd.dof.use_dof = True
+        cd.dof.aperture_fstop = 3.0
+        cd.clip_start = max(R * 1e-3, 1e-4)
+        cd.clip_end = max(1000.0, R * 500.0)   # clear the far sphere wall
+        cam = bpy.data.objects.new(name, cd)
+        cam.location = loc
+        _aim(cam, (cx, cy, cz))
+        cd.dof.focus_distance = math.dist(loc, (cx, cy, cz))   # focus on origin
+        coll.objects.link(cam)
 
 
 MM = 0.001  # mm -> Blender meters
@@ -494,6 +529,7 @@ def main():
     # and point a wide-angle depth-of-field camera at the system.
     add_lighting_environment(center_m, radius_m)
     add_camera(center_m, radius_m)
+    add_ortho_cameras(center_m, radius_m)
 
     if animate:
         frame_of, max_frame, t0, span = _build_frame_mapper(scenes, fps, max_seconds, log_time)
