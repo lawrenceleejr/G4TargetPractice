@@ -127,21 +127,32 @@ ENV PATH=${GENIE}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${GENIE}/lib:${LD_LIBRARY_PATH}
 
 # --- HEDIS inputs (OPTIONAL) -------------------------------------------------
-# Bake in the LHAPDF grid + structure-function tables for the reference HEDIS
-# tune so a HEDIS run needs no manual setup. Only runs when ENABLE_HEDIS=1.
-ARG HEDIS_TUNE=GHE19_00a_00_000
-ARG HEDIS_PDF=NNPDF31sx_nlo_as_0118_LHCb_nf_6
+# Bake in the PDF grid + structure-function tables for the reference HEDIS tune
+# so a HEDIS run needs no manual setup. Only runs when ENABLE_HEDIS=1.
+#
+# Default to the LO tune GHE19_00c_00_000: it uses the standard cteq6l1 PDF
+# (published on the LHAPDF server) and no NLO structure functions, so it builds
+# reliably. (The NLO GHE19_00a tune's PDF, NNPDF31sx_nlo_as_0118_LHCb_nf_6, is
+# not on the LHAPDF server, so it can't be fetched here; APFEL is still built
+# above, so a correct NLO PDF could be dropped in and the tune switched.)
+ARG HEDIS_TUNE=GHE19_00c_00_000
+ARG HEDIS_PDF=cteq6l1
+ARG LHAPDF_SETS_URL=https://lhapdfsets.web.cern.ch/current
+# gmkhedissf writes the QrkSF tables here; the gdmltp genie driver reads the
+# same path at run time (its HEDIS_SF_DATA_PATH default), so a baked-in tune
+# needs no on-demand rebuild.
+ENV HEDIS_SF_DATA_PATH=${GENIE}/data/evgen/hedis-sf
 RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
       set -e && \
-      lhapdf update || true ; \
-      lhapdf install "${HEDIS_PDF}" || true ; \
-      DD="$(lhapdf-config --datadir)" && \
-      echo "LHAPDF datadir: $DD" && ls -la "$DD" && \
-      if [ ! -e "$DD/${HEDIS_PDF}/${HEDIS_PDF}.info" ]; then \
-        echo "ERROR: LHAPDF set ${HEDIS_PDF} not installed (not in the index or download failed)."; \
-        exit 1; \
-      fi && \
-      gmkhedissf --tune "${HEDIS_TUNE}" ; \
+      DD="$(lhapdf-config --datadir)" && mkdir -p "$DD" && \
+      wget -q --tries=5 --retry-connrefused --waitretry=20 --timeout=60 \
+        "${LHAPDF_SETS_URL}/${HEDIS_PDF}.tar.gz" -O /tmp/pdf.tar.gz && \
+      tar -xzf /tmp/pdf.tar.gz -C "$DD" && rm /tmp/pdf.tar.gz && \
+      test -e "$DD/${HEDIS_PDF}/${HEDIS_PDF}.info" \
+        || { echo "ERROR: LHAPDF set ${HEDIS_PDF} missing after download"; ls -la "$DD"; exit 1; } && \
+      mkdir -p "$HEDIS_SF_DATA_PATH" && cd "$HEDIS_SF_DATA_PATH" && \
+      gmkhedissf --tune "${HEDIS_TUNE}" && \
+      echo "HEDIS SF tables built:" && find "$HEDIS_SF_DATA_PATH" -name 'QrkSF*' | head ; \
     fi
 # Runtime marker: the gdmltp genie driver checks this before running gmkhedissf
 # so a HEDIS tune on a non-HEDIS image fails with a clear message, not SIGABRT.

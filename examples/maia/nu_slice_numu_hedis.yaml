@@ -8,23 +8,17 @@
 #
 #   gdmltp run --config examples/maia/nu_slice_numu_hedis.yaml -o slice_hedis
 #
-# Tune GHE19_00a_00_000 = the BGR18 NLO model, valid E_nu > 100 GeV up to ~1e9
-# GeV, so the 0.1-5 TeV slice sits well inside. The event-generator-list must
-# be HEDIS on both the spline build and generation (the driver handles that).
+# Tune GHE19_00c_00_000 = the LO high-energy-DIS model, valid E_nu > 100 GeV up
+# to ~1e9 GeV, so the 0.1-5 TeV slice sits well inside. LO -> it uses the
+# standard cteq6l1 PDF and needs no APFEL, which is why it is the tune baked
+# into the HEDIS genie image. The event-generator-list must be HEDIS on both
+# the spline build and generation (the driver handles that).
 #
-# PREREQUISITES (this is NOT out-of-the-box -- see docs/neutrino.md "HEDIS"):
-#   1. GENIE built with APFEL (for the NLO structure functions) and LHAPDF.
-#   2. The tune's LHAPDF set installed: NNPDF31sx_nlo_as_0118_LHCb_nf_6.
-#   3. HEDIS structure-function tables (QrkSF_*.dat), built once by
-#      `gmkhedissf --tune GHE19_00a_00_000` -- the driver runs this on demand,
-#      but it needs (1) and (2) present.
-# Build the HEDIS-provisioned GENIE base image with:
-#   docker build -f docker/genie-base.Dockerfile --build-arg ENABLE_HEDIS=1 ...
-# (The default genie image does NOT include APFEL/HEDIS; it would fail at the
-# gmkhedissf step with a clear error.)
-#
-# GHE19_00c_00_000 is the LO variant and needs NO APFEL (only the cteq6 PDF) --
-# a lighter alternative if you don't want to build APFEL.
+# This runs out of the box on the HEDIS-provisioned genie image (built with
+# ENABLE_HEDIS=1, which bakes cteq6l1 + the GHE19_00c structure-function
+# tables). On a non-HEDIS image the driver stops with a clear message.
+# The NLO GHE19_00a (BGR18) tune needs APFEL + its NNPDF3.1sx PDF, which is not
+# on the LHAPDF server -- supply that set and switch the tune to use it.
 generator: genie
 
 geometry:
@@ -45,7 +39,7 @@ run:
   seed: 20241418
 
 genie:
-  tune: GHE19_00a_00_000            # BGR18 NLO high-energy DIS (or GHE19_00c for LO)
+  tune: GHE19_00c_00_000            # LO high-energy DIS (cteq6l1 PDF, no APFEL)
   event_generator_list: HEDIS       # CC + NC HEDIS; must match on spline + gen
   cross_sections: auto              # on-demand gmkhedissf + gmkspl, cached in run dir
   length_units: cm
