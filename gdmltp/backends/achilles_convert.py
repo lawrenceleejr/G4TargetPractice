@@ -18,8 +18,12 @@ from the beam and outgoing-lepton four-vectors with a fixed nucleon mass -- so
 the branches are comparable across all three backends. Units in: GeV or MeV
 (from the U line); out: MeV, MeV/c, MeV^2, mm, ns.
 """
+import contextlib
 import gzip
 import math
+import os
+import shutil
+import tempfile
 
 import numpy as np
 import awkward as ak
@@ -30,84 +34,61 @@ from ..masses import mass_mev
 
 NUCLEON_MASS_MEV = 939.565          # matches g4sim/EventAction.cc
 _LEPTONS = {11, -11, 12, -12, 13, -13, 14, -14, 15, -15, 16, -16}
-_LEN_TO_MM = {"MM": 1.0, "CM": 10.0}
-_ENE_TO_MEV = {"GEV": 1000.0, "MEV": 1.0}
-
-
-def _open_text(path):
-    p = str(path)
-    if p.endswith(".gz"):
-        return gzip.open(p, "rt")
-    # sniff gzip magic in case the extension was dropped
-    with open(p, "rb") as f:
-        magic = f.read(2)
-    if magic == b"\x1f\x8b":
-        return gzip.open(p, "rt")
-    return open(p, "r")
 
 
 def parse_nuhepmc(path):
-    """Parse a NuHepMC/HepMC3 ASCII file -> list of event dicts:
+    """Parse a NuHepMC/HepMC3 file -> list of event dicts:
     {particles: [(pdg, px,py,pz, E, m, status)], vertex: (x,y,z,t) or None,
-     e_scale (->MeV), l_scale (->mm)}. Momenta/energies still in file units;
-    the per-event scales say how to convert."""
-    events = []
-    cur = None
-    e_scale, l_scale = 1000.0, 1.0            # HepMC default GEV / MM
+     weight, e_scale (->MeV), l_scale (->mm)}. Momenta/energies are in the
+     event's native units; the per-event scales say how to convert.
 
-    with _open_text(path) as f:
-        for line in f:
-            if not line or line[0] in "#\n":
-                continue
-            tag = line[0]
-            if tag == "E":
-                if cur is not None:
-                    events.append(cur)
-                cur = {"particles": [], "vertex": None, "weight": None,
-                       "e_scale": e_scale, "l_scale": l_scale}
-                # optional event position shift: "E n nvtx npart @ x y z t"
-                if "@" in line:
-                    try:
-                        pos = [float(v) for v in line.split("@", 1)[1].split()[:4]]
-                        cur["vertex"] = tuple(pos)
-                    except ValueError:
-                        pass
-            elif cur is None:
-                continue
-            elif tag == "U":
-                t = line.split()
-                e_scale = _ENE_TO_MEV.get(t[1].upper(), 1000.0) if len(t) > 1 else 1000.0
-                l_scale = _LEN_TO_MM.get(t[2].upper(), 1.0) if len(t) > 2 else 1.0
-                cur["e_scale"], cur["l_scale"] = e_scale, l_scale
-            elif tag == "V":
-                # vertex position, when recorded: "V id status [...] @ x y z t"
-                if "@" in line and cur["vertex"] is None:
-                    try:
-                        pos = [float(v) for v in line.split("@", 1)[1].split()[:4]]
-                        cur["vertex"] = tuple(pos)
-                    except ValueError:
-                        pass
-            elif tag == "W":
-                # event weight(s): keep the first (the external backend stores
-                # it as eventWeight; Achilles conversion ignores it)
-                try:
-                    cur["weight"] = float(line.split()[1])
-                except (IndexError, ValueError):
-                    pass
-            elif tag == "P":
-                t = line.split()
-                # P id parent pdg px py pz e m status
-                if len(t) >= 10:
-                    try:
-                        pdg = int(t[3])
-                        px, py, pz, en, m = (float(v) for v in t[4:9])
-                        status = int(t[9])
-                    except ValueError:
-                        continue
-                    cur["particles"].append((pdg, px, py, pz, en, m, status))
-    if cur is not None:
-        events.append(cur)
+    Read with the official HepMC3 library (pyhepmc), not a hand-rolled ASCII
+    parser -- so every HepMC3 dialect NuHepMC uses (ASCIIv3, weights, vertex
+    positions) is handled by the reference implementation. gzip is transparently
+    decompressed to a temp file (pyhepmc reads a filename)."""
+    import pyhepmc
+
+    with _hepmc_path(path) as p:
+        events = []
+        with pyhepmc.open(str(p)) as reader:
+            for ev in reader:
+                es = 1000.0 if ev.momentum_unit == pyhepmc.Units.GEV else 1.0
+                ls = 10.0 if ev.length_unit == pyhepmc.Units.CM else 1.0
+                parts = []
+                for pp in ev.particles:
+                    m = pp.momentum
+                    parts.append((pp.pid, m.px, m.py, m.pz, m.e,
+                                  pp.generated_mass, pp.status))
+                vtx = None
+                if ev.vertices:
+                    pos = ev.vertices[0].position
+                    vtx = (pos.x, pos.y, pos.z, pos.t)
+                weights = list(ev.weights)
+                events.append({"particles": parts, "vertex": vtx,
+                               "weight": weights[0] if weights else None,
+                               "e_scale": es, "l_scale": ls})
     return events
+
+
+@contextlib.contextmanager
+def _hepmc_path(path):
+    """Yield a plain-file path pyhepmc can open, decompressing gzip if needed."""
+    p = str(path)
+    is_gz = p.endswith(".gz")
+    if not is_gz:
+        with open(p, "rb") as f:
+            is_gz = f.read(2) == b"\x1f\x8b"
+    if not is_gz:
+        yield p
+        return
+    with tempfile.NamedTemporaryFile("wb", suffix=".hepmc", delete=False) as tmp:
+        with gzip.open(p, "rb") as f:
+            shutil.copyfileobj(f, tmp)
+        name = tmp.name
+    try:
+        yield name
+    finally:
+        os.unlink(name)
 
 
 def _classify(ev):

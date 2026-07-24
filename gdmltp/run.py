@@ -159,9 +159,27 @@ def _stream_run(cmd, image, cwd, env, events=None, is_docker=True, label=""):
             f"e.g.  --image <repo>:<tag>\n"
             f"  - make the GHCR package public, or merge to the default branch so "
             f"the ':main'/':latest' tag publishes")
+    if "command not found" in low:
+        # a macro command the CLI emitted is absent from the engine -> the image
+        # is older than this gdmltp checkout (a new /gun or /gdmltp command was
+        # added after the image was built)
+        cmd_line = next((l for l in tail if "COMMAND NOT FOUND" in l), "")
+        raise RuntimeError(
+            f"the engine rejected a command this gdmltp emitted:\n    {cmd_line.strip()}\n"
+            f"The container image is OLDER than your gdmltp checkout -- it was "
+            f"built before that command existed. Use an image built from your "
+            f"current commit:\n"
+            f"  - pull the branch tag (updated on every push), not a pinned "
+            f"'-<sha>' tag:  --image {_repo_of(image)}:<branch>\n"
+            f"  - or build it locally:  docker build -f docker/geant4.Dockerfile "
+            f"-t g4sim-local . && gdmltp run ... --image g4sim-local")
     tail_txt = "\n".join(list(tail)[-15:]) or "(no output captured)"
     raise RuntimeError(
         f"the '{image}' stage exited with status {proc.returncode}:\n{tail_txt}")
+
+
+def _repo_of(image):
+    return image.rsplit(":", 1)[0] if ":" in image else image
 
 
 def _wants_transport(cfg):
