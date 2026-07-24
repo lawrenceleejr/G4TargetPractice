@@ -43,7 +43,7 @@ def _scene_to_dict(sc, max_tracks=4000):
 
 def render_blend(scenes, out_path, outdir=".", blender_image=DEFAULT_BLENDER_IMAGE,
                  local_blender=None, fps=30, time_scale=0.5, max_seconds=12.0,
-                 log_time=True):
+                 log_time=True, animate=False):
     if not isinstance(scenes, (list, tuple)):
         scenes = [scenes]
     outdir = Path(outdir).resolve()
@@ -53,16 +53,21 @@ def render_blend(scenes, out_path, outdir=".", blender_image=DEFAULT_BLENDER_IMA
         out_path = outdir / out_path
 
     scenes_json = outdir / "scene.json"
+    ntracks = sum(len(getattr(s, "tracks", []) or []) for s in scenes)
     print(f"[gdmltp] serializing {len(scenes)} event(s) to scene.json ...", flush=True)
     scenes_json.write_text(json.dumps([_scene_to_dict(s) for s in scenes]))
     print(f"[gdmltp] scene.json written ({scenes_json.stat().st_size / 1e6:.1f} MB); "
-          f"launching Blender (headless) ...", flush=True)
+          f"building the .blend in Blender ({len(scenes)} event(s), {ntracks} "
+          f"track(s)) -- progress below (this is the slow step for many tracks):",
+          flush=True)
     builder = outdir / "build_blend.py"
     builder.write_text(resources.files("gdmltp.assets").joinpath("build_blend.py").read_text())
 
-    # positional args to build_blend.py: scene.json out.blend fps time_scale max_seconds time_mode
+    # positional args to build_blend.py: scene.json out.blend fps time_scale
+    # max_seconds time_mode anim_mode
     mode = "log" if log_time else "linear"
-    pos = [str(fps), str(time_scale), str(max_seconds), mode]
+    pos = [str(fps), str(time_scale), str(max_seconds), mode,
+           "anim" if animate else "static"]
 
     if local_blender or shutil.which("blender"):
         blender = local_blender or "blender"

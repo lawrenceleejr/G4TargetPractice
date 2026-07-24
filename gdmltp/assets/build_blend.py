@@ -8,12 +8,41 @@ sub-collections) and vertices, so you can show an ensemble or a single event.
 A shared timeline animates the time-ordered reveal of every track (respecting
 each step's global time and the particle's speed), so showers grow in time.
 """
-import bpy, json, sys, math
+import bpy, json, sys, math, time
 
 
 def argv_after_dd():
     a = sys.argv
     return a[a.index("--") + 1:] if "--" in a else []
+
+
+class Progress:
+    """Heartbeat progress for the long build loops. Blender's bundled Python has
+    no tqdm and its stdout is piped (through Docker), so a redrawing bar won't
+    render -- emit periodic count / % / rate / ETA lines instead (flushed), per
+    the project's progress convention for non-TTY output."""
+
+    def __init__(self, total, label, every=1.0):
+        self.total = max(int(total), 0)
+        self.label = label
+        self.every = every
+        self.t0 = time.time()
+        self.last = 0.0
+        self.n = 0
+        if self.total:
+            print(f"[gdmltp] {label}: 0/{self.total} ...", flush=True)
+
+    def update(self, k=1):
+        self.n += k
+        now = time.time()
+        if self.total and (now - self.last >= self.every or self.n >= self.total):
+            self.last = now
+            el = now - self.t0
+            rate = self.n / el if el > 0 else 0.0
+            eta = (self.total - self.n) / rate if rate > 0 else 0.0
+            pct = 100.0 * self.n / self.total
+            print(f"[gdmltp] {self.label}: {self.n}/{self.total} ({pct:.0f}%) "
+                  f"{rate:.0f}/s  ETA {eta:.0f}s", flush=True)
 
 
 def clear_scene():
@@ -69,7 +98,9 @@ VERTEX_EDGE_FRAC = 0.0016    # vertex cube edge = 0.16% of scene radius
 
 def add_geometry(coll, geometry):
     gm = mat("geo", (0.4, 0.55, 0.7, 0.18))
+    prog = Progress(len(geometry), "geometry")
     for i, g in enumerate(geometry):
+        prog.update()
         t = g["type"]
         x, y, z = g["x"] * MM, g["y"] * MM, g["z"] * MM
         if t in ("box", "bbox"):
@@ -133,6 +164,65 @@ def add_track(coll, track, bev, frame_of):
     return obj
 
 
+def add_event_curve(coll, tracks, bev, name):
+    """All of an event's tracks as ONE curve object -- one POLY spline per
+    track, colored per-track via spline.material_index. This is both the fast
+    path (no per-object/ops overhead: thousands of tracks build in one
+    datablock) and a single object you can select/move/parent as a unit.
+    Returns (object, n_splines)."""
+    cu = bpy.data.curves.new(name, "CURVE")
+    cu.dimensions = "3D"
+    cu.bevel_depth = bev
+    slot = {}                      # particle name -> material slot index
+    n_added = 0
+    for tk in tracks:
+        pts = tk["p"]
+        n = len(pts) // 3
+        if n < 2:
+            continue
+        sp = cu.splines.new("POLY")
+        sp.points.add(n - 1)
+        for i in range(n):
+            sp.points[i].co = (pts[3 * i] * MM, pts[3 * i + 1] * MM,
+                               pts[3 * i + 2] * MM, 1.0)
+        nm = tk["n"]
+        if nm not in slot:
+            cu.materials.append(mat(f"p_{nm}", hex_rgba(tk["c"]), emission=True))
+            slot[nm] = len(cu.materials) - 1
+        sp.material_index = slot[nm]
+        n_added += 1
+    obj = bpy.data.objects.new(name, cu)
+    coll.objects.link(obj)
+    return obj, n_added
+
+
+# unit cube (verts + quad faces) for building many vertex markers into one mesh
+_CUBE_V = [(-.5, -.5, -.5), (.5, -.5, -.5), (.5, .5, -.5), (-.5, .5, -.5),
+           (-.5, -.5, .5), (.5, -.5, .5), (.5, .5, .5), (-.5, .5, .5)]
+_CUBE_F = [(0, 1, 2, 3), (4, 5, 6, 7), (0, 1, 5, 4),
+           (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+
+
+def add_event_vertices(coll, vertices, size, name):
+    """All of an event's vertex markers as ONE mesh object (a cube at each hit),
+    built with from_pydata in a single call -- fast and renderable."""
+    verts, faces = [], []
+    for v in vertices:
+        cx, cy, cz = v[0] * MM, v[1] * MM, v[2] * MM
+        base = len(verts)
+        verts += [(cx + x * size, cy + y * size, cz + z * size)
+                  for (x, y, z) in _CUBE_V]
+        faces += [tuple(base + i for i in f) for f in _CUBE_F]
+    if not verts:
+        return None
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    me.materials.append(mat("vtx", (1.0, 0.85, 0.1, 1.0), emission=True))
+    obj = bpy.data.objects.new(name, me)
+    coll.objects.link(obj)
+    return obj
+
+
 def _move_to(obj, coll):
     for c in list(obj.users_collection):
         c.objects.unlink(obj)
@@ -191,6 +281,10 @@ def main():
     # max_seconds rather than scaled from real time.
     max_seconds = float(args[4]) if len(args) > 4 else 12.0
     log_time = (args[5].lower() != "linear") if len(args) > 5 else True
+    # args[6]: "anim" -> the per-track time-reveal animation (one object per
+    # track, slower); default "static" -> one curve object per event (fast,
+    # thousands of tracks, manipulable as a unit).
+    animate = (len(args) > 6 and args[6].lower() == "anim")
 
     scenes = json.load(open(scenes_json))
     clear_scene()
@@ -200,39 +294,56 @@ def main():
     if scenes:
         add_geometry(geo_coll, scenes[0]["geometry"])
 
-    frame_of, max_frame, t0, span = _build_frame_mapper(scenes, fps, max_seconds, log_time)
-    bpy.context.scene.frame_start = 1
-    bpy.context.scene.frame_end = max_frame
-    print(f"[gdmltp] timeline: {max_frame} frames ({max_seconds:g}s @ {fps}fps), "
-          f"{'log' if log_time else 'linear'}-time over {span:.3g} ns "
-          f"(t0={t0:.3g} ns); frame 1 is empty, early behavior emphasized.")
-
-    # Track width and vertex size scale with the scene's bounding radius (no
-    # absolute floor), so both shrink/grow with the geometry.
     radius_m = (scenes[0]["radius"] * MM) if scenes else MM
     bev = radius_m * TRACK_RADIUS_FRAC
     vtx_size = radius_m * VERTEX_EDGE_FRAC
+    n_tracks = sum(len(s["tracks"]) for s in scenes)
+    n_verts = sum(len(s["vertices"]) for s in scenes)
 
-    for s in scenes:
-        ev = new_collection(f"Event_{s['event_id']:02d}")
-        tracks_coll = new_collection("Tracks", ev)
-        vtx_coll = new_collection("Vertices", ev)
-        by_type = {}
-        for t in s["tracks"]:
-            sub = by_type.get(t["n"])
-            if sub is None:
-                sub = new_collection(t["n"], tracks_coll)
-                by_type[t["n"]] = sub
-            add_track(sub, t, bev, frame_of)
-        for i, v in enumerate(s["vertices"]):
-            bpy.ops.mesh.primitive_cube_add(size=vtx_size,
-                                            location=(v[0] * MM, v[1] * MM, v[2] * MM))
-            o = bpy.context.object
-            o.name = f"vtx_{s['event_id']:02d}_{i}"
-            _move_to(o, vtx_coll)
+    if animate:
+        frame_of, max_frame, t0, span = _build_frame_mapper(scenes, fps, max_seconds, log_time)
+        bpy.context.scene.frame_start = 1
+        bpy.context.scene.frame_end = max_frame
+        print(f"[gdmltp] animated timeline: {max_frame} frames ({max_seconds:g}s @ "
+              f"{fps}fps), {'log' if log_time else 'linear'}-time over {span:.3g} ns.",
+              flush=True)
+        tprog = Progress(n_tracks, "tracks (animated)")
+        vprog = Progress(n_verts, "vertices")
+        for s in scenes:
+            ev = new_collection(f"Event_{s['event_id']:02d}")
+            tracks_coll = new_collection("Tracks", ev)
+            vtx_coll = new_collection("Vertices", ev)
+            by_type = {}
+            for t in s["tracks"]:
+                sub = by_type.get(t["n"])
+                if sub is None:
+                    sub = new_collection(t["n"], tracks_coll)
+                    by_type[t["n"]] = sub
+                add_track(sub, t, bev, frame_of)
+                tprog.update()
+            for i, v in enumerate(s["vertices"]):
+                bpy.ops.mesh.primitive_cube_add(size=vtx_size,
+                                                location=(v[0] * MM, v[1] * MM, v[2] * MM))
+                _move_to(bpy.context.object, vtx_coll)
+                vprog.update()
+    else:
+        # Fast, single-object-per-event build (default).
+        print(f"[gdmltp] building one object per event ({n_tracks} track(s), "
+              f"{n_verts} vertex marker(s)); static (add --animate for the "
+              f"time-reveal).", flush=True)
+        tprog = Progress(len(scenes), "events")
+        for s in scenes:
+            ev = new_collection(f"Event_{s['event_id']:02d}")
+            obj, _ = add_event_curve(ev, s["tracks"], bev,
+                                     f"Event_{s['event_id']:02d}_tracks")
+            add_event_vertices(ev, s["vertices"], vtx_size,
+                               f"Event_{s['event_id']:02d}_vertices")
+            tprog.update()
 
+    print(f"[gdmltp] saving {out_blend} ...", flush=True)
     bpy.ops.wm.save_as_mainfile(filepath=out_blend)
-    print(f"[gdmltp] wrote {out_blend} with {len(scenes)} event(s), frames 1..{max_frame}")
+    print(f"[gdmltp] wrote {out_blend} with {len(scenes)} event(s)"
+          f"{' (animated)' if animate else ''}", flush=True)
 
 
 if __name__ == "__main__":

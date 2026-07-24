@@ -122,6 +122,10 @@ def _build_parser():
     d.add_argument("--linear-time", dest="log_time", action="store_false",
                    help="map step time to frames linearly (default: log, emphasizes early behavior)")
     d.set_defaults(log_time=True)
+    d.add_argument("--animate", action="store_true",
+                   help="Blender: time-reveal animation (one object per track, slower); "
+                        "default is one static curve object per event (fast, thousands "
+                        "of tracks, manipulable as a unit)")
     d.add_argument("--max-tracks", type=int, default=2000)
     d.add_argument("--all", dest="all_events", action="store_true",
                    help="overlay ALL events into one scene (not the default; "
@@ -397,7 +401,8 @@ def _display(args):
             out = render_blender.render_blend(sel, f"{args.prefix}.blend",
                                               outdir=str(outdir), blender_image=args.blender_image,
                                               fps=args.anim_fps, time_scale=args.time_scale,
-                                              max_seconds=args.max_seconds, log_time=args.log_time)
+                                              max_seconds=args.max_seconds, log_time=args.log_time,
+                                              animate=args.animate)
             if out:
                 print("[gdmltp] BLEND:", out)
         except Exception as e:
