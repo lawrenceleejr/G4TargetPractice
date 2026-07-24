@@ -8,7 +8,8 @@ sub-collections) and vertices, so you can show an ensemble or a single event.
 A shared timeline animates the time-ordered reveal of every track (respecting
 each step's global time and the particle's speed), so showers grow in time.
 """
-import bpy, json, sys, math, time
+import bpy, bmesh, json, sys, math, time
+from mathutils import Matrix
 
 
 def argv_after_dd():
@@ -96,29 +97,52 @@ TRACK_RADIUS_FRAC = 0.0004   # tube radius      = 0.04% of scene radius
 VERTEX_EDGE_FRAC = 0.0016    # vertex cube edge = 0.16% of scene radius
 
 
-def add_geometry(coll, geometry):
-    gm = mat("geo", (0.4, 0.55, 0.7, 0.18))
+GEO_SEG = 24   # segments for curved geometry primitives (smoothness vs speed)
+
+
+def _uvsphere(bm, radius, matrix):
+    """bmesh.ops.create_uvsphere across Blender versions: the radius kwarg was
+    named `diameter` before ~3.0 and `radius` after. Try radius, fall back."""
+    try:
+        bmesh.ops.create_uvsphere(bm, u_segments=GEO_SEG, v_segments=GEO_SEG // 2,
+                                  radius=radius, matrix=matrix)
+    except TypeError:
+        bmesh.ops.create_uvsphere(bm, u_segments=GEO_SEG, v_segments=GEO_SEG // 2,
+                                  diameter=radius, matrix=matrix)
+
+
+def add_geometry(coll, geometry, name="Geometry_solids"):
+    """All detector solids merged into ONE mesh via bmesh -- no bpy.ops.
+
+    bpy.ops.mesh.primitive_*_add runs a full scene/view-layer update on every
+    call, so hundreds of GDML solids took seconds and left hundreds of separate
+    objects in the outliner. bmesh.ops build each primitive as raw geometry (a
+    couple of C calls) into one shared bmesh that becomes a single joined
+    object -- far faster and a single backdrop you can hide/move as a unit."""
+    bm = bmesh.new()
     prog = Progress(len(geometry), "geometry")
-    for i, g in enumerate(geometry):
+    for g in geometry:
         prog.update()
         t = g["type"]
-        x, y, z = g["x"] * MM, g["y"] * MM, g["z"] * MM
+        loc = Matrix.Translation((g["x"] * MM, g["y"] * MM, g["z"] * MM))
         if t in ("box", "bbox"):
-            bpy.ops.mesh.primitive_cube_add(size=1, location=(x, y, z))
-            o = bpy.context.object
-            o.scale = (g.get("sx", 1) * MM, g.get("sy", 1) * MM, g.get("sz", 1) * MM)
+            scale = Matrix.Diagonal((g.get("sx", 1) * MM, g.get("sy", 1) * MM,
+                                     g.get("sz", 1) * MM, 1.0))
+            bmesh.ops.create_cube(bm, size=1.0, matrix=loc @ scale)
         elif t == "orb":
-            bpy.ops.mesh.primitive_uv_sphere_add(radius=g.get("r", 1) * MM, location=(x, y, z))
-            o = bpy.context.object
+            _uvsphere(bm, g.get("r", 1) * MM, loc)
         elif t == "tube":
-            bpy.ops.mesh.primitive_cylinder_add(radius=g.get("rmax", 1) * MM,
-                                                depth=g.get("z", 1) * MM, location=(x, y, z))
-            o = bpy.context.object
-        else:
-            continue
-        o.name = f"geo_{g.get('name', i)}"
-        o.data.materials.append(gm)
-        _move_to(o, coll)
+            r = g.get("rmax", 1) * MM
+            bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=GEO_SEG,
+                                  radius1=r, radius2=r, depth=g.get("z", 1) * MM,
+                                  matrix=loc)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(mat("geo", (0.4, 0.55, 0.7, 0.18)))
+    obj = bpy.data.objects.new(name, me)
+    coll.objects.link(obj)
+    return obj
 
 
 def add_track(coll, track, bev, frame_of):
@@ -319,7 +343,6 @@ def main():
               f"{fps}fps), {'log' if log_time else 'linear'}-time over {span:.3g} ns.",
               flush=True)
         tprog = Progress(n_tracks, "tracks (animated)")
-        vprog = Progress(n_verts, "vertices")
         for s in scenes:
             ev = new_collection(f"Event_{s['event_id']:02d}")
             tracks_coll = new_collection("Tracks", ev)
@@ -332,11 +355,9 @@ def main():
                     by_type[t["n"]] = sub
                 add_track(sub, t, bev, frame_of)
                 tprog.update()
-            for i, v in enumerate(s["vertices"]):
-                bpy.ops.mesh.primitive_cube_add(size=vtx_size,
-                                                location=(v[0] * MM, v[1] * MM, v[2] * MM))
-                _move_to(bpy.context.object, vtx_coll)
-                vprog.update()
+            # vertices as one joined mesh (fast), not one bpy.ops cube each
+            add_event_vertices(vtx_coll, s["vertices"], vtx_size,
+                               f"Event_{s['event_id']:02d}_vertices")
     else:
         # Fast, single-object-per-event build (default).
         print(f"[gdmltp] building one object per event ({n_tracks} track(s), "
