@@ -74,6 +74,10 @@ ENV LD_LIBRARY_PATH=${LHAPDF_DIR}/lib:${LD_LIBRARY_PATH}
 # lhapdf-config on PATH: APFEL's configure and `lhapdf install` both need it
 # (APFEL aborts "LHAPDF cannot be found!" otherwise).
 ENV PATH=${LHAPDF_DIR}/bin:${PATH}
+# Explicit PDF search path so gmkhedissf (which links LHAPDF) finds sets that
+# `lhapdf install` drops in the prefix datadir.
+ENV LHAPDF_DATA_PATH=${LHAPDF_DIR}/share/LHAPDF
+ENV LHAPATH=${LHAPDF_DIR}/share/LHAPDF
 
 # --- APFEL (OPTIONAL: only for HEDIS high-energy-DIS tunes) -------------------
 # ENABLE_HEDIS=0 (default) builds nothing here and leaves the GENIE configure
@@ -128,8 +132,16 @@ ENV LD_LIBRARY_PATH=${GENIE}/lib:${LD_LIBRARY_PATH}
 ARG HEDIS_TUNE=GHE19_00a_00_000
 ARG HEDIS_PDF=NNPDF31sx_nlo_as_0118_LHCb_nf_6
 RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
-      lhapdf install ${HEDIS_PDF} && \
-      gmkhedissf --tune ${HEDIS_TUNE} ; \
+      set -e && \
+      lhapdf update || true ; \
+      lhapdf install "${HEDIS_PDF}" || true ; \
+      DD="$(lhapdf-config --datadir)" && \
+      echo "LHAPDF datadir: $DD" && ls -la "$DD" && \
+      if [ ! -e "$DD/${HEDIS_PDF}/${HEDIS_PDF}.info" ]; then \
+        echo "ERROR: LHAPDF set ${HEDIS_PDF} not installed (not in the index or download failed)."; \
+        exit 1; \
+      fi && \
+      gmkhedissf --tune "${HEDIS_TUNE}" ; \
     fi
 # Runtime marker: the gdmltp genie driver checks this before running gmkhedissf
 # so a HEDIS tune on a non-HEDIS image fails with a clear message, not SIGABRT.
