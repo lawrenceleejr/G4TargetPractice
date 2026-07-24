@@ -21,6 +21,10 @@ on:
         description: "ROOT version for the GENIE base"
         required: false
         default: "6.28.12"
+      enable_hedis:
+        description: "Build HEDIS support (APFEL + GHE19 tune inputs) into the GENIE base"
+        required: false
+        default: "0"
       achilles_ref:
         description: "Achilles git ref"
         required: false
@@ -84,6 +88,7 @@ jobs:
           build-args: |
             GENIE_VERSION=${{ env.GENIE_VERSION }}
             ROOT_VERSION=${{ env.ROOT_VERSION }}
+            ENABLE_HEDIS=${{ github.event.inputs.enable_hedis || '0' }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

@@ -1,0 +1,49 @@
+# The 10 TeV neutrino slice with GENIE's HIGH-ENERGY DIS (HEDIS) tune.
+#
+# The standard G18_10a tune's DIS model and splines top out around ~1 TeV --
+# gmkspl "refuses to exceed validity range: Emax = 1000" and no splines are
+# made (which is why nu_slice_numu.yaml, at E_mu = 5 TeV, fails to build
+# splines). For a multi-TeV muon-collider beam you must switch tune FAMILIES
+# to HEDIS (the GHE19 models), not merely raise the energy.
+#
+#   gdmltp run --config examples/maia/nu_slice_numu_hedis.yaml -o slice_hedis
+#
+# Tune GHE19_00a_00_000 = the BGR18 NLO model, valid E_nu > 100 GeV up to ~1e9
+# GeV, so the 0.1-5 TeV slice sits well inside. The event-generator-list must
+# be HEDIS on both the spline build and generation (the driver handles that).
+#
+# PREREQUISITES (this is NOT out-of-the-box -- see docs/neutrino.md "HEDIS"):
+#   1. GENIE built with APFEL (for the NLO structure functions) and LHAPDF.
+#   2. The tune's LHAPDF set installed: NNPDF31sx_nlo_as_0118_LHCb_nf_6.
+#   3. HEDIS structure-function tables (QrkSF_*.dat), built once by
+#      `gmkhedissf --tune GHE19_00a_00_000` -- the driver runs this on demand,
+#      but it needs (1) and (2) present.
+# Build the HEDIS-provisioned GENIE base image with:
+#   docker build -f docker/genie-base.Dockerfile --build-arg ENABLE_HEDIS=1 ...
+# (The default genie image does NOT include APFEL/HEDIS; it would fail at the
+# gmkhedissf step with a clear error.)
+#
+# GHE19_00c_00_000 is the LO variant and needs NO APFEL (only the cteq6 PDF) --
+# a lighter alternative if you don't want to build APFEL.
+generator: genie
+
+geometry:
+  gdml: gdml/MAIA_v0.gdml
+
+beam:
+  particle: nu_mu
+  energy: {mode: mudecay_numu, value: "5 TeV"}   # E_mu = 5 TeV, <E_nu> ~ 1.75 TeV
+  position: "0 0 300 cm"       # mid-nozzle; fixed vertex -> native spectral flux
+  direction: "0 0 1"
+
+run:
+  events: 500
+  output: output.root
+  seed: 20241418
+
+genie:
+  tune: GHE19_00a_00_000            # BGR18 NLO high-energy DIS (or GHE19_00c for LO)
+  event_generator_list: HEDIS       # CC + NC HEDIS; must match on spline + gen
+  cross_sections: auto              # on-demand gmkhedissf + gmkspl, cached in run dir
+  length_units: cm
+  target: 1000741840                # W-184 (the tungsten nozzles)

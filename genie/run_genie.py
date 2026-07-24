@@ -34,6 +34,37 @@ def spline_emax_gev(job, beam_energies_gev=None):
     return max(100.0, math.ceil(emax))
 
 
+def _is_hedis(job):
+    """A high-energy DIS (HEDIS) run -- GHE19 tune or a HEDIS generator list."""
+    tune = str(job.get("tune", ""))
+    egl = str(job.get("event_generator_list", ""))
+    return tune.startswith("GHE19") or "HEDIS" in egl.upper()
+
+
+def _ensure_hedis_sf(job, workdir):
+    """HEDIS reads pre-tabulated structure-function grids (QrkSF_*.dat) from
+    $HEDIS_SF_DATA_PATH, produced once by gmkhedissf --tune <tune>. Generate
+    them on demand if absent (requires GENIE built with APFEL + the tune's
+    LHAPDF set installed -- see docs/neutrino.md; without them GENIE errors
+    clearly). Cached by a stamp file so it runs at most once per tune."""
+    tune = job.get("tune", "GHE19_00a_00_000")
+    sf_dir = Path(os.environ.get("HEDIS_SF_DATA_PATH",
+                                 str(Path(os.environ.get("GENIE", "/opt/genie"))
+                                     / "data" / "evgen" / "hedis-sf")))
+    stamp = sf_dir / f".gdmltp_hedis_sf_{tune}.done"
+    if stamp.exists() or (sf_dir.exists() and any(sf_dir.glob("QrkSF*.dat"))):
+        return
+    print(f"[run_genie] building HEDIS structure-function tables (gmkhedissf "
+          f"--tune {tune}); slow, one-time, needs APFEL + the tune's LHAPDF "
+          f"set. See docs/neutrino.md if this fails.", flush=True)
+    subprocess.run(["gmkhedissf", "--tune", tune], cwd=workdir, check=True)
+    try:
+        sf_dir.mkdir(parents=True, exist_ok=True)
+        stamp.write_text("ok\n")
+    except OSError:
+        pass
+
+
 def _xsec_args(job, workdir, emax_gev=None):
     """Cross-section splines for gevgen, in priority order: an explicit path in
     the job, the image's $GENIE_XSEC_FILE, else generate them ON DEMAND with
@@ -42,7 +73,9 @@ def _xsec_args(job, workdir, emax_gev=None):
     no manual setup at all -- the first run on a new probe/target just takes
     longer while the splines compute. `emax_gev` (see spline_emax_gev) sets the
     spline reach and is part of the cache name, so a TeV run never silently
-    reuses a 100 GeV file."""
+    reuses a 100 GeV file. For HEDIS tunes the structure-function tables are
+    ensured first and the generator list is passed to gmkspl (it must match
+    gevgen)."""
     xsec = job.get("cross_sections", "auto")
     if xsec and xsec != "auto":
         return ["--cross-sections", xsec]
@@ -52,15 +85,23 @@ def _xsec_args(job, workdir, emax_gev=None):
     probe = int(job["probe"])
     target = int(job["target"])
     tune = job.get("tune", "G18_10a_00_000")
+    hedis = _is_hedis(job)
+    egl = job.get("event_generator_list", "Default")
     emax = int(emax_gev if emax_gev is not None else spline_emax_gev(job))
-    out = Path(workdir) / f"gxspl_{abs(probe)}_{target}_{tune}_{emax}gev.xml"
+    tag = f"{tune}_{egl}" if hedis else tune
+    out = Path(workdir) / f"gxspl_{abs(probe)}_{target}_{tag}_{emax}gev.xml"
     if not out.exists():
+        if hedis:
+            _ensure_hedis_sf(job, workdir)
         print(f"[run_genie] no spline file found; generating with gmkspl for "
               f"probe {probe} on {target} (tune {tune}, up to {emax} GeV). "
               f"This is slow the first time; the result is cached in the run "
               f"directory.", flush=True)
         cmd = ["gmkspl", "-p", f"{probe},{-probe}", "-t", str(target),
-               "-n", "100", "-e", str(emax), "--tune", tune, "-o", str(out)]
+               "-n", "100", "-e", str(emax), "--tune", tune]
+        if hedis:
+            cmd += ["--event-generator-list", egl]   # must match gevgen
+        cmd += ["-o", str(out)]
         print("[run_genie]", " ".join(cmd), flush=True)
         subprocess.run(cmd, cwd=workdir, check=True)
     return ["--cross-sections", str(out)]

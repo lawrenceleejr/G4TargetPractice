@@ -112,3 +112,38 @@ def test_driver_generates_splines_on_demand(repo_root, tmp_path, monkeypatch):
     calls.clear()
     assert mod.run(str(_write_job(tmp_path))) == 0
     assert calls[0][0] == "gevgen"
+
+
+def test_driver_hedis_tune(repo_root, tmp_path, monkeypatch):
+    """A GHE19/HEDIS tune: the driver builds structure-function tables first
+    (gmkhedissf), then gmkspl and gevgen both carry --event-generator-list
+    HEDIS (they must match), out to the TeV flux endpoint."""
+    mod = _load_driver(repo_root)
+    monkeypatch.delenv("GENIE_XSEC_FILE", raising=False)
+    monkeypatch.setenv("HEDIS_SF_DATA_PATH", str(tmp_path / "sf"))  # empty -> build
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        if cmd[0] == "gmkspl":
+            (tmp_path / cmd[cmd.index("-o") + 1].split("/")[-1]).write_text("<xml/>")
+        return type("R", (), {"returncode": 0})()
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    import gdmltp.backends.genie_convert as gc
+    monkeypatch.setattr(gc, "convert", lambda *a, **k: None)
+
+    job = _write_job(tmp_path, tune="GHE19_00a_00_000",
+                     event_generator_list="HEDIS",
+                     flux={"mode": "mono", "value": "5 TeV", "min": None,
+                           "max": None, "bins": []},
+                     flux_emax_gev=5000.0)
+    assert mod.run(str(job)) == 0
+    names = [c[0] for c in calls]
+    assert names[0] == "gmkhedissf"                      # SF tables built first
+    assert calls[0][calls[0].index("--tune") + 1] == "GHE19_00a_00_000"
+    gmkspl = next(c for c in calls if c[0] == "gmkspl")
+    assert gmkspl[gmkspl.index("--event-generator-list") + 1] == "HEDIS"
+    assert gmkspl[gmkspl.index("-e") + 1] == "5000"      # TeV spline reach
+    gevgen = next(c for c in calls if c[0] == "gevgen")
+    assert gevgen[gevgen.index("--event-generator-list") + 1] == "HEDIS"

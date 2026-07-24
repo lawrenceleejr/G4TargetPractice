@@ -114,6 +114,27 @@ detector concept (`gdml/MAIA_v0.gdml`): all four flavor components, both
 collider stages, slice phase-space painting in the tungsten nozzles, and a
 fast spectrum-only variant. See `examples/maia/README.md`.
 
+## TeV energies: the HEDIS tune
+
+The standard `G18_10a` tune's DIS model and cross-section splines top out
+around ~1 TeV — `gmkspl` refuses to build splines above the tune's validity,
+so the 5 TeV muon-collider slice (`nu_slice_numu.yaml`) can't make splines
+with it. For multi-TeV you must switch tune **families** to GENIE's
+high-energy DIS (HEDIS): `examples/maia/nu_slice_numu_hedis.yaml` uses
+`GHE19_00a_00_000` (the BGR18 NLO model, valid to ~10⁹ GeV) with
+`event_generator_list: HEDIS`. The driver builds the HEDIS structure-function
+tables (`gmkhedissf`) and passes `--event-generator-list HEDIS` to both the
+spline build and generation automatically.
+
+**HEDIS is not out-of-the-box** — it needs a HEDIS-provisioned GENIE image:
+GENIE built with APFEL (for the NLO structure functions), the tune's LHAPDF
+grid (`NNPDF31sx_nlo_as_0118_LHCb_nf_6`), and the structure-function tables.
+Build one with the base-image workflow's `enable_hedis: 1` dispatch input (or
+`docker build -f docker/genie-base.Dockerfile --build-arg ENABLE_HEDIS=1 …`);
+the default GENIE image does not include APFEL and will fail at the
+`gmkhedissf` step with a clear error. (`GHE19_00c_00_000` is a LO variant that
+needs no APFEL, only the `cteq6` grid — a lighter alternative.)
+
 ## Realistic beams
 
 Everything above uses a pencil beam. The frontend also samples **distributions

@@ -20,6 +20,7 @@ growing to 43 cm.
 | `nu_slice_numu_3tev.yaml` | the √s = 3 TeV collider stage (Eμ = 1.5 TeV, wider fan) |
 | `nu_slice_spectrum_only.yaml` | fixed vertex, native gevgen spectral flux — for large-N spectrum studies |
 | `nu_slice_geant4_biased.yaml` | the slice simulated **entirely in Geant4** with 1e10 neutrino biasing (guaranteed interaction + full transport) |
+| `nu_slice_numu_hedis.yaml` | the TeV slice with GENIE's **HEDIS** high-energy-DIS tune (needs a HEDIS-provisioned image; see `docs/neutrino.md`) |
 | `hnl_decay.yaml` | a 1 GeV HNL decaying displaced inside MAIA — decayed **by Geant4** (`decay` backend; see `docs/bsm.md`) |
 
 ## The physics inputs

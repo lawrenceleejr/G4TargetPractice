@@ -72,12 +72,34 @@ RUN wget -q https://lhapdf.hepforge.org/downloads/?f=LHAPDF-${LHAPDF_VERSION}.ta
 ENV LHAPDF_DIR=/opt/lhapdf
 ENV LD_LIBRARY_PATH=${LHAPDF_DIR}/lib:${LD_LIBRARY_PATH}
 
+# --- APFEL (OPTIONAL: only for HEDIS high-energy-DIS tunes) -------------------
+# ENABLE_HEDIS=0 (default) builds nothing here and leaves the GENIE configure
+# below byte-for-byte unchanged, so the proven default image is unaffected.
+# ENABLE_HEDIS=1 additionally builds APFEL (needed for the NLO structure
+# functions of the GHE19 tunes) -- see the multi-TeV neutrino examples.
+ARG ENABLE_HEDIS=0
+ARG APFEL_VERSION=3.0.6
+RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
+      wget -q https://github.com/scarrazza/apfel/archive/refs/tags/${APFEL_VERSION}.tar.gz \
+        -O apfel.tar.gz && tar -xzf apfel.tar.gz && rm apfel.tar.gz && \
+      cd apfel-${APFEL_VERSION} && ./configure --prefix=/opt/apfel && \
+      make -j"$(nproc)" && make install && cd /opt && rm -rf apfel-${APFEL_VERSION} ; \
+    fi
+ENV APFEL_DIR=/opt/apfel
+ENV LD_LIBRARY_PATH=${APFEL_DIR}/lib:${LD_LIBRARY_PATH}
+ENV PATH=${APFEL_DIR}/bin:${PATH}
+
 # --- GENIE Generator ----------------------------------------------------------
 # In-place build (the GENIE convention: $GENIE holds source, bin/ and lib/).
 # The default G18 tunes use GENIE's native GRV98LO, so no external PDF data
-# files are required at run time.
+# files are required at run time. With ENABLE_HEDIS=1, --enable-apfel is added
+# so the high-energy-DIS (GHE19/HEDIS) tunes are available too.
 ENV GENIE=/opt/genie
 RUN cd ${GENIE} && \
+    HEDIS_CFG="" && \
+    if [ "$ENABLE_HEDIS" = "1" ]; then \
+      HEDIS_CFG="--enable-apfel --with-apfel-inc=${APFEL_DIR}/include --with-apfel-lib=${APFEL_DIR}/lib" ; \
+    fi && \
     ./configure \
       --enable-lhapdf6 \
       --with-lhapdf6-inc=${LHAPDF_DIR}/include \
@@ -88,11 +110,22 @@ RUN cd ${GENIE} && \
       --with-libxml2-inc=/usr/include/libxml2 \
       --with-libxml2-lib=/usr/lib/x86_64-linux-gnu \
       --enable-flux-drivers --enable-geom-drivers \
-      --disable-profiler --disable-validation-tools --disable-doxygen-doc && \
+      --disable-profiler --disable-validation-tools --disable-doxygen-doc \
+      ${HEDIS_CFG} && \
     make -j"$(nproc)" && \
     find ${GENIE} -name '*.o' -delete
 ENV PATH=${GENIE}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${GENIE}/lib:${LD_LIBRARY_PATH}
+
+# --- HEDIS inputs (OPTIONAL) -------------------------------------------------
+# Bake in the LHAPDF grid + structure-function tables for the reference HEDIS
+# tune so a HEDIS run needs no manual setup. Only runs when ENABLE_HEDIS=1.
+ARG HEDIS_TUNE=GHE19_00a_00_000
+ARG HEDIS_PDF=NNPDF31sx_nlo_as_0118_LHCb_nf_6
+RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
+      lhapdf install ${HEDIS_PDF} && \
+      gmkhedissf --tune ${HEDIS_TUNE} ; \
+    fi
 
 # Sanity: the generator toolchain must resolve.
 RUN gevgen --help >/dev/null 2>&1 || gevgen -h >/dev/null 2>&1 || \
