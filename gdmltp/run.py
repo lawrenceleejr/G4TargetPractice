@@ -224,7 +224,7 @@ def _repo_of(image):
 def _wants_transport(cfg):
     # decay is NOT here: it is a single-stage Geant4 run (Geant4 both decays
     # and transports); external files opt in like the vertex-level generators.
-    return cfg.generator in ("genie", "achilles", "external") and \
+    return cfg.generator in ("genie", "achilles", "pythia", "external") and \
         bool(getattr(cfg, cfg.generator).get("transport"))
 
 

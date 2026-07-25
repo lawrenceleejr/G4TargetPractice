@@ -20,6 +20,8 @@ case "$1" in
       exec python3 /app/genie/run_genie.py "$@"
     elif [ -f /app/achilles/run_achilles.py ]; then
       exec python3 /app/achilles/run_achilles.py "$@"
+    elif [ -f /app/pythia/run_pythia.py ]; then
+      exec python3 /app/pythia/run_pythia.py "$@"
     else
       echo "This image ships no generator driver for $1" >&2
       exit 64

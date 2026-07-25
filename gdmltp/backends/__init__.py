@@ -18,6 +18,7 @@ register(Geant4Backend())
 
 _LAZY = {"genie": ("genie", "GenieBackend"),
          "achilles": ("achilles", "AchillesBackend"),
+         "pythia": ("pythia", "PythiaBackend"),
          "decay": ("decay", "DecayBackend"),
          "external": ("external", "ExternalBackend")}
 

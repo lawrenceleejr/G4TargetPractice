@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 
-GENERATORS = ("geant4", "genie", "achilles", "decay", "external")
+GENERATORS = ("geant4", "genie", "achilles", "pythia", "decay", "external")
 # mudecay_*: the neutrino energy spectrum from in-flight muon decay (the
 # neutrino-factory / muon-collider "neutrino slice" flux, angle-integrated over
 # the ~1/gamma cone; unpolarized). energy.value is the PARENT MUON energy E_mu:
@@ -28,6 +28,17 @@ GENERATORS = ("geant4", "genie", "achilles", "decay", "external")
 ENERGY_MODES = ("mono", "gauss", "exp", "arb", "mudecay_numu", "mudecay_nue")
 # Modes with no native g4sim gun command: the host samples them into a beam file.
 SAMPLED_ENERGY_MODES = ("mudecay_numu", "mudecay_nue")
+
+# Pythia 8 process presets (pythia.process). Each expands to a small set of
+# Pythia settings in the backend; raw pythia.settings are appended after them so
+# a user can always override or add anything the presets don't cover.
+#   dis      -- deep-inelastic scattering off a nucleon via weak-boson exchange
+#               (CC W + NC gamma/Z): the lepton/neutrino-beam case, valid to TeV
+#               and beyond with no cross-section splines to precompute
+#   softqcd  -- inelastic minimum-bias hadron-nucleon collisions
+#   hardqcd  -- hard QCD 2->2 jets (needs a pTmin cut)
+#   none     -- no preset; pythia.settings (or a verbatim cmnd) is the whole card
+PYTHIA_PROCESSES = ("dis", "softqcd", "hardqcd", "none")
 
 
 class ConfigError(ValueError):
@@ -167,6 +178,7 @@ class RunConfig:
     geant4: dict = field(default_factory=dict)  # field, neutrino_mode, celeritas, physics_list
     genie: dict = field(default_factory=dict)   # tune, cross_sections, target, ...
     achilles: dict = field(default_factory=dict)  # nuclear_model, cascade, processes, run_card, ...
+    pythia: dict = field(default_factory=dict)  # process, settings, target, cmnd, transport, ...
     decay: dict = field(default_factory=dict)   # ctau, ctau_sample, channels, charge, name
     external: dict = field(default_factory=dict)  # file, format, transport
 
@@ -199,6 +211,8 @@ class RunConfig:
             self._validate_decay()
         if self.generator == "external":
             self._validate_external()
+        if self.generator == "pythia":
+            self._validate_pythia()
         try:
             int(self.run.events)
         except (TypeError, ValueError):
@@ -254,6 +268,25 @@ class RunConfig:
         if fmt != "hepmc3":
             raise ConfigError(f"external.format must be 'hepmc3', got {fmt!r}")
 
+    def _validate_pythia(self):
+        """Structural checks for the pythia backend. Pythia 8 is driven by a
+        command ('.cmnd') file of `key = value` lines; we render one from a
+        process preset plus raw `settings`, or take a verbatim `cmnd` file."""
+        p = self.pythia
+        proc = p.get("process", "dis")
+        if proc not in PYTHIA_PROCESSES:
+            raise ConfigError(
+                f"unknown pythia.process {proc!r}; choose one of "
+                f"{', '.join(PYTHIA_PROCESSES)} -- or drop pythia.process and give "
+                f"raw pythia.settings / a verbatim pythia.cmnd file")
+        settings = p.get("settings")
+        if settings is not None and not isinstance(settings, list):
+            raise ConfigError("pythia.settings must be a list of raw Pythia "
+                              "'key = value' strings")
+        if settings and any(not isinstance(s, str) for s in settings):
+            raise ConfigError("pythia.settings entries must be strings, e.g. "
+                              "'PhaseSpace:Q2Min = 1.0'")
+
     def _validate_beam_distributions(self):
         b = self.beam
         for group in (b.position_dist, b.direction_slopes):
@@ -279,7 +312,7 @@ class RunConfig:
 # YAML front-end
 # --------------------------------------------------------------------------- #
 _TOP_KEYS = {"generator", "geometry", "beam", "projectile", "run",
-             "geant4", "genie", "achilles", "decay", "external", "mac"}
+             "geant4", "genie", "achilles", "pythia", "decay", "external", "mac"}
 
 
 def _energy_from(raw) -> Energy:
@@ -459,6 +492,7 @@ def from_dict(data: dict) -> RunConfig:
         run=_run_from(data.get("run") or {}),
         geant4=dict(data.get("geant4") or {}),
         genie=dict(data.get("genie") or {}),
+        pythia=dict(data.get("pythia") or {}),
         achilles=dict(data.get("achilles") or {}),
         decay=dict(data.get("decay") or {}),
         external=dict(data.get("external") or {}),

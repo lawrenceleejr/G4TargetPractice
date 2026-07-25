@@ -120,12 +120,18 @@ def _out_lepton(beam_pdg, fs):
     return lep, False, False
 
 
-def convert(hepmc_path, out_path, out_tree="tree", beam=None, process_label="Achilles"):
+def convert(hepmc_path, out_path, out_tree="tree", beam=None, process_label="Achilles",
+            target_pdg=None):
     """Convert NuHepMC at `hepmc_path` to schema `output.root` at `out_path`.
 
     `beam` (beam-file path or entry list) replays a host-sampled beam exactly as
     the GENIE converter does: each event's vertex moves to the ray's position and
     all momenta rotate from the generator's axis onto the ray direction.
+
+    `target_pdg` fills nu_targetZ/A for generators that do not record a target
+    particle in the event (Pythia 8 collides with a free nucleon and writes no
+    NuHepMC status-11 target); per-event target records found in the file always
+    win over this fallback.
     """
     events = parse_nuhepmc(hepmc_path)
     n = len(events)
@@ -137,7 +143,15 @@ def convert(hepmc_path, out_path, out_tree="tree", beam=None, process_label="Ach
     lep_pdg = np.zeros(n, np.int64)
     is_cc = np.zeros(n, bool); is_nc = np.zeros(n, bool)
     vx = np.zeros(n); vy = np.zeros(n); vz = np.zeros(n); vt = np.zeros(n)
-    tZ = np.full(n, -1, np.int64); tA = np.full(n, -1, np.int64)
+    # target Z/A default: the caller's fallback (free-nucleon generators record
+    # no target particle), overridden per event by any target found in the file
+    if target_pdg is not None:
+        t0 = int(target_pdg)
+        z0 = 1 if t0 == 2212 else (0 if t0 == 2112 else (abs(t0) // 10000) % 1000)
+        a0 = 1 if t0 in (2212, 2112) else (abs(t0) // 10) % 1000
+    else:
+        z0 = a0 = -1
+    tZ = np.full(n, z0, np.int64); tA = np.full(n, a0, np.int64)
     counts = np.zeros(n, np.int64)
     fs_pdg, fs_kin, fs_p = [], [], []
 
