@@ -150,6 +150,36 @@ def test_driver_hedis_tune(repo_root, tmp_path, monkeypatch):
     assert gevgen[gevgen.index("--event-generator-list") + 1] == "HEDIS"
 
 
+def test_driver_hedis_uses_baked_spline(repo_root, tmp_path, monkeypatch):
+    """A baked HEDIS xsec spline (image-provided, covering the requested energy)
+    is used directly -- no gmkhedissf, no gmkspl -- so the example skips the
+    slow spline build. The baked file follows the driver's own cache naming."""
+    mod = _load_driver(repo_root)
+    monkeypatch.delenv("GENIE_XSEC_FILE", raising=False)
+    monkeypatch.setenv("GDMLTP_HEDIS", "1")
+    baked_dir = tmp_path / "hedis-xsec"
+    baked_dir.mkdir()
+    # a 5 TeV baked spline for numu on W-184, GHE19_00c / HEDIS
+    (baked_dir / "gxspl_14_1000741840_GHE19_00c_00_000_HEDIS_5000gev.xml").write_text("<xml/>")
+    monkeypatch.setenv("HEDIS_XSEC_DIR", str(baked_dir))
+    calls = []
+    monkeypatch.setattr(mod.subprocess, "run",
+                        lambda cmd, **kw: calls.append(cmd) or type("R", (), {"returncode": 0})())
+    import gdmltp.backends.genie_convert as gc
+    monkeypatch.setattr(gc, "convert", lambda *a, **k: None)
+
+    job = _write_job(tmp_path, tune="GHE19_00c_00_000", target=1000741840,
+                     probe=14, event_generator_list="HEDIS",
+                     flux={"mode": "mono", "value": "3 TeV", "min": None,
+                           "max": None, "bins": []}, flux_emax_gev=3000.0)
+    assert mod.run(str(job)) == 0
+    names = [c[0] for c in calls]
+    assert "gmkspl" not in names and "gmkhedissf" not in names   # baked -> skipped
+    gevgen = next(c for c in calls if c[0] == "gevgen")
+    xsec = gevgen[gevgen.index("--cross-sections") + 1]
+    assert xsec.endswith("gxspl_14_1000741840_GHE19_00c_00_000_HEDIS_5000gev.xml")
+
+
 def test_driver_hedis_tune_unprovisioned_errors(repo_root, tmp_path, monkeypatch):
     """A HEDIS tune on an image NOT built with HEDIS (no GDMLTP_HEDIS marker)
     fails with a clear, actionable message before gmkhedissf can SIGABRT."""

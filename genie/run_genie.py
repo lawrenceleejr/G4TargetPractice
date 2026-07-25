@@ -97,6 +97,31 @@ def _ensure_hedis_sf(job, workdir):
         pass
 
 
+def _baked_hedis_spline(probe_abs, target, tune, egl, emax):
+    """A HEDIS xsec spline baked into the image for this exact probe+target+
+    tune+egl whose energy reach covers `emax`, or None. Filenames follow the
+    driver's own cache convention (gxspl_<probe>_<target>_<tune>_<egl>_<E>gev.xml)
+    so a baked file is a drop-in for what gmkspl would have produced. The energy
+    is read from the filename, so a 5 TeV baked spline serves a 3 TeV request."""
+    import glob
+    base = os.environ.get(
+        "HEDIS_XSEC_DIR",
+        str(Path(os.environ.get("GENIE", "/opt/genie")) / "data" / "evgen" / "hedis-xsec"))
+    if not os.path.isdir(base):
+        return None
+    prefix = f"gxspl_{probe_abs}_{target}_{tune}_{egl}_"
+    best = None
+    for p in glob.glob(os.path.join(base, prefix + "*gev.xml")):
+        name = os.path.basename(p)
+        try:
+            e = int(name[len(prefix):-len("gev.xml")])
+        except ValueError:
+            continue
+        if e >= emax and (best is None or e < best[0]):
+            best = (e, p)          # smallest spline that still covers the range
+    return best[1] if best else None
+
+
 def _xsec_args(job, workdir, emax_gev=None):
     """Cross-section splines for gevgen, in priority order: an explicit path in
     the job, the image's $GENIE_XSEC_FILE, else generate them ON DEMAND with
@@ -122,6 +147,17 @@ def _xsec_args(job, workdir, emax_gev=None):
     emax = int(emax_gev if emax_gev is not None else spline_emax_gev(job))
     tag = f"{tune}_{egl}" if hedis else tune
     out = Path(workdir) / f"gxspl_{abs(probe)}_{target}_{tag}_{emax}gev.xml"
+    # HEDIS xsec splines are very expensive to compute (gmkspl integrates the
+    # structure functions per knot -- ~an hour even for a coarse spline). The
+    # image can bake one for the shipped tune/target so the example skips that:
+    # if a baked spline for this probe+target+tune+egl covers the needed energy,
+    # use it directly. (HEDIS_XSEC_DIR overrides the default location.)
+    if hedis:
+        baked = _baked_hedis_spline(abs(probe), target, tune, egl, emax)
+        if baked is not None:
+            print(f"[run_genie] using baked HEDIS spline {baked} (skips gmkspl).",
+                  flush=True)
+            return ["--cross-sections", str(baked)]
     if not out.exists():
         if hedis:
             _ensure_hedis_sf(job, workdir)
