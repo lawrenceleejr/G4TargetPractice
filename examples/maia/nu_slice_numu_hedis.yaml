@@ -17,6 +17,15 @@
 # This runs out of the box on the HEDIS-provisioned genie image (built with
 # ENABLE_HEDIS=1, which bakes cteq6l1 + the GHE19_00c structure-function
 # tables). On a non-HEDIS image the driver stops with a clear message.
+#
+# PERFORMANCE NOTE: the HEDIS *cross-section splines* (gmkspl) are built on
+# demand for this probe/target/energy and are SLOW to compute -- a modest
+# spline takes on the order of an hour, and this example's multi-TeV reach
+# takes longer, so the FIRST run spends a long time in gmkspl before any events
+# are generated. The result is cached in the run directory, so reruns are fast.
+# The structure-function tables themselves are baked into the image; only the
+# xsec splines are on-demand. To pre-seed, drop a prebuilt gxspl XML in the run
+# dir (or point `cross_sections:` at one).
 # The NLO GHE19_00a (BGR18) tune needs APFEL + its NNPDF3.1sx PDF, which is not
 # on the LHAPDF server -- supply that set and switch the tune to use it.
 generator: genie
