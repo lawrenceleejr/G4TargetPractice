@@ -33,6 +33,7 @@ flux); only the spatial model is the direct-injection slice.
 | `nu_slice_spectrum_only.yaml` | single fixed vertex in the slice, native gevgen spectral flux — for large-N spectrum studies |
 | `nu_slice_geant4_biased.yaml` | the slice simulated **entirely in Geant4** with 1e10 neutrino biasing (guaranteed interaction + full transport) |
 | `nu_slice_numu_hedis.yaml` | the TeV slice with GENIE's **HEDIS** high-energy-DIS tune (needs a HEDIS-provisioned image; see `docs/neutrino.md`) |
+| `nu_slice_achilles.yaml` | the same slice through **Achilles** — a ~GeV muon-decay spectrum on ¹²C (Achilles is a GeV-scale theory generator, not TeV DIS); for a GENIE-vs-Achilles comparison on identical geometry |
 | `hnl_decay.yaml` | a 1 GeV HNL decaying displaced inside MAIA — decayed **by Geant4** (`decay` backend; see `docs/bsm.md`) |
 
 ## The physics inputs
@@ -56,7 +57,14 @@ flux); only the spatial model is the direct-injection slice.
 
 - **First run is slow**: `cross_sections: auto` generates GENIE splines up to
   Eμ on demand (`gmkspl … -e 5000`) and caches them in the run directory —
-  hours the first time for 5 TeV on tungsten, instant afterwards.
+  hours the first time for 5 TeV on tungsten, instant afterwards. The HEDIS
+  image bakes the νμ-on-W-184 spline for `nu_slice_numu_hedis.yaml`, so that
+  one config skips the wait (the driver picks up `$HEDIS_XSEC_DIR`); other
+  probe/target combinations still build on demand.
+- **Achilles ≠ high energy**: `nu_slice_achilles.yaml` deliberately drops to a
+  5 GeV muon source and a ¹²C target — Achilles models the ~GeV regime, not the
+  TeV DIS the muon-collider slice actually lives in. It shares the *geometry*,
+  not the energy scale, of the GENIE jobs.
 - **Per-event replay is O(N)**: painted configs run one `gevgen` per event.
   Keep `run.events` modest; use `nu_slice_spectrum_only.yaml` for statistics.
 - **TeV-scale GENIE**: the standard `G18_10a_00_000` tune extrapolates its DIS
