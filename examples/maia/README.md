@@ -57,10 +57,11 @@ flux); only the spatial model is the direct-injection slice.
 
 - **First run is slow**: `cross_sections: auto` generates GENIE splines up to
   Eμ on demand (`gmkspl … -e 5000`) and caches them in the run directory —
-  hours the first time for 5 TeV on tungsten, instant afterwards. The HEDIS
-  image bakes the νμ-on-W-184 spline for `nu_slice_numu_hedis.yaml`, so that
-  one config skips the wait (the driver picks up `$HEDIS_XSEC_DIR`); other
-  probe/target combinations still build on demand.
+  hours the first time for 5 TeV on tungsten, instant afterwards. **The HEDIS
+  image now bakes the νμ-on-W-184 spline (to 5 TeV)**, so
+  `nu_slice_numu_hedis.yaml` skips that wait entirely — verified by running
+  `gevgen` off the baked file. Other probe/target/energy combinations still
+  build on demand.
 - **Achilles ≠ high energy**: `nu_slice_achilles.yaml` deliberately drops to a
   5 GeV muon source and a ¹²C target — Achilles models the ~GeV regime, not the
   TeV DIS the muon-collider slice actually lives in. It shares the *geometry*,

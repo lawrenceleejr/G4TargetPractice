@@ -1,6 +1,6 @@
 # Neutrino physics quickstart
 
-GDMLTargetPractice runs **three engines against the same GDML target through
+GDMLTargetPractice runs **four engines against the same GDML target through
 one YAML frontend**, and every engine writes the same `output.root` schema —
 so generating, validating, and comparing neutrino interactions is a
 three-command workflow. This page walks the canonical study: **2 GeV νμ on
@@ -27,7 +27,7 @@ gdmltp run --gdml gdml/liquid_argon_1m3.gdml --particle nu_mu \
            --energy "2 GeV" -n 1000 -o g4_out
 ```
 
-The two YAML files differ only in the `generator:` line and the backend block —
+These YAML files differ only in the `generator:` line and the backend block —
 beam and geometry are shared. Anything in the YAML can be overridden per run
 from the command line (`--energy "5 GeV"`, `--particle nu_e`, `-n 10000`).
 Particles can be given by name (`nu_mu`) or PDG id (`14`).
@@ -140,10 +140,11 @@ needs no APFEL, only the `cteq6` grid — a lighter alternative.)
 
 ### The HEDIS cross-section splines are the expensive part
 
-The structure-function tables are baked into the HEDIS image, but the **xsec
-splines** (`gmkspl`) are not, and at TeV energies on a heavy nucleus they are
-genuinely slow: measured here, a coarse 500 GeV free-proton spline took ~80
-minutes, and νμ on W-184 up to 5 TeV extrapolates to many hours. This is
+The image bakes the structure-function tables **and** the xsec spline for the
+reference configuration (νμ on W-184 to 5 TeV), so the shipped MAIA HEDIS
+example needs no spline build. Any *other* probe/target/energy still calls
+`gmkspl`, and at TeV energies on a heavy nucleus that is genuinely slow:
+measured here, a coarse 500 GeV free-proton spline took ~80 minutes. This is
 inherent to high-energy DIS, not a quirk of this tool — FASER, doing the same
 νμ-on-W-184 physics, states plainly that "the default GENIE doesn't have the
 cross section splines above 100 GeV. The cross section splines should be
@@ -163,13 +164,18 @@ Your options, best first:
    equivalent). There is **no public HTTP download** of these files — the
    `GENIE-HEDIS` fork that once shipped XML/ROOT tables is gone and
    `tunes.genie-mc.org` is offline, so CVMFS is the only pre-computed source.
-2. **Bake one into the image.** The base build attempts a coarse spline
-   (best-effort, time-bounded — see `docker/genie-base.Dockerfile`), and
-   `--build-arg HEDIS_XSEC_URL=<url>` bakes a spline you host yourself instead
-   of computing it. The driver picks up anything in `$HEDIS_XSEC_DIR` whose
-   name/energy covers the request.
-3. **Let it build on demand** (`cross_sections: auto`, the default). Slow once,
-   then cached in the run directory. Fine for an overnight run.
+2. **Use the baked one.** The HEDIS base image **already ships** the spline for
+   νμ(+ν̄μ) on **W-184 up to 5 TeV** (`GHE19_00c` / HEDIS) in `$HEDIS_XSEC_DIR`,
+   and the driver finds it automatically — so
+   `examples/maia/nu_slice_numu_hedis.yaml` starts generating immediately.
+   Verified: `gevgen` runs straight off it with no metafile mismatch. Other
+   probe/target/energy combinations fall back to on-demand generation. To bake a
+   different one, `--build-arg HEDIS_XSEC_URL=<url>` fetches a spline you host,
+   or adjust `HEDIS_XSEC_{PROBE,TARGET,EMAX,KNOTS}` in
+   `docker/genie-base.Dockerfile`.
+3. **Let it build on demand** (`cross_sections: auto`, the default) for any
+   combination that is not baked. Slow once (hours for a heavy nucleus at TeV),
+   then cached in the run directory.
 
 ### Other TeV-scale options
 

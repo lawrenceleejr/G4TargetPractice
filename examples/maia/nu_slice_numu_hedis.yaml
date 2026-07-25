@@ -18,14 +18,17 @@
 # ENABLE_HEDIS=1, which bakes cteq6l1 + the GHE19_00c structure-function
 # tables). On a non-HEDIS image the driver stops with a clear message.
 #
-# PERFORMANCE NOTE: the HEDIS *cross-section splines* (gmkspl) are built on
-# demand for this probe/target/energy and are SLOW to compute -- a modest
-# spline takes on the order of an hour, and this example's multi-TeV reach
-# takes longer, so the FIRST run spends a long time in gmkspl before any events
-# are generated. The result is cached in the run directory, so reruns are fast.
-# The structure-function tables themselves are baked into the image; only the
-# xsec splines are on-demand. To pre-seed, drop a prebuilt gxspl XML in the run
-# dir (or point `cross_sections:` at one).
+# PERFORMANCE: this exact configuration runs WITHOUT a spline build. The HEDIS
+# image bakes both the structure-function tables and the cross-section spline
+# for numu(+bar) on W-184 up to 5 TeV, and the driver picks it up automatically
+# from $HEDIS_XSEC_DIR -- verified: gevgen runs straight off it. (Computing that
+# spline with gmkspl takes hours, which is why it is baked rather than left to
+# the first run.)
+#
+# Change the probe, target or raise the energy beyond 5 TeV and the driver falls
+# back to on-demand gmkspl -- slow the first time, then cached in the run
+# directory. To pre-seed those cases, point `cross_sections:` at a prebuilt
+# gxspl XML (a CVMFS path works; see docs/neutrino.md).
 # The NLO GHE19_00a (BGR18) tune needs APFEL + its NNPDF3.1sx PDF, which is not
 # on the LHAPDF server -- supply that set and switch the tune to use it.
 generator: genie
