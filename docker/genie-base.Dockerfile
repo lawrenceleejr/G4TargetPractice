@@ -200,9 +200,22 @@ ARG HEDIS_XSEC_TARGET=1000741840
 ARG HEDIS_XSEC_EMAX=5000
 ARG HEDIS_XSEC_KNOTS=3
 ARG HEDIS_XSEC_TIMEOUT=14400
+# Prefer a ready-made spline over computing one: GENIE's own pre-computed HEDIS
+# splines are published on CVMFS only (no public HTTP download -- the
+# GENIE-HEDIS fork that shipped XML/ROOT tables is gone and tunes.genie-mc.org
+# is offline), so point this at a spline you host yourself to skip gmkspl
+# entirely. Users with /cvmfs mounted can instead just set
+# genie.cross_sections to the CVMFS path at run time (see docs/neutrino.md).
+ARG HEDIS_XSEC_URL=
 RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
       mkdir -p "$HEDIS_XSEC_DIR" && cd "$HEDIS_XSEC_DIR" && \
       OUT="gxspl_${HEDIS_XSEC_PROBE}_${HEDIS_XSEC_TARGET}_${HEDIS_TUNE}_HEDIS_${HEDIS_XSEC_EMAX}gev.xml" && \
+      if [ -n "${HEDIS_XSEC_URL}" ]; then \
+        echo "[hedis] fetching prebuilt xsec spline from ${HEDIS_XSEC_URL}" && \
+        wget -q --tries=5 --retry-connrefused --waitretry=20 --timeout=60 \
+          "${HEDIS_XSEC_URL}" -O "$OUT" && \
+        ls -la "$HEDIS_XSEC_DIR" ; \
+      else \
       echo "[hedis] baking xsec spline (best-effort, timeout ${HEDIS_XSEC_TIMEOUT}s): $OUT" && \
       if timeout "${HEDIS_XSEC_TIMEOUT}" gmkspl \
             -p "${HEDIS_XSEC_PROBE},-${HEDIS_XSEC_PROBE}" -t "${HEDIS_XSEC_TARGET}" \
@@ -212,6 +225,7 @@ RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
       else \
         echo "[hedis] xsec spline bake did not finish in budget; removing partial, driver will build on demand" && \
         rm -f "$OUT" ; \
+      fi ; \
       fi ; \
     fi
 # Runtime marker: the gdmltp genie driver checks this before running gmkhedissf

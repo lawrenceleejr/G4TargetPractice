@@ -135,6 +135,49 @@ the default GENIE image does not include APFEL and will fail at the
 `gmkhedissf` step with a clear error. (`GHE19_00c_00_000` is a LO variant that
 needs no APFEL, only the `cteq6` grid — a lighter alternative.)
 
+### The HEDIS cross-section splines are the expensive part
+
+The structure-function tables are baked into the HEDIS image, but the **xsec
+splines** (`gmkspl`) are not, and at TeV energies on a heavy nucleus they are
+genuinely slow: measured here, a coarse 500 GeV free-proton spline took ~80
+minutes, and νμ on W-184 up to 5 TeV extrapolates to many hours. This is
+inherent to high-energy DIS, not a quirk of this tool — FASER, doing the same
+νμ-on-W-184 physics, states plainly that "the default GENIE doesn't have the
+cross section splines above 100 GeV. The cross section splines should be
+calculated in advance", and generates them on a batch farm with
+`gmkspl -p 14 -t 1000741840 -n 200 -e 10000`.
+
+Your options, best first:
+
+1. **Point at a spline you already have.** `genie.cross_sections: /path/to/gxspl.xml`
+   in the YAML is honored verbatim. If you have CVMFS, the HEDIS splines are
+   published there and work directly:
+   ```yaml
+   genie:
+     cross_sections: /cvmfs/fermilab.opensciencegrid.org/products/genie/externals/pochoarus-genie_he_data/splines/GHE19_00a_00_000.xml
+   ```
+   (mount `/cvmfs` into the container with `--docker-arg` / your runner's
+   equivalent). There is **no public HTTP download** of these files — the
+   `GENIE-HEDIS` fork that once shipped XML/ROOT tables is gone and
+   `tunes.genie-mc.org` is offline, so CVMFS is the only pre-computed source.
+2. **Bake one into the image.** The base build attempts a coarse spline
+   (best-effort, time-bounded — see `docker/genie-base.Dockerfile`), and
+   `--build-arg HEDIS_XSEC_URL=<url>` bakes a spline you host yourself instead
+   of computing it. The driver picks up anything in `$HEDIS_XSEC_DIR` whose
+   name/energy covers the request.
+3. **Let it build on demand** (`cross_sections: auto`, the default). Slow once,
+   then cached in the run directory. Fine for an overnight run.
+
+### Other TeV-scale options
+
+HEDIS is not the only way to get TeV DIS, though it is the only one that plugs
+into this tool's GENIE path. For reference: **CSMS**, **BGR18** (the model
+behind GHE19), **CTW** and **GQRS** are cross-section calculations only — no
+final states. For full events, **Pythia 8** (used by the forward-physics/FASERν
+community), **Sherpa** and **Herwig** can do νN DIS but bring no nuclear/FSI
+modeling. **NEUT**, **NuWro** and **Achilles** are accelerator/GeV-scale and are
+not valid at TeV.
+
 ## Realistic beams
 
 Everything above uses a pencil beam. The frontend also samples **distributions
