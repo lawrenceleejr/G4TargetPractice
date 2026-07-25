@@ -184,6 +184,36 @@ RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
       gmkhedissf --tune "${HEDIS_TUNE}" && \
       echo "HEDIS SF tables built:" && find "$HEDIS_SF_DATA_PATH" -name 'QrkSF*' | head ; \
     fi
+# Bake a HEDIS cross-section spline for the shipped MAIA example (nu_mu + bar on
+# W-184, GHE19_00c / HEDIS, up to 5 TeV) so it runs without the slow on-demand
+# gmkspl. HEDIS xsec integration is genuinely expensive -- a full-quality spline
+# is many hours, more than a CI build can afford -- so this is BEST-EFFORT and
+# NON-FATAL: a coarse spline (few knots; gevgen accepts it, verified) under a
+# hard time budget that keeps the build inside its cap. If it doesn't finish it
+# is skipped and the driver falls back to on-demand generation (which caches in
+# the run dir). The filename follows the driver's cache convention so
+# _baked_hedis_spline() in run_genie.py finds it. Knot count / budget are ARGs
+# so a beefier offline build can raise them.
+ENV HEDIS_XSEC_DIR=${GENIE}/data/evgen/hedis-xsec
+ARG HEDIS_XSEC_PROBE=14
+ARG HEDIS_XSEC_TARGET=1000741840
+ARG HEDIS_XSEC_EMAX=5000
+ARG HEDIS_XSEC_KNOTS=3
+ARG HEDIS_XSEC_TIMEOUT=14400
+RUN if [ "$ENABLE_HEDIS" = "1" ]; then \
+      mkdir -p "$HEDIS_XSEC_DIR" && cd "$HEDIS_XSEC_DIR" && \
+      OUT="gxspl_${HEDIS_XSEC_PROBE}_${HEDIS_XSEC_TARGET}_${HEDIS_TUNE}_HEDIS_${HEDIS_XSEC_EMAX}gev.xml" && \
+      echo "[hedis] baking xsec spline (best-effort, timeout ${HEDIS_XSEC_TIMEOUT}s): $OUT" && \
+      if timeout "${HEDIS_XSEC_TIMEOUT}" gmkspl \
+            -p "${HEDIS_XSEC_PROBE},-${HEDIS_XSEC_PROBE}" -t "${HEDIS_XSEC_TARGET}" \
+            --tune "${HEDIS_TUNE}" --event-generator-list HEDIS \
+            -n "${HEDIS_XSEC_KNOTS}" -e "${HEDIS_XSEC_EMAX}" -o "$OUT" ; then \
+        echo "[hedis] baked xsec spline:" && ls -la "$HEDIS_XSEC_DIR" ; \
+      else \
+        echo "[hedis] xsec spline bake did not finish in budget; removing partial, driver will build on demand" && \
+        rm -f "$OUT" ; \
+      fi ; \
+    fi
 # Runtime marker: the gdmltp genie driver checks this before running gmkhedissf
 # so a HEDIS tune on a non-HEDIS image fails with a clear message, not SIGABRT.
 ENV GDMLTP_HEDIS=${ENABLE_HEDIS}
