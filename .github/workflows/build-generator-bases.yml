@@ -1,10 +1,10 @@
 name: Build Generator Base Images
-# Builds GENIE and Achilles FROM SOURCE into dedicated base images, so nobody
-# downstream (users or the per-push app-image workflows) ever compiles a
-# generator themselves. These are slow builds (GENIE ~2-3 h: Pythia6 + ROOT +
-# LHAPDF + GENIE), so they run only when the base recipes change or on manual
-# dispatch -- the per-push app images just layer gdmltp on top of the published
-# bases. Failures are real failures.
+# Builds GENIE, Achilles and Pythia 8 FROM SOURCE into dedicated base images, so
+# nobody downstream (users or the per-push app-image workflows) ever compiles a
+# generator themselves. GENIE is the slow one (~2-3 h: Pythia6 + ROOT + LHAPDF +
+# GENIE); the Pythia 8 + HepMC3 base builds in minutes. They run only when the
+# base recipes change or on manual dispatch -- the per-push app images just layer
+# gdmltp on top of the published bases. Failures are real failures.
 #
 # The GENIE base is built WITH HEDIS support by default (enable_hedis=1): it
 # adds APFEL, installs the GHE19 tune's LHAPDF grid, and bakes the HEDIS
@@ -16,6 +16,7 @@ on:
     paths:
       - "docker/genie-base.Dockerfile"
       - "docker/achilles-base.Dockerfile"
+      - "docker/pythia-base.Dockerfile"
       - ".github/workflows/build-generator-bases.yml"
   workflow_dispatch:
     inputs:
@@ -35,6 +36,10 @@ on:
         description: "Achilles git ref"
         required: false
         default: "main"
+      pythia_version:
+        description: "Pythia 8 version (e.g. 8315)"
+        required: false
+        default: "8315"
 
 concurrency:
   group: generator-bases-${{ github.ref }}
@@ -44,6 +49,7 @@ env:
   GENIE_VERSION: ${{ github.event.inputs.genie_version || 'R-3_04_02' }}
   ROOT_VERSION: ${{ github.event.inputs.root_version || '6.28.12' }}
   ACHILLES_REF: ${{ github.event.inputs.achilles_ref || 'main' }}
+  PYTHIA_VERSION: ${{ github.event.inputs.pythia_version || '8315' }}
 
 jobs:
   genie-base:
@@ -153,3 +159,48 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=achilles-base
           cache-to: type=gha,mode=max,scope=achilles-base
+
+  pythia-base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-pythia-base
+          flavor: |
+            latest=true
+          tags: |
+            type=raw,value=${{ env.PYTHIA_VERSION }}
+
+      - name: Build and push the Pythia base image
+        # Cheap compared to the GENIE base: Pythia 8 + HepMC3 are self-contained
+        # C++ and build in minutes, so the plain GHA cache is fine here.
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/pythia-base.Dockerfile
+          build-args: |
+            PYTHIA_VERSION=${{ env.PYTHIA_VERSION }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=pythia-base
+          cache-to: type=gha,mode=max,scope=pythia-base

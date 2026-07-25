@@ -1,0 +1,107 @@
+name: Build Pythia Image
+# Separate workflow (mirrors the GENIE/Achilles ones): the Pythia base and the
+# card grammar are release-sensitive, so it builds independently and is not a
+# required merge check (the Python + Geant4 jobs in build-test-deploy.yml are).
+# Runs on every push; failures are REAL failures, shown red.
+#
+# Unlike the GENIE image this one is cheap end-to-end: Pythia 8 + HepMC3 compile
+# in minutes and there are no cross-section splines to precompute, so the smoke
+# test below runs a real generation AND the full conversion to output.root.
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      pythia_base:
+        description: "Pythia base image"
+        required: false
+        default: "ghcr.io/lawrenceleejr/g4targetpractice-pythia-base:latest"
+
+env:
+  # Base-image resolution: workflow_dispatch input > repo variable > our own
+  # from-source base (built by build-generator-bases.yml so nobody downstream
+  # compiles Pythia themselves). Red until that base workflow has published once.
+  PYTHIA_BASE: ${{ github.event.inputs.pythia_base || vars.PYTHIA_BASE_IMAGE || 'ghcr.io/lawrenceleejr/g4targetpractice-pythia-base:latest' }}
+
+jobs:
+  docker-pythia:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-pythia
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build (and push on non-PR) the Pythia image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/pythia.Dockerfile
+          build-args: |
+            PYTHIA_BASE=${{ env.PYTHIA_BASE }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=pythia
+          cache-to: type=gha,mode=max,scope=pythia
+
+      - name: Smoke test (real generation -> output.root)
+        run: |
+          set -x
+          IMG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          # the image must expose gdmltp, the converter and the Pythia toolchain
+          docker run --rm --entrypoint python3 "$IMG" -c \
+            "import gdmltp; from gdmltp.backends import achilles_convert, pythia; print('pythia image OK', gdmltp.__version__)"
+          docker run --rm --entrypoint bash "$IMG" -c \
+            'set -e; command -v pythia_gen; ! ldd "$(command -v pythia_gen)" | grep "not found"'
+
+          # End-to-end: a real 100 GeV nu_mu DIS run on a free nucleon through
+          # the driver, then assert the ntuple exists and carries the nu_* block.
+          mkdir -p run && cp gdml/liquid_argon_1m3.gdml run/
+          cat > run/pythia_job.json <<'JSON'
+          {
+            "generator": "pythia", "gdml": "liquid_argon_1m3.gdml",
+            "probe": 14, "nucleon": 2212, "process": "dis",
+            "settings": [], "q2_min": 1.0, "pt_min": null,
+            "flux": {"mode": "mono", "value": "100 GeV", "sigma": null,
+                     "min": null, "max": null, "bins": []},
+            "position": "0 0 -50 cm", "direction": "0 0 1",
+            "events": 20, "output": "output.root", "seed": 4242,
+            "length_units": "mm", "cmnd": null
+          }
+          JSON
+          docker run --rm -v "$PWD/run":/run -w /run "$IMG" pythia_job.json
+          docker run --rm -v "$PWD/run":/run -w /run --entrypoint python3 "$IMG" -c "
+          import uproot
+          t = uproot.open('/run/output.root')['tree']
+          n = t.num_entries
+          print('events:', n)
+          assert n == 20, f'expected 20 events, got {n}'
+          assert t['nu_isCC'].array(library='np').sum() + t['nu_isNC'].array(library='np').sum() > 0
+          assert (t['nTracks'].array(library='np') > 0).all(), 'an event has no final-state particles'
+          print('primaryPDG[0]:', t['primaryPDG'].array(library='np')[0])
+          print('process label:', t['nu_interactionProcess'].array(library='np')[0])
+          print('pythia -> output.root OK')
+          "

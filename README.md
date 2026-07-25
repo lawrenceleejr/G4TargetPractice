@@ -19,6 +19,7 @@ just Docker.
   - `geant4` — full particle transport (the `g4sim` engine). *Default.*
   - `genie` — neutrino event generation on the GDML target. *Vertex-level (v1).*
   - `achilles` — theory-driven lepton-nucleus generation ([Achilles](https://github.com/AchillesGen/Achilles)); neutrino **and** `e∓` beams. *Vertex-level (v1).*
+  - `pythia` — [Pythia 8](https://pythia.org) collisions off a **free nucleon**: TeV-scale DIS with **no cross-section splines to precompute**, plus min-bias/hard-QCD. Shower + hadronization, then Geant4 transport via `transport: true`. *No nuclear medium/cascade — use genie/achilles for those.*
   - `decay` — long-lived **BSM projectiles** (HNLs, dark photons, ALPs), decayed **by Geant4** (`G4DecayTable`/`G4Decay`) with lifetime-importance reweighting: displaced vertex + full detector response in one stage. See [docs/bsm.md](docs/bsm.md).
   - `external` — bring **HepMC3 events from a real generator** (Pythia8, MadGraph) into the same schema/transport pipeline. See [docs/bsm.md](docs/bsm.md).
   - `fluka` (via flugg) — *planned, not yet available.*
@@ -245,6 +246,7 @@ gdmltp run --generator genie --gdml gdml/liquid_argon_1m3.gdml --particle nu_mu 
 | `geant4` | `ghcr.io/lawrenceleejr/g4targetpractice` | full transport |
 | `genie` | `ghcr.io/lawrenceleejr/g4targetpractice-genie` | neutrino vertices (v1) |
 | `achilles` | `ghcr.io/lawrenceleejr/g4targetpractice-achilles` | ν / e∓ vertices (v1) |
+| `pythia` | `ghcr.io/lawrenceleejr/g4targetpractice-pythia` | Pythia 8 free-nucleon collisions; TeV DIS with no splines |
 | `decay` | the geant4 image | BSM decay-in-flight **by Geant4** (G4DecayTable + G4Decay), one stage incl. transport |
 | `external` | *(none — host conversion)* | HepMC3 events from Pythia8/MadGraph etc.; `transport: true` uses the geant4 image |
 
@@ -252,7 +254,7 @@ gdmltp run --generator genie --gdml gdml/liquid_argon_1m3.gdml --particle nu_mu 
 `--image`. (Image repositories keep the `g4targetpractice` name until the GitHub
 repository itself is renamed.)
 
-> **Nobody compiles generators.** GENIE and Achilles are built **from source in
+> **Nobody compiles generators.** GENIE, Achilles and Pythia 8 are built **from source in
 > CI** into dedicated base images (`docker/genie-base.Dockerfile`: Pythia6 →
 > ROOT-with-Pythia6 → LHAPDF → GENIE; `docker/achilles-base.Dockerfile`),
 > published by the `Build Generator Base Images` workflow as

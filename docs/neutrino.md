@@ -10,7 +10,7 @@ Requirements: Docker + `pip install "git+https://github.com/lawrenceleejr/G4Targ
 (the frontend is pure Python — no ROOT, no Geant4, no GENIE on your machine;
 the engines run in containers that `gdmltp run` pulls automatically).
 
-## 1. Generate: the same beam and target, three engines
+## 1. Generate: the same beam and target, four engines
 
 ```bash
 # GENIE (neutrino event generator; the reference for oscillation-experiment physics)
@@ -18,6 +18,9 @@ gdmltp run --config examples/nu_argon.yaml -o genie_out
 
 # Achilles (theory-driven lepton-nucleus generator with intranuclear cascade)
 gdmltp run --config examples/nu_argon_achilles.yaml -o achilles_out
+
+# Pythia 8 (high-energy DIS off a free nucleon; no cross-section splines needed)
+gdmltp run --config examples/nu_argon_pythia.yaml -o pythia_out
 
 # Geant4's built-in neutrino handling (thin; kept for contrast/completeness)
 gdmltp run --gdml gdml/liquid_argon_1m3.gdml --particle nu_mu \
@@ -170,13 +173,61 @@ Your options, best first:
 
 ### Other TeV-scale options
 
-HEDIS is not the only way to get TeV DIS, though it is the only one that plugs
-into this tool's GENIE path. For reference: **CSMS**, **BGR18** (the model
-behind GHE19), **CTW** and **GQRS** are cross-section calculations only — no
-final states. For full events, **Pythia 8** (used by the forward-physics/FASERν
-community), **Sherpa** and **Herwig** can do νN DIS but bring no nuclear/FSI
-modeling. **NEUT**, **NuWro** and **Achilles** are accelerator/GeV-scale and are
-not valid at TeV.
+HEDIS is not the only way to get TeV DIS. **Pythia 8 is wired up as a first-class
+backend** precisely because it needs no splines — see below. For reference,
+**CSMS**, **BGR18** (the model behind GHE19), **CTW** and **GQRS** are
+cross-section calculations only, with no final states; **Sherpa** and **Herwig**
+can do νN DIS but bring no nuclear/FSI modeling and are not integrated here;
+**NEUT**, **NuWro** and **Achilles** are accelerator/GeV-scale and are not valid
+at TeV.
+
+## Pythia 8: TeV DIS with no spline cost, handed to Geant4
+
+The `pythia` backend generates the collision with Pythia 8 (full parton shower +
+hadronization) and hands every final-state particle to Geant4 for transport:
+
+```yaml
+generator: pythia
+geometry: {gdml: gdml/MAIA_v0.gdml}
+beam:
+  particle: nu_mu
+  energy: {mode: mudecay_numu, value: "5 TeV"}
+pythia:
+  process: dis             # weak-boson exchange: CC (W) + NC (gamma*/Z)
+  target: 1000741840       # W-184 -> reduced to its majority nucleon
+  transport: true          # Geant4 transports the final state through the GDML
+```
+
+`examples/nu_argon_pythia.yaml` (simple) and
+`examples/maia/nu_slice_pythia.yaml` (the TeV MAIA slice) are ready to run.
+
+**Why reach for it.** No cross-section splines: where the HEDIS route spends
+hours in `gmkspl` before the first event, Pythia starts generating immediately,
+at any energy. The image is correspondingly cheap to build (Pythia 8 + HepMC3
+compile in minutes, versus hours for the GENIE base).
+
+**What you give up — state this in any writeup.** Pythia collides the beam with a
+single **free nucleon**: no nuclear medium, no Fermi motion, no intranuclear
+cascade, and no nuclear A-scaling of the rate. A nuclear target from the GDML is
+reduced to its majority nucleon (W-184 → a neutron). When nuclear effects
+matter, use `genie` (HEDIS at TeV) or `achilles` (GeV, with a cascade).
+
+**Knobs.** `process:` selects a preset — `dis` (weak-boson exchange), `softqcd`
+(inelastic minimum bias), `hardqcd` (2→2 jets, with `pt_min`), or `none`.
+`q2_min` sets the DIS phase-space cut. Raw `settings:` are appended to the
+generated card **after** the preset, so they override anything it set:
+
+```yaml
+pythia:
+  process: dis
+  settings: ["PDF:pSet = 8", "PartonLevel:MPI = off"]
+```
+
+For total control, `cmnd: my_card.cmnd` supplies a verbatim Pythia command file
+and the presets are bypassed entirely. Card grammar is release-sensitive; the
+rendered card is checked by the unit tests and exercised for real by the
+(non-gating) pythia CI smoke, which runs a generation and asserts the resulting
+`output.root`.
 
 ## Realistic beams
 

@@ -7,7 +7,7 @@
 # DIS with no cross-section splines to precompute.
 FROM ubuntu:22.04
 
-ARG PYTHIA_VERSION=8312
+ARG PYTHIA_VERSION=8315
 ARG HEPMC3_VERSION=3.2.6
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -36,8 +36,11 @@ ENV LD_LIBRARY_PATH=${HEPMC3_DIR}/lib:${HEPMC3_DIR}/lib64:${LD_LIBRARY_PATH}
 
 # --- Pythia 8 (configured against HepMC3 so Pythia8Plugins/HepMC3.h works) ---
 ENV PYTHIA8_DIR=/opt/pythia8
+# NB: the download path is /releases/pythia83/ (it 302-redirects, so wget must
+# follow) -- /download/pythia83/ is a 404.
 RUN wget -q --tries=5 --retry-connrefused --waitretry=20 --timeout=60 \
-      "https://pythia.org/download/pythia83/pythia${PYTHIA_VERSION}.tgz" \
+      --max-redirect=5 \
+      "https://pythia.org/releases/pythia83/pythia${PYTHIA_VERSION}.tgz" \
       -O pythia.tgz && \
     tar -xzf pythia.tgz && rm pythia.tgz && \
     cd "pythia${PYTHIA_VERSION}" && \
