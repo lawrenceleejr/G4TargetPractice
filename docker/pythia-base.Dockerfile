@@ -32,7 +32,7 @@ RUN wget -q --tries=5 --retry-connrefused --waitretry=20 --timeout=60 \
     cmake --build hepmc3-build -j"$(nproc)" && cmake --install hepmc3-build && \
     rm -rf hepmc3-build "HepMC3-${HEPMC3_VERSION}"
 ENV PATH=${HEPMC3_DIR}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${HEPMC3_DIR}/lib:${HEPMC3_DIR}/lib64:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=${HEPMC3_DIR}/lib:${HEPMC3_DIR}/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 
 # --- Pythia 8 (configured against HepMC3 so Pythia8Plugins/HepMC3.h works) ---
 ENV PYTHIA8_DIR=/opt/pythia8
@@ -50,7 +50,7 @@ RUN wget -q --tries=5 --retry-connrefused --waitretry=20 --timeout=60 \
     make -j"$(nproc)" && make install && \
     cd /opt && rm -rf "pythia${PYTHIA_VERSION}"
 ENV PATH=${PYTHIA8_DIR}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${PYTHIA8_DIR}/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=${PYTHIA8_DIR}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
 # Pythia needs its data tables (particle data, PDF grids) at run time.
 ENV PYTHIA8DATA=${PYTHIA8_DIR}/share/Pythia8/xmldoc
 
