@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<gdml>
+  <solids>
+    <box name="WorldBox" x="1000" y="1000" z="1000" lunit="cm"/>
+    <box name="WBox"     x="500"  y="500"  z="500"  lunit="cm"/>
+  </solids>
+
+  <structure>
+    <volume name="W_vol">
+      <materialref ref="G4_W"/>
+      <solidref ref="WBox"/>
+    </volume>
+
+    <volume name="World">
+      <materialref ref="G4_AIR"/>
+      <solidref ref="WorldBox"/>
+      <physvol>
+        <volumeref ref="W_vol"/>
+        <position x="0" y="0" z="0"/>
+      </physvol>
+    </volume>
+  </structure>
+
+  <setup name="Default" version="1.0">
+    <world ref="World"/>
+  </setup>
+</gdml>
