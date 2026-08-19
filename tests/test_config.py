@@ -182,3 +182,29 @@ def test_yaml_kept_when_flag_at_default(tmp_path):
     path = _write(tmp_path, "geometry: {gdml: g.gdml}\nbeam: {particle: proton}\n")
     cfg = config.load(_run_ns(config=path), _DEFAULTS)
     assert cfg.beam.particle == "proton"          # flag default must not clobber YAML
+
+
+def test_neutrino_block_validation():
+    """geant4.neutrino is validated by rendering it, so every group/term the
+    backend accepts validates and nothing else does."""
+    def cfg(v):
+        return config.RunConfig(gdml="g.gdml", geant4={"neutrino": v})
+
+    cfg({"region": "target", "region_pattern": "LAr"}).validate()
+    cfg({"nucleus_mu": {"mfp_bias": 1e9, "xsec_bias": 1, "lowest_energy": "1 MeV"}}).validate()
+    cfg({"electron": {"enable": False, "cc_bias": 10, "nc_bias": 1}}).validate()
+    cfg({"oscillation": {"enable": True, "region": "tgtosc",
+                         "region_pattern": "LAr", "distance_bias": 1e8}}).validate()
+    cfg({"oscillation": "off"}).validate()
+
+    for bad, frag in [
+        ("nope", "must be a mapping"),
+        ({"whoops": {"mfp_bias": 2}}, "unknown key(s): whoops"),
+        ({"nucleus_mu": {"bogus": 1}}, "unknown key 'bogus' under nucleus_mu"),
+        # a distance bias is not a mean-free-path bias -- distinct Geant4 terms
+        ({"oscillation": {"mfp_bias": 2}}, "unknown key 'mfp_bias' under oscillation"),
+        ({"oscillation": 5}, "must be on/off or a mapping"),
+    ]:
+        with pytest.raises(config.ConfigError) as exc:
+            cfg(bad).validate()
+        assert frag in str(exc.value)

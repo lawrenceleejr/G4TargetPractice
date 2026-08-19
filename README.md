@@ -310,15 +310,27 @@ transport record — analyze/display/Blender all just work.
 
 ## Biasing knobs
 
-- **geant4**: `geant4.neutrino_bias` — Geant4's built-in neutrino cross sections
-  are so small that unbiased runs record nothing; when the primary is a neutrino
-  the generated macro auto-enables the stock `/physics_lists/em/Nu*` biasing
-  (factor 5×10¹², as in the shipped macros). Tune with
-  `{factor, cc_bias, nc_bias, nucleus_bias, detector_name}` or disable with
-  `neutrino_bias: off`. (Guarded with `/control/suppressAbortion` so Geant4
-  builds lacking these commands warn instead of aborting.) Prefer the `genie`
-  or `achilles` backends for real neutrino physics — event generators produce an
-  interaction in every event by construction, so they need no cross-section bias.
+- **geant4**: Geant4's built-in neutrino cross sections are so small that
+  unbiased runs record nothing (a 40 GeV νμ crosses 1 m of liquid argon with
+  interaction probability ~2.4×10⁻¹¹), so runs are biased. Two levels:
+  - `geant4.neutrino_bias` — the one-liner. `auto` (default) turns it on for a
+    neutrino primary at factor 5×10¹²; tune with
+    `{factor, cc_bias, nc_bias, nucleus_bias, detector_name, region_pattern}` or
+    `neutrino_bias: off`.
+  - `geant4.neutrino` — **one key per biasing term Geant4 actually implements**,
+    per process family, because Geant4 has four independent neutrino process
+    objects: `electron`, `nucleus_e`, `nucleus_mu`, `nucleus_tau` (plus
+    `nucleus`/`all` aliases) and `oscillation`. Terms: `enable`, `region` (a
+    `G4Region` name — the process is inert outside it), `mfp_bias`,
+    `cc_bias`/`nc_bias`, `xsec_bias`, `lowest_energy`, and
+    `oscillation.distance_bias`. These are genuinely different terms, not
+    aliases; see `docs/neutrino.md` for what each one does, measured
+    interaction rates for each, and `examples/nu_bias_lar_40gev.yaml`.
+
+  Upstream `/physics_lists/nu/*` macros still run — g4sim re-registers those
+  eight commands and translates them. Prefer the `genie` or `achilles` backends
+  for real neutrino physics: event generators produce an interaction in every
+  event by construction, so they need no cross-section bias.
 - **genie**: `genie.event_generator_list` restricts the interaction channels
   (e.g. `CC`, `CCQE`); `genie.tune` selects the model set.
 - **achilles**: `achilles.processes` selects the final-state lepton channels

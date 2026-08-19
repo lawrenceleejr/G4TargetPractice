@@ -101,6 +101,7 @@ void RunAction::BeginOfRunAction([[maybe_unused]] const G4Run* run) {
         fTree->Branch("nu_vertexT", &nu_vertexT, "nu_vertexT/D");
         fTree->Branch("nu_targetZ", &nu_targetZ, "nu_targetZ/I");
         fTree->Branch("nu_targetA", &nu_targetA, "nu_targetA/I");
+        fTree->Branch("nu_nOscillations", &nu_nOscillations, "nu_nOscillations/I");
         fTree->Branch("nu_outLeptonPDG", &nu_outLeptonPDG, "nu_outLeptonPDG/I");
         fTree->Branch("nu_outLeptonE", &nu_outLeptonE, "nu_outLeptonE/D");
         fTree->Branch("nu_outLeptonPx", &nu_outLeptonPx, "nu_outLeptonPx/D");

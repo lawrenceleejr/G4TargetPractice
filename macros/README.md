@@ -338,10 +338,12 @@ by `/analysis/neutrinoMode` (issue before `/run/beamOn`):
 `nu_*` branches: `nu_isCC`, `nu_isNC` (charged- vs neutral-current, from the
 outgoing lepton), `nu_interactionProcess` (the Geant4 process that caused the
 interaction — the categorization), `nu_vertexX/Y/Z/T` (interaction vertex),
-`nu_targetZ`/`nu_targetA` (struck nucleus), `nu_outLeptonPDG/E/Px/Py/Pz`
+`nu_targetZ`/`nu_targetA` (struck nucleus), `nu_nOscillations` (how many times
+Geant4's vacuum-oscillation process changed the neutrino's flavour — see
+`macros/nu_bias_40gev.mac`), `nu_outLeptonPDG/E/Px/Py/Pz`
 (outgoing lepton), and the derived kinematics `nu_Q2`, `nu_W`, `nu_x`
 (Bjorken x), `nu_y`, `nu_q0`. The neutrino macros (`neutrinos_lar_*.mac`,
-`electron_neutrinos_lar_mono.mac`) enable it explicitly. Example analysis:
+`electron_neutrinos_lar_mono.mac`, `nu_bias_40gev*.mac`) enable it explicitly. Example analysis:
 
 ```cpp
 // charged-current fraction

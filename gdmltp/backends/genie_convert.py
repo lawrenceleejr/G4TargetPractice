@@ -265,6 +265,8 @@ def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", 
         "nu_interactionProcess": procs,
         "nu_vertexX": vx, "nu_vertexY": vy, "nu_vertexZ": vz, "nu_vertexT": vt,
         "nu_targetZ": Z.astype(np.int32), "nu_targetA": A.astype(np.int32),
+        # external generators do not oscillate the probe: the flavour is fixed
+        "nu_nOscillations": np.zeros(n, np.int32),
         "nu_outLeptonPDG": lep_pdg.astype(np.int32),
         "nu_outLeptonE": El * GEV_TO_MEV,
         "nu_outLeptonPx": outlep_p[:, 0], "nu_outLeptonPy": outlep_p[:, 1],

@@ -206,6 +206,7 @@ class RunConfig:
         if nm is not None and nm not in ("auto", "on", "off"):
             raise ConfigError(
                 f"geant4.neutrino_mode must be auto/on/off, got {nm!r}")
+        self._validate_neutrino()
         self._validate_beam_distributions()
         if self.generator == "decay":
             self._validate_decay()
@@ -218,6 +219,19 @@ class RunConfig:
         except (TypeError, ValueError):
             raise ConfigError(f"run.events must be an integer, got {self.run.events!r}")
         return self
+
+    def _validate_neutrino(self):
+        """The `geant4.neutrino` block: one key per Geant4 biasing term. Validate
+        it by rendering it -- the renderer is the single source of truth for which
+        groups and terms exist, so the two can never drift apart."""
+        raw = self.geant4.get("neutrino")
+        if raw is None:
+            return
+        from .backends.geant4 import neutrino_knob_lines
+        try:
+            neutrino_knob_lines(raw)
+        except (ValueError, TypeError) as exc:
+            raise ConfigError(f"geant4.neutrino: {exc}") from None
 
     def _validate_decay(self):
         """Structural checks for the decay backend. The decay itself is done

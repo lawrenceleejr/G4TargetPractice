@@ -6,6 +6,7 @@
 #include "G4GDMLParser.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4Region.hh"
+#include "G4RegionStore.hh"
 #include "G4LogicalVolumeStore.hh"
 #include "G4UserLimits.hh"
 #include "G4NistManager.hh"
@@ -115,32 +116,67 @@ G4VPhysicalVolume* DetectorConstruction::Construct()
     }
     
 
-    // -----------------------------------------
-    // Create target region for sensitive volumes
-    // -----------------------------------------
-    auto targetRegion = new G4Region("target");
+    // -----------------------------------------------------------------
+    // Neutrino physics regions.
+    //
+    // Geant4's G4NeutrinoPhysics applies its cross-section bias only inside
+    // the G4Region named by /physics_lists/nu/NuDetectorName, and measures
+    // oscillation distance in the region named by NuOscDistanceName. The name
+    // is matched against a REGION, not a logical volume -- verified by
+    // experiment: with NuDetectorName=DefaultRegionForTheWorld a 40 GeV nu_mu
+    // at NuNucleusBias 1e12 interacted in 100/100 events (62 CC / 38 NC),
+    // while the same run naming an EMPTY region gave 0/100.
+    //
+    // This used to add only volumes whose name contained "_sens", so for every
+    // shipped geometry (LAr_vol, MAIA_*, ...) the "target" region came out
+    // EMPTY and neutrino biasing silently did nothing. Default now: every
+    // non-world volume joins "target". Narrow it with
+    // /detector/targetRegionPattern, and opt into a separate oscillation
+    // region with /detector/oscRegionPattern.
+    // -----------------------------------------------------------------
+    auto regionStore = G4RegionStore::GetInstance();
+    // FindOrCreate, not new: Construct() runs again on /run/reinitializeGeometry
+    // and a second G4Region with the same name would only warn and be ignored.
+    auto targetRegion = regionStore->FindOrCreateRegion("target");
+    // The oscillation region is created only when asked for: G4RunManagerKernel
+    // complains about a region with no root logical volume.
+    G4Region* oscRegion = fOscRegionPattern.empty()
+                          ? nullptr
+                          : regionStore->FindOrCreateRegion("tgtosc");
 
     auto lvStore = G4LogicalVolumeStore::GetInstance();
+    G4int nTarget = 0, nOsc = 0;
 
-    G4cout << "\n=== Assigning Target Region ===" << G4endl;
-
+    G4cout << "\n=== Assigning neutrino regions ===" << G4endl;
     for (auto lv : *lvStore) {
+        if (lv == worldLogical) continue;              // never bias the world
 
-      //G4cout << "Logical volume: " << lv->GetName() << G4endl;
-
-        // Select your detector volume
-	//        if (lv->GetName() == "VertexBarrel_layer0_sens") {
-        if (lv->GetName().find("_sens") != std::string::npos) {
-	  // if (lv == world->GetLogicalVolume()){
-	  //continue;   // Skip world
-	  // }
+        // Oscillation region wins when its pattern is set and matches, so a
+        // volume is never in both (G4Region membership is exclusive).
+        if (oscRegion &&
+            lv->GetName().find(fOscRegionPattern) != std::string::npos) {
+            oscRegion->AddRootLogicalVolume(lv);
+            ++nOsc;
+            G4cout << ">>> tgtosc (oscillation): " << lv->GetName() << G4endl;
+            continue;
+        }
+        if (fTargetRegionPattern.empty() ||
+            lv->GetName().find(fTargetRegionPattern) != std::string::npos) {
             targetRegion->AddRootLogicalVolume(lv);
-
-            G4cout << ">>> Target region set on: "
-                   << lv->GetName() << G4endl;
-	     }
+            ++nTarget;
+        }
     }
-
+    G4cout << "target region: " << nTarget << " volume(s)"
+           << (fTargetRegionPattern.empty()
+               ? G4String(" (all non-world)")
+               : G4String(" matching \"" + fTargetRegionPattern + "\""))
+           << "; tgtosc region: " << nOsc << " volume(s)" << G4endl;
+    if (nTarget == 0) {
+        G4cout << "*** WARNING: the \"target\" region is EMPTY -- "
+               << "/physics_lists/nu/NuDetectorName target will bias NOTHING "
+               << "and no neutrino will interact. Check "
+               << "/detector/targetRegionPattern." << G4endl;
+    }
     G4cout << "===============================\n" << G4endl;
 
     return fWorld;

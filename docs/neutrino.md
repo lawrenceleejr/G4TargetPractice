@@ -245,12 +245,99 @@ Achilles events are placed and rotated onto each sampled ray. See
 `examples/twiss_muon.yaml` and `examples/gauss_beam.yaml`, and the beam section
 of the main README.
 
+## Geant4's built-in neutrino physics: every biasing knob
+
+The `geant4` backend uses Geant4's own neutrino processes, whose cross sections
+are so small that an unbiased run records nothing: a 40 GeV νμ crossing 1 m of
+liquid argon interacts with probability ~2.4×10⁻¹¹. Geant4 therefore ships
+several **different** biasing terms, and g4sim exposes each of them separately —
+one YAML key, one UI command — instead of the single collapsed factor
+`/physics_lists/nu/*` gives you.
+
+### The four process families
+
+In Geant4 these are four independent process objects, each with its own factors,
+so they get their own groups: `electron` (ν+e⁻), `nucleus_e`, `nucleus_mu`,
+`nucleus_tau`. `nucleus` sets all three nucleus families at once and `all` sets
+all four. Oscillation is its own group.
+
+### The terms, and what each one actually does
+
+| Key | Geant4 call | Effect |
+|---|---|---|
+| `enable` | (register the process or not) | drop a family entirely |
+| `region` | process envelope name | **a `G4Region` name.** Outside it the process never interacts, whatever the bias |
+| `mfp_bias` | `G4*Process::SetBiasingFactor` | scales the mean free path **inside `region` only**, and **only for values > 1**. The "guarantee an interaction here" knob |
+| `cc_bias` / `nc_bias` | `G4*Process::SetBiasingFactors` | process factor becomes `max(cc, nc)`; either > 1 also makes the vertex be sampled **uniformly along the chord** through the volume. For `electron` the pair additionally reaches the separate CC and NC cross-section sets — the only place Geant4 truly reweights CC against NC |
+| `xsec_bias` | `G4*TotXsc::SetBiasingFactor` | scales the **tabulated cross section itself**, in every region. Upstream `G4NeutrinoPhysics` never sets this |
+| `lowest_energy` | `G4*Process::SetLowestEnergy` | below it the process does nothing |
+| `oscillation.distance_bias` | `G4NuVacOscProcess::SetBiasingFactor` | divides the oscillation length inside `region`; ignored unless > 1 |
+
+`region_pattern` (at the block's top level, and inside `oscillation`) chooses
+which logical volumes make up the regions: a substring the volume name must
+contain. Empty means every non-world volume joins `target`.
+
+```yaml
+geant4:
+  neutrino_mode: on
+  neutrino:
+    region: target                    # shorthand for all four families
+    nucleus_mu: {mfp_bias: 1.0e9}
+    electron:   {cc_bias: 1, nc_bias: 1}
+    oscillation: {enable: false}
+```
+
+`gdmltp run --dry-run` prints the rendered `/gdmltp/nu/...` lines;
+`/gdmltp/nu/list` in a macro prints the resolved table into the run log.
+`geant4.neutrino_bias` remains as the blunt one-liner shortcut (`auto` turns it
+on for a neutrino primary), and stands down automatically when an explicit
+`neutrino:` block is present.
+
+### Measured behaviour
+
+40 GeV νμ into `gdml/liquid_argon_1m3.gdml`, 300 events, one term at a time:
+
+| Setting | Interactions | Vertex z (mm) | Note |
+|---|---|---|---|
+| nothing | 0/300 | — | unbiased Geant4 |
+| `nucleus_mu.mfp_bias: 1e9` | 8/300 | 55 … 479 | vertex at the step end, forward half only |
+| `nucleus_mu.xsec_bias: 1e9` | 8/300 | 55 … 479 | same rate, different mechanism |
+| `nucleus_mu.cc_bias/nc_bias: 1e9` | 8/300 | −450 … 377 | `max()` rate **plus** uniform vertex spread |
+| `mfp_bias: 1e9`, region name that no region has | 0/300 | — | region scoping is absolute |
+| `nucleus_mu.lowest_energy: 100 TeV` | 0/300 | — | threshold above the beam kills the process |
+| `oscillation.distance_bias: 1e8` | 1/300 | — | 299/300 events oscillate (`nu_nOscillations`) |
+
+`nu_nOscillations` is a new output branch: how many times the vacuum-oscillation
+process changed the neutrino's flavour. It is what makes the oscillation knobs
+observable — and Geant4 keeps that process **on by default**, with no upstream
+command to disable it.
+
+### Upstream `/physics_lists/nu/*` macros still run
+
+g4sim registers its own neutrino constructor rather than `G4NeutrinoPhysics`, and
+re-registers the eight upstream command paths as a translation layer, so an
+existing macro works unchanged (`macros/nu_bias_40gev_physicslists.mac`). Two
+things to know about that interface:
+
+- `NuDetectorName` takes a **`G4Region`** name. Before this repo built `target`
+  over every non-world volume, that region was empty for every shipped geometry
+  and the bias silently did nothing — 0/100 interactions, versus 100/100 when
+  naming a region that exists.
+- `NeutrinoActivation` is registered but **dead upstream**: Geant4's messenger
+  has no branch for it. g4sim gives it the meaning its guidance claims (enable
+  the nucleus families).
+- `NuNucleusBias` is one factor shared by all three flavours and only applies
+  when `NuETotXscActivation` is true — which simultaneously collapses
+  `NuEleCcBias`/`NuEleNcBias` into a single `max(cc, nc)`. The `/gdmltp/nu/`
+  commands have no such coupling.
+
 ## Output schema (what you analyze)
 
 One TTree `tree`, one entry per event; units mm / MeV / ns / MeV/c. Neutrino
 runs fill the `nu_*` block: `nu_isCC/isNC`, `nu_interactionProcess`
 (QES/RES/DIS/COH/MEC), vertex, struck nucleus (Z, A), outgoing lepton
-(PDG, E, p), and Q²/W/x/y/q₀ (Q² in MeV²). Final-state particles are `trk_*`
+(PDG, E, p), Q²/W/x/y/q₀ (Q² in MeV²) and `nu_nOscillations` (Geant4 only;
+external generators write 0). Final-state particles are `trk_*`
 rows (kinetic `trk_startE`, production momenta `trk_px/py/pz`);
 transported files add `step_*` and `totalEdep`. Full branch reference:
 `macros/README.md`.

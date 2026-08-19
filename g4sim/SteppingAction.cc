@@ -10,6 +10,15 @@
 #include "G4SystemOfUnits.hh"
 #include <cmath>
 
+// Geant4's neutrino INTERACTION process names (the G4*NeutrinoNucleusProcess
+// and G4NeutrinoElectronProcess defaults). "nuVacOscillation" is deliberately
+// absent -- see the use site in UserSteppingAction.
+static bool IsNeutrinoInteraction(const G4String& name)
+{
+    return name == "muNuNucleus" || name == "elNuNucleus"
+        || name == "tau-neutrino-nucleus" || name == "nuElectron";
+}
+
 SteppingAction::SteppingAction(EventAction* eventAction, RunAction* runAction)
 : fEventAction(eventAction), fRunAction(runAction) {}
 
@@ -53,9 +62,26 @@ void SteppingAction::UserSteppingAction(const G4Step* step)
         bool isPrimaryNeutrino =
             std::abs(pdg) == 12 || std::abs(pdg) == 14 || std::abs(pdg) == 16;
 
-        if (isPrimaryNeutrino && stepProcess && !fEventAction->interactionRecorded) {
-            G4String procName = stepProcess->GetProcessName();
-            if (procName != "Transportation") {
+        if (isPrimaryNeutrino && stepProcess) {
+            const G4String procName = stepProcess->GetProcessName();
+            const bool madeSecondaries =
+                !step->GetSecondaryInCurrentStep()->empty();
+
+            // Vacuum oscillation kills the neutrino and emits a new-flavour
+            // one. Count it, but never record it as an interaction: it used to
+            // fall through the "any process that is not Transportation" test
+            // below and be written out as a neutral-current event, so a run
+            // with /gdmltp/nu/oscillation/distanceBias > 1 reported ~100% NC.
+            if (procName == "nuVacOscillation") {
+                if (madeSecondaries) ++fEventAction->nuOscillations;
+            }
+            // Only Geant4's four genuine neutrino interaction processes count,
+            // and only when they actually produced a final state: these
+            // processes are region-scoped and return without interacting when
+            // the step is outside their region, which would otherwise be
+            // recorded as a vertex with an empty final state.
+            else if (!fEventAction->interactionRecorded
+                     && IsNeutrinoInteraction(procName) && madeSecondaries) {
                 fEventAction->nuInteractionProcess = procName;
                 auto vpos = step->GetPostStepPoint()->GetPosition();
                 fEventAction->vertexX = vpos.x();

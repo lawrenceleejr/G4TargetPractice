@@ -17,7 +17,7 @@
 #include "RunAction.hh"
 #include "PrimaryGeneratorMessenger.hh"
 #include "EventAction.hh"
-#include "G4NeutrinoPhysics.hh"
+#include "NeutrinoPhysics.hh"
 #include "G4PhysListFactory.hh"
 #include "G4VModularPhysicsList.hh"
 #include "SteppingAction.hh"
@@ -62,9 +62,12 @@ int main(int argc, char** argv) {
     runManager->SetUserInitialization(detector);
 
     G4VModularPhysicsList* physics = factory.GetReferencePhysList("FTFP_BERT");
-    // Keep the pointer: /gdmltp/neutrinoBias sets bias factors on THIS instance
-    // (they are members read in its ConstructProcess() at /run/initialize).
-    auto* nuPhysics = new G4NeutrinoPhysics();
+    // Our own neutrino constructor rather than G4NeutrinoPhysics: same processes,
+    // models and cross sections, but every biasing term individually settable
+    // (see NeutrinoPhysics.hh). Keep the pointer -- the /gdmltp/nu/ commands
+    // write knobs on THIS instance, read in ConstructProcess() at
+    // /run/initialize.
+    auto* nuPhysics = new NeutrinoPhysics();
     physics->RegisterPhysics(nuPhysics);
     // User-defined long-lived particles (/bsm/define, /bsm/channel in PreInit);
     // registered LAST so every standard particle exists when it constructs.
@@ -72,7 +75,7 @@ int main(int argc, char** argv) {
     auto* bsmMessenger = new BSMMessenger();
     (void)bsmMessenger;   // owned for the program lifetime (macro-driven)
     auto* nuBiasMessenger = new NeutrinoBiasMessenger(nuPhysics);
-    (void)nuBiasMessenger;   // /gdmltp/neutrinoBias, PreInit
+    (void)nuBiasMessenger;   // /gdmltp/nu/*, /gdmltp/neutrinoBias -- PreInit
 #ifdef USE_CELERITAS
     auto& celerIntegration = celeritas::TrackingManagerIntegration::Instance();
     physics->RegisterPhysics(

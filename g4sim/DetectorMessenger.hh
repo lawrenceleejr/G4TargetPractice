@@ -16,4 +16,6 @@ private:
 
     G4UIcmdWithAString* fReadGDMLCmd;
     G4UIcmdWith3VectorAndUnit* fGlobalFieldCmd;
+    G4UIcmdWithAString* fTargetRegionCmd;
+    G4UIcmdWithAString* fOscRegionCmd;
 };

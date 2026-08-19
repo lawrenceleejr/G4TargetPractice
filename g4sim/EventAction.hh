@@ -88,6 +88,10 @@ public:
     bool isNC = false;
     double vertexX = 0, vertexY = 0, vertexZ = 0, vertexT = 0;
     int nuTargetZ = -1, nuTargetA = -1;
+    // How many times Geant4's vacuum-oscillation process actually changed the
+    // neutrino's flavour in this event (0 unless the oscillation distance is
+    // biased -- see /gdmltp/nu/oscillation/).
+    int nuOscillations = 0;
     int outgoingLeptonPDG = 0;
     double outgoingLeptonE = 0;
     double outgoingLeptonPx = 0, outgoingLeptonPy = 0, outgoingLeptonPz = 0;

@@ -1,0 +1,78 @@
+# Geant4's OWN built-in neutrino physics, with every biasing term set explicitly:
+# a 40 GeV nu_mu on a 1 m^3 liquid-argon target.
+#
+#   gdmltp run --config examples/nu_bias_lar_40gev.yaml -o nu_bias
+#
+# No external event generator is involved -- the interaction, its final state AND
+# the transport of every secondary all happen in Geant4, so output.root carries
+# the nu_* interaction block, trk_* and step_*/totalEdep together.
+#
+# The `geant4.neutrino` block is one key per biasing term Geant4 actually
+# implements, per process family (the four families are separate process objects
+# in Geant4, each with its own factors). `gdmltp run --dry-run` shows the
+# /gdmltp/nu/... macro lines it renders, and `/gdmltp/nu/list` in the run log
+# prints the resolved table.
+generator: geant4
+
+geometry:
+  gdml: gdml/liquid_argon_1m3.gdml
+
+beam:
+  particle: nu_mu
+  energy:
+    mode: mono
+    value: "40 GeV"
+  position: "-10 0 0 cm"
+  direction: "0 0 1"
+
+run:
+  events: 1000
+  output: output.root
+  seed: 20240819
+
+geant4:
+  neutrino_mode: on            # write the nu_* interaction branches
+  neutrino:
+    # A G4Region NAME, not a volume name: outside it these processes never
+    # interact. g4sim builds "target" from every non-world volume, so this
+    # biases the argon but not the world's filler material.
+    region: target
+    # Which logical volumes make up "target" (substring match). Omit or leave
+    # empty for every non-world volume.
+    region_pattern: ""
+
+    # nu_mu on nuclei. The unbiased rate at 40 GeV in 1 m of argon is
+    # ~2.4e-11 per traversal, so 1e9 gives a few percent of events an
+    # interaction (measured: 8/300); use ~1e11-1e12 for essentially every event.
+    # mfp_bias acts only inside `region` and Geant4 ignores values <= 1.
+    nucleus_mu:
+      mfp_bias: 1.0e9
+      # xsec_bias would instead scale the tabulated cross section itself, in
+      # every region -- a genuinely different term. lowest_energy sets the
+      # threshold below which the process does nothing.
+      # xsec_bias: 1
+      # lowest_energy: "1 keV"
+
+    # The other flavours are separate process objects with their own factors.
+    nucleus_e:   {mfp_bias: 1}
+    nucleus_tau: {mfp_bias: 1}
+
+    # Neutrino-electron scattering: the only family where Geant4 really
+    # reweights CC against NC (the pair reaches the separate CC and NC
+    # cross-section data sets). Setting either > 1 also makes the vertex be
+    # sampled uniformly along the neutrino's chord through the volume.
+    electron:
+      cc_bias: 1
+      nc_bias: 1
+
+    # Geant4 registers its vacuum-oscillation process by DEFAULT and upstream
+    # offers no way to switch it off; here it is off, so the flavour that
+    # interacts is the flavour that was fired. To study oscillation instead, set
+    # `enable: true` with a `distance_bias` > 1 -- the oscillation length is
+    # divided by it inside `region`, and the nu_nOscillations branch counts the
+    # flavour changes (measured: distance_bias 1e8 -> 299/300 events oscillate).
+    oscillation:
+      enable: false
+      # region: tgtosc
+      # region_pattern: LAr
+      # distance_bias: 1.0e8

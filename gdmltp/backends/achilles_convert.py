@@ -259,6 +259,8 @@ def convert(hepmc_path, out_path, out_tree="tree", beam=None, process_label="Ach
         "nu_interactionProcess": ak.Array([process_label] * n),
         "nu_vertexX": vx, "nu_vertexY": vy, "nu_vertexZ": vz, "nu_vertexT": vt,
         "nu_targetZ": tZ.astype(np.int32), "nu_targetA": tA.astype(np.int32),
+        # external generators do not oscillate the probe: the flavour is fixed
+        "nu_nOscillations": np.zeros(n, np.int32),
         "nu_outLeptonPDG": lep_pdg.astype(np.int32),
         "nu_outLeptonE": Elep,
         "nu_outLeptonPx": plep[:, 0], "nu_outLeptonPy": plep[:, 1], "nu_outLeptonPz": plep[:, 2],

@@ -1,0 +1,45 @@
+# The same run driven by GEANT4'S OWN /physics_lists/nu/ commands rather than
+# g4sim's /gdmltp/nu/ ones -- for reproducing a macro written against upstream
+# G4NeutrinoPhysics. g4sim understands both.
+#
+#   gdmltp run --mac macros/nu_bias_40gev_physicslists.mac -o nu_bias_pl
+#
+# Caveats of the upstream command set, all verified against the Geant4 11.4
+# sources -- they are why macros/nu_bias_40gev.mac exists:
+#
+#  * NuDetectorName takes a G4Region name. Before this repo built "target" over
+#    every non-world volume, that region was empty for every shipped geometry
+#    and the bias silently did nothing (0/100 interactions vs 100/100 when
+#    naming a region that exists).
+#  * NeutrinoActivation is a REGISTERED BUT DEAD command: the upstream messenger
+#    has no branch for it, so it is a no-op. Kept here only for fidelity.
+#  * NuNucleusBias is one factor shared by all three flavours, and it only takes
+#    effect when NuETotXscActivation is true -- which simultaneously collapses
+#    NuEleCcBias/NuEleNcBias into a single max(cc, nc) factor. The two cannot be
+#    used independently through this interface.
+#  * There is no upstream command for the cross-section-table bias or the
+#    per-process energy thresholds, and none to switch oscillation off.
+/physics_lists/nu/NuDetectorName target
+/physics_lists/nu/NeutrinoActivation true
+/physics_lists/nu/NuETotXscActivation true
+/physics_lists/nu/NuEleCcBias 1
+/physics_lists/nu/NuEleNcBias 1
+/physics_lists/nu/NuNucleusBias 1e9
+
+# Oscillation-distance biasing. NuOscDistanceName is also a G4Region name;
+# /detector/oscRegionPattern <substring> puts matching volumes in "tgtosc".
+#/detector/oscRegionPattern LAr
+#/physics_lists/nu/NuOscDistanceName tgtosc
+#/physics_lists/nu/NuOscDistanceBias 1e8
+
+/detector/readGDML liquid_argon_1m3.gdml
+/run/initialize
+/analysis/neutrinoMode on
+
+/gun/particle nu_mu
+/gun/energy 40 GeV
+/gun/position -10 0 0 cm
+/gun/direction 0 0 1
+
+/run/printProgress 200
+/run/beamOn 1000

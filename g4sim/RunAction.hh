@@ -67,6 +67,7 @@ public:
     std::string nu_interactionProcess;
     double nu_vertexX = 0, nu_vertexY = 0, nu_vertexZ = 0, nu_vertexT = 0;
     int nu_targetZ = -1, nu_targetA = -1;
+    int nu_nOscillations = 0;
     int nu_outLeptonPDG = 0;
     double nu_outLeptonE = 0, nu_outLeptonPx = 0, nu_outLeptonPy = 0, nu_outLeptonPz = 0;
     double nu_Q2 = 0, nu_W = 0, nu_x = 0, nu_y = 0, nu_q0 = 0;

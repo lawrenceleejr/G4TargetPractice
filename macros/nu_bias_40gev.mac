@@ -1,0 +1,56 @@
+# Geant4's built-in neutrino physics: every biasing term set explicitly, on a
+# liquid-argon target with a 40 GeV nu_mu beam.
+#
+#   gdmltp run --mac macros/nu_bias_40gev.mac -o nu_bias
+#
+# These are g4sim's own /gdmltp/nu/ commands, which reach EVERY biasing term
+# Geant4's neutrino processes implement -- including the ones
+# /physics_lists/nu/* cannot touch (per-flavour nucleus factors, the
+# cross-section-table bias, the per-process energy thresholds, and switching the
+# vacuum-oscillation process off). All of them are PreInit-only, so they must
+# come BEFORE /run/initialize. Run /gdmltp/nu/list to print what was resolved.
+#
+# `region` is a G4Region NAME, not a volume name: outside it these processes
+# never interact. DetectorConstruction builds "target" from every non-world
+# volume, so "target" biases the detector but not the world's filler material.
+# Narrow it with /detector/targetRegionPattern <substring>.
+/gdmltp/nu/all/region target
+
+# nu_mu on nuclei: 1e9 on the mean free path. At 40 GeV in 1 m of argon the
+# unbiased rate is ~2.4e-11 per traversal, so 1e9 gives a few percent of events
+# an interaction (measured: 8/300). Use ~1e11-1e12 to make it essentially every
+# event. mfpBias acts only inside `region` and only for values > 1.
+/gdmltp/nu/nucleusMu/mfpBias 1e9
+
+# The other flavours' nucleus processes are separate Geant4 process objects with
+# their own factors -- leave them unbiased here.
+/gdmltp/nu/nucleusE/mfpBias 1
+/gdmltp/nu/nucleusTau/mfpBias 1
+
+# Neutrino-electron scattering: the one family where Geant4 really does reweight
+# CC against NC (the pair reaches the separate CC and NC cross-section sets).
+/gdmltp/nu/electron/ccBias 1
+/gdmltp/nu/electron/ncBias 1
+
+# Vacuum oscillation. Geant4 registers this process by DEFAULT and no
+# /physics_lists/nu/ command can switch it off; here it is off so the flavour
+# that interacts is the flavour that was fired. To study oscillation instead,
+# set `enable true` and a distanceBias > 1 -- the oscillation length is divided
+# by it inside `region`, and the nu_nOscillations branch counts the flavour
+# changes (measured: distanceBias 1e8 -> 299/300 events oscillate).
+/gdmltp/nu/oscillation/enable false
+
+/gdmltp/nu/list
+
+/detector/readGDML liquid_argon_1m3.gdml
+/run/initialize
+/analysis/neutrinoMode on
+
+# --- Primary particle gun ---
+/gun/particle nu_mu
+/gun/energy 40 GeV
+/gun/position -10 0 0 cm
+/gun/direction 0 0 1
+
+/run/printProgress 200
+/run/beamOn 1000

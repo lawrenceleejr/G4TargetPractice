@@ -108,6 +108,79 @@ def test_macro_neutrino_bias_off_and_custom():
     assert "/gdmltp/neutrinoBias 1e+10 3e+09 1e+10 DefaultRegionForTheWorld" in custom
 
 
+def test_macro_neutrino_bias_region_pattern():
+    """detector_name names a G4Region, and region_pattern chooses which logical
+    volumes make up g4sim's "target" region -- both must land before
+    /run/initialize, since the regions are built during initialization."""
+    mac = geant4.build_macro(config.RunConfig(
+        gdml="g.gdml", beam=config.Beam(particle="nu_mu"),
+        geant4={"neutrino_bias": {
+            "cc_bias": 1, "nc_bias": 1, "nucleus_bias": 1e9,
+            "detector_name": "target", "region_pattern": "LAr"}}))
+    assert "/detector/targetRegionPattern LAr" in mac
+    assert "/gdmltp/neutrinoBias 1 1 1e+09 target" in mac
+    assert mac.index("/detector/targetRegionPattern") < mac.index("/run/initialize")
+    assert mac.index("/gdmltp/neutrinoBias") < mac.index("/run/initialize")
+    # an empty pattern means "all non-world volumes" -- nothing to emit
+    default = geant4.build_macro(config.RunConfig(
+        gdml="g.gdml", beam=config.Beam(particle="nu_mu"),
+        geant4={"neutrino_bias": {"detector_name": "target", "region_pattern": ""}}))
+    assert "/detector/targetRegionPattern" not in default
+    assert "/gdmltp/neutrinoBias 5e+12 5e+12 5e+12 target" in default
+
+
+def test_macro_neutrino_knobs_full_surface():
+    """Every Geant4 biasing term gets its own command, per process family, and
+    the region-membership commands come first (DetectorConstruction builds the
+    regions the physics knobs name)."""
+    mac = geant4.build_macro(config.RunConfig(
+        gdml="g.gdml", beam=config.Beam(particle="nu_mu"),
+        geant4={"neutrino": {
+            "region": "target",
+            "region_pattern": "LAr",
+            "nucleus": {"lowest_energy": "1 MeV"},
+            "nucleus_mu": {"mfp_bias": 1.0e9, "xsec_bias": 2},
+            "electron": {"enable": False, "cc_bias": 10, "nc_bias": 1},
+            "oscillation": {"enable": True, "region": "tgtosc",
+                            "region_pattern": "LAr", "distance_bias": 1.0e8},
+        }}))
+    lines = mac.splitlines()
+    for expected in [
+        "/detector/targetRegionPattern LAr",
+        "/detector/oscRegionPattern LAr",
+        "/gdmltp/nu/all/region target",
+        "/gdmltp/nu/nucleus/lowestEnergy 1 MeV",
+        "/gdmltp/nu/nucleusMu/mfpBias 1e+09",
+        "/gdmltp/nu/nucleusMu/xsecBias 2",
+        "/gdmltp/nu/electron/enable false",
+        "/gdmltp/nu/electron/ccBias 10",
+        "/gdmltp/nu/oscillation/enable true",
+        "/gdmltp/nu/oscillation/region tgtosc",
+        "/gdmltp/nu/oscillation/distanceBias 1e+08",
+    ]:
+        assert expected in lines, expected
+    # geometry before physics, and everything before /run/initialize
+    assert lines.index("/detector/targetRegionPattern LAr") < \
+        lines.index("/gdmltp/nu/all/region target")
+    # broad groups first so a per-family line can override them
+    assert lines.index("/gdmltp/nu/all/region target") < \
+        lines.index("/gdmltp/nu/nucleusMu/mfpBias 1e+09")
+    assert max(i for i, l in enumerate(lines) if l.startswith("/gdmltp/nu/")) < \
+        lines.index("/run/initialize")
+    # an explicit block means the user drives every term: the blunt auto
+    # shortcut must stand down rather than silently re-pointing the region
+    assert "/gdmltp/neutrinoBias" not in mac
+
+
+def test_macro_neutrino_knobs_absent_by_default():
+    """No neutrino block -> no /gdmltp/nu/ lines at all, and Geant4's own
+    defaults (oscillation on, unscoped) are left alone."""
+    mac = geant4.build_macro(config.RunConfig(
+        gdml="g.gdml", beam=config.Beam(particle="nu_mu")))
+    assert "/gdmltp/nu/" not in mac
+    assert "/gdmltp/neutrinoBias" in mac      # the auto shortcut still fires
+
+
 def test_macro_no_bias_for_charged_primaries():
     mac = geant4.build_macro(config.RunConfig(
         gdml="g.gdml", beam=config.Beam(particle="proton")))

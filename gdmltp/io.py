@@ -32,7 +32,7 @@ STEP_BRANCHES = [
 NU_BRANCHES = [
     "nu_isCC", "nu_isNC", "nu_interactionProcess",
     "nu_vertexX", "nu_vertexY", "nu_vertexZ", "nu_vertexT",
-    "nu_targetZ", "nu_targetA",
+    "nu_targetZ", "nu_targetA", "nu_nOscillations",
     "nu_outLeptonPDG", "nu_outLeptonE",
     "nu_outLeptonPx", "nu_outLeptonPy", "nu_outLeptonPz",
     "nu_Q2", "nu_W", "nu_x", "nu_y", "nu_q0",

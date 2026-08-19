@@ -36,6 +36,7 @@ void EventAction::BeginOfEventAction(const G4Event* event)
     isNC = false;
     vertexX = vertexY = vertexZ = vertexT = 0;
     nuTargetZ = nuTargetA = -1;
+    nuOscillations = 0;
     outgoingLeptonPDG = 0;
     outgoingLeptonE = outgoingLeptonPx = outgoingLeptonPy = outgoingLeptonPz = 0;
     q0 = Q2 = W = xBj = yBj = 0;
@@ -147,6 +148,7 @@ void EventAction::EndOfEventAction(const G4Event*)
         fRunAction->nu_vertexT = vertexT;
         fRunAction->nu_targetZ = nuTargetZ;
         fRunAction->nu_targetA = nuTargetA;
+        fRunAction->nu_nOscillations = nuOscillations;
         fRunAction->nu_outLeptonPDG = outgoingLeptonPDG;
         fRunAction->nu_outLeptonE = outgoingLeptonE;
         fRunAction->nu_outLeptonPx = outgoingLeptonPx;
