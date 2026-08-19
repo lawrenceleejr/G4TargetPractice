@@ -1,0 +1,44 @@
+# =============================================================================
+# muons_minus_tumor_spread.mac
+#
+# Spread-out muon peak: superpose mu- beams of several energies, weighted
+# toward the highest energy (as in proton SOBP range modulation), so the
+# summed stopping region covers the full tumor (9-11 cm depth) instead of a
+# single pristine peak. Uses the arbitrary-histogram energy mode.
+#
+# Detector: gdml/water_phantom_tumor.gdml
+#   - World:   60×60×100 cm (G4_AIR)
+#   - Phantom: 30×30 cm water tank, 40 cm deep, entrance face at z = 0
+#   - Tumor:   r = 1.5 cm soft-tissue sphere centred at 10 cm depth
+#
+# Beam:
+#   - Particle : mu-
+#   - Energy   : 44-50 MeV discrete spectrum (see bins below)
+#   - Position : upstream on the beam axis (z = -20 cm)
+#   - Direction: along +z
+#
+# Depth-dose extraction (in ROOT, z in mm, edep in MeV):
+#   tree->Draw("step_z>>h(200,0,400)", "step_edep")
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/water_phantom_tumor.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    mu-
+/gun/energyMode  arb
+/gun/clearEnergyBins
+/gun/addEnergyBin 44   MeV 0.07
+/gun/addEnergyBin 45.5 MeV 0.10
+/gun/addEnergyBin 47   MeV 0.13
+/gun/addEnergyBin 48.5 MeV 0.20
+/gun/addEnergyBin 50   MeV 0.50
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 200
+/run/beamOn 2000

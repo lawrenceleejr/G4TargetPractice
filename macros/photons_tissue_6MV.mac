@@ -1,0 +1,45 @@
+# =============================================================================
+# photons_tissue_6MV.mac
+#
+# Heterogeneity study: approximate 6 MV photon beam through a layered
+# chest-wall-like phantom (soft tissue / cortical bone / lung / soft
+# tissue). Compare the depth-dose against photons_water_6MV.mac to see the
+# increased attenuation in bone and the reduced attenuation and loss of
+# electronic equilibrium in low-density lung.
+#
+# Detector: gdml/tissue_phantom_layered.gdml
+#   - World: 60×60×60 cm (G4_AIR), phantom entrance face at z = 0
+#   - Layers along z:
+#       0.0 -  0.5 cm soft tissue (skin)
+#       0.5 -  2.0 cm cortical bone (rib proxy)
+#       2.0 - 12.0 cm lung
+#      12.0 - 14.0 cm soft tissue
+#
+# Beam:
+#   - Particle : gamma
+#   - Energy   : exponential, E0 = 2 MeV, sampled 0.25-6 MeV
+#   - Position : upstream on the beam axis (z = -20 cm)
+#   - Direction: along +z
+#
+# Depth-dose extraction (in ROOT, z in mm, edep in MeV):
+#   tree->Draw("step_z>>h(140,0,140)", "step_edep")
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/tissue_phantom_layered.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    gamma
+/gun/energyMode  exp
+/gun/energy      2 MeV
+/gun/energyMin   0.25 MeV
+/gun/energyMax   6 MeV
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 500
+/run/beamOn 5000

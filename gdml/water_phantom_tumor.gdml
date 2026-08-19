@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<!--
+  Water phantom with an embedded spherical "tumor" target, for studying
+  particle-therapy concepts (e.g. muon-based therapy).
+
+  World:   60 x 60 x 100 cm air box centred at the origin.
+  Phantom: 30 x 30 cm water tank, 40 cm deep along z.
+           The entrance face is at z = 0, so depth in water = z.
+  Tumor:   1.5 cm radius sphere of soft tissue (G4_TISSUE_SOFT_ICRP),
+           centred on the beam axis at 10 cm depth (global z = 10 cm,
+           i.e. z = -10 cm relative to the water-volume centre).
+
+  Aim the beam along +z from negative z (e.g. /gun/position 0 0 -20 cm).
+  In the output tree the tumor volume corresponds to the selection
+    sqrt(x^2 + y^2 + (z-100)^2) < 15   (positions in mm).
+-->
+<gdml>
+  <solids>
+    <box name="WorldBox"    x="60" y="60" z="100" lunit="cm"/>
+    <box name="WaterBox"    x="30" y="30" z="40"  lunit="cm"/>
+    <orb name="TumorSphere" r="1.5" lunit="cm"/>
+  </solids>
+
+  <structure>
+    <volume name="Tumor_vol">
+      <materialref ref="G4_TISSUE_SOFT_ICRP"/>
+      <solidref ref="TumorSphere"/>
+    </volume>
+
+    <volume name="WaterPhantom_vol">
+      <materialref ref="G4_WATER"/>
+      <solidref ref="WaterBox"/>
+      <physvol>
+        <volumeref ref="Tumor_vol"/>
+        <position x="0" y="0" z="-10" unit="cm"/>
+      </physvol>
+    </volume>
+
+    <volume name="World">
+      <materialref ref="G4_AIR"/>
+      <solidref ref="WorldBox"/>
+      <physvol>
+        <volumeref ref="WaterPhantom_vol"/>
+        <position x="0" y="0" z="20" unit="cm"/>
+      </physvol>
+    </volume>
+  </structure>
+
+  <setup name="Default" version="1.0">
+    <world ref="World"/>
+  </setup>
+</gdml>

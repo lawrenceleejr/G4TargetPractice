@@ -1,0 +1,73 @@
+<?xml version="1.0"?>
+<!--
+  Layered tissue phantom (crude chest-wall analogue) for studying dose
+  deposition in heterogeneous media.
+
+  World: 60 x 60 x 60 cm air box centred at the origin.
+
+  Layers (30 x 30 cm lateral), stacked along +z with the entrance face
+  at z = 0, so depth in the phantom = z:
+
+    z =  0.0 -  0.5 cm : soft tissue (G4_TISSUE_SOFT_ICRP)   - skin
+    z =  0.5 -  2.0 cm : cortical bone (G4_BONE_CORTICAL_ICRP) - rib proxy
+    z =  2.0 - 12.0 cm : lung (G4_LUNG_ICRP)
+    z = 12.0 - 14.0 cm : soft tissue (G4_TISSUE_SOFT_ICRP)
+
+  Aim the beam along +z from negative z (e.g. /gun/position 0 0 -20 cm).
+-->
+<gdml>
+  <solids>
+    <box name="WorldBox"   x="60" y="60" z="60"  lunit="cm"/>
+    <box name="SkinBox"    x="30" y="30" z="0.5" lunit="cm"/>
+    <box name="BoneBox"    x="30" y="30" z="1.5" lunit="cm"/>
+    <box name="LungBox"    x="30" y="30" z="10"  lunit="cm"/>
+    <box name="TissueBox"  x="30" y="30" z="2"   lunit="cm"/>
+  </solids>
+
+  <structure>
+    <volume name="Skin_vol">
+      <materialref ref="G4_TISSUE_SOFT_ICRP"/>
+      <solidref ref="SkinBox"/>
+    </volume>
+
+    <volume name="Bone_vol">
+      <materialref ref="G4_BONE_CORTICAL_ICRP"/>
+      <solidref ref="BoneBox"/>
+    </volume>
+
+    <volume name="Lung_vol">
+      <materialref ref="G4_LUNG_ICRP"/>
+      <solidref ref="LungBox"/>
+    </volume>
+
+    <volume name="Tissue_vol">
+      <materialref ref="G4_TISSUE_SOFT_ICRP"/>
+      <solidref ref="TissueBox"/>
+    </volume>
+
+    <volume name="World">
+      <materialref ref="G4_AIR"/>
+      <solidref ref="WorldBox"/>
+      <physvol>
+        <volumeref ref="Skin_vol"/>
+        <position x="0" y="0" z="0.25" unit="cm"/>
+      </physvol>
+      <physvol>
+        <volumeref ref="Bone_vol"/>
+        <position x="0" y="0" z="1.25" unit="cm"/>
+      </physvol>
+      <physvol>
+        <volumeref ref="Lung_vol"/>
+        <position x="0" y="0" z="7" unit="cm"/>
+      </physvol>
+      <physvol>
+        <volumeref ref="Tissue_vol"/>
+        <position x="0" y="0" z="13" unit="cm"/>
+      </physvol>
+    </volume>
+  </structure>
+
+  <setup name="Default" version="1.0">
+    <world ref="World"/>
+  </setup>
+</gdml>

@@ -3,156 +3,98 @@
 
 #include "G4UserEventAction.hh"
 #include "G4Event.hh"
-#include "RunAction.hh"       // if you use RunAction inside EventAction                                                                                                                                                             
+#include "RunAction.hh"
 #include "globals.hh"
-#include "G4ThreeVector.hh"  // Add this                                                                                                                                                                                             
+#include "G4ThreeVector.hh"
 #include <vector>
 #include <string>
+#include <map>
+
 class RunAction;
-// Structs for event display                                                                                                                                                                                                         
-// -----------------------------                                                                                                                                                                                                     
+
+// One recorded Geant4 step (all tracks). Feeds the lean step_* branches and,
+// via aggregation, the per-track trk_* table.
 struct StepInfo {
-  int trackID;
-  int parentID;
-  int PDG;
-  G4ThreeVector prePos;
-  G4ThreeVector postPos;
-  G4ThreeVector preMom;
-  G4ThreeVector postMom;
-  double kineticE;
-  double edep;
-  double globalTime;
-  double stepLength;
-  std::string processName;
-  std::string creatorprocessName;
-  G4ThreeVector birthPos;
-  G4double birthKE;
-};
-struct SecondaryInfo {
-    int trackID;
-    int parentID;
-    double energy;
-    std::string name;
-};
-struct TrackInfo {
     int trackID;
     int parentID;
     int PDG;
-    G4ThreeVector startPos;
-    G4ThreeVector endPos;
-    double startE;
-    double endE;
-    G4ThreeVector startMom;
-    G4ThreeVector endMom;
-    std::string name;
+    G4ThreeVector prePos;
+    G4ThreeVector postPos;
+    double preKinE;        // kinetic energy at the pre-step point
+    double postKinE;       // kinetic energy at the post-step point
+    double edep;
+    double globalTime;
+    double stepLength;
+    std::string processName;
     std::string creatorProcess;
+    G4ThreeVector birthPos;   // track vertex position
+    double birthKE;           // track vertex kinetic energy
+};
+
+// Per-track summary, accumulated over the track's steps (see AddStepInfo).
+struct TrackSummary {
+    int parentID = 0;
+    int pdg = 0;
+    double startX = 0, startY = 0, startZ = 0, startE = 0;
+    double endX = 0, endY = 0, endZ = 0, endE = 0;
+    std::string creatorProcess = "Primary";
+    double edep = 0.0;     // summed energy deposit over the track's steps
+    double length = 0.0;   // summed step length
+    bool started = false;  // start fields locked on the first step seen
 };
 
 class EventAction : public G4UserEventAction {
 public:
-    EventAction(RunAction* runAction);   // pass pointer to RunAction if needed                                                                                                                                                      
+    EventAction(RunAction* runAction);
     ~EventAction() override;
 
-    // Override correct function                                                                                                                                                                                                     
-  void BeginOfEventAction(const G4Event*) override;
-  void EndOfEventAction(const G4Event* event) override;
+    void BeginOfEventAction(const G4Event*) override;
+    void EndOfEventAction(const G4Event* event) override;
 
-  int eventID;
-int primaryPDG;
+    // Record one step; also folds it into the per-track table.
+    void AddStepInfo(int trackID, int parentID, int PDG,
+                     const G4ThreeVector& prePos, const G4ThreeVector& postPos,
+                     double preKinE, double postKinE,
+                     double edep, double globalTime, double stepLength,
+                     const std::string& processName,
+                     const std::string& creatorProcess,
+                     const G4ThreeVector& birthPos, double birthKE);
 
-std::string nuInteractionProcess;
+    void AddEdep(double edep) { totalEdep_ += edep; }
+    void IncrementStep() { nSteps_++; }
 
-bool isCC;
-bool isNC;
+    // --- Per-event collections ---
+    std::vector<StepInfo> steps;
+    std::map<int, TrackSummary> trackTable;
 
-int outgoingLeptonPDG;
-double outgoingLeptonE;
-double outgoingLeptonPx;
-double outgoingLeptonPy;
-double outgoingLeptonPz;
+    // --- Per-event scalars ---
+    int eventID = 0;
+    int primaryPDG = 0;
+    int primaryTrackID = 0;
 
-double q0;
-double Q2;
-double W;
-double xBj;
-double yBj;
+    double E = 0, x = 0, y = 0, z = 0;       // primary initial KE / position
+    double px = 0, py = 0, pz = 0;           // primary initial momentum
+    double finalE = 0, finalX = 0, finalY = 0, finalZ = 0;  // primary stop point
+    double finalPx = 0, finalPy = 0, finalPz = 0;           // primary final momentum
 
-  int primaryTrackID;
-  int PDG;
-  std::vector<StepInfo> steps;
-   // Step info                                                                                                                                                                                                                      
-    // -----------------------------                                                                                                                                                                                                 
-  void AddStepInfo(int trackID, int parentID,
-                   int PDG, const G4ThreeVector& prePos,
-                   const G4ThreeVector& postPos, const G4ThreeVector& preMom,
-                 const G4ThreeVector& postMom, double kineticE,
-                   double edep,double globalTime,
-                 double stepLength, const std::string& processName, const std::string& creatorprocessName,G4ThreeVector birthPos,
-                   G4double birthKE);
+    double totalEdep_ = 0;
+    int nSteps_ = 0;
 
-    //    steps.push_back({trackID, prePos, postPos, kineticE, edep, processName});                                                                                                                                                  
-    //}
-  //to reconstruct CC vs NC
-  std::vector<int> finalStatePDG;
-  int primaryNuPDG = 0;
-  //  std::string interactionType = "Unknown";
-
-  std::vector<SecondaryInfo> secondaries; // all secondaries                                                                                                                                                                         
-
-    // optional flattened step info if you want                                                                                                                                                                                      
-  std::vector<int> secTrackID;
-  std::vector<int> secParentID;
-  std::vector<double> secEnergies;
-  std::vector<std::string> secNames;
-  std::vector<int> secPDG;
-  std::vector<double> step_preX, step_preY, step_preZ;
-  std::vector<double> step_postX, step_postY, step_postZ;
-  std::vector<double> step_kinE, step_edep;
-  std::vector<std::string> stepProcessNames;
-    std::vector<std::string> stepcreatorProcessNames;
-
-
-  void AddEdep(double edep) { totalEdep_ += edep; }
-  void AddSecondaryE(double e) { totalSecondaryE += e; }
-
-  void IncrementStep() { nSteps_++; }
-
-  G4bool neutrinoInteractionPrinted = false;
-  double totalEdep_;
-  int nSteps_;
-  double totalSecondaryE;
-  int nSecondaries;
-  //G4ThreeVector vertex;                                                                                                                                                                                                            
-  //  std::vector<std::string> secNames;                                                                                                                                                                                             
-  //  std::vector<double> secEnergies;                                                                                                                                                                                               
-  std::string interactionType;
-  std::vector<double> secStartX;
-  std::vector<double> secStartY;
-  std::vector<double> secStartZ;
-
-  std::vector<double> secEndX;
-  std::vector<double> secEndY;
-  std::vector<double> secEndZ;
-
-   double E, x, y, z;
-  double px, py, pz;
-  double theta, phi, costh;
-
-  double vertexX, vertexY, vertexZ, vertexT;
-  bool interactionRecorded;
-
-  double finalE, finalX, finalY, finalZ;
-  double finalPx, finalPy, finalPz;
-  double finalTheta, finalPhi, finalCosth, finalPhiDeg;
+    // --- Neutrino-interaction quantities (only meaningful in neutrino mode) ---
+    int primaryNuPDG = 0;
+    bool interactionRecorded = false;
+    std::string nuInteractionProcess = "None";
+    bool isCC = false;
+    bool isNC = false;
+    double vertexX = 0, vertexY = 0, vertexZ = 0, vertexT = 0;
+    int nuTargetZ = -1, nuTargetA = -1;
+    int outgoingLeptonPDG = 0;
+    double outgoingLeptonE = 0;
+    double outgoingLeptonPx = 0, outgoingLeptonPy = 0, outgoingLeptonPz = 0;
+    double q0 = 0, Q2 = 0, W = 0, xBj = 0, yBj = 0;
 
 private:
     RunAction* fRunAction;
- // Per-event accumulators                                                                                                                                                                                                           
-  //    double totalEdep_ = 0;                                                                                                                                                                                                       
-  //  int nSteps_ = 0;                                                                                                                                                                                                               
 };
 
 #endif
-
-
-

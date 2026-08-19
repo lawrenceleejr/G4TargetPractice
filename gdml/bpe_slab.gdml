@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<!--
+  Borated-polyethylene (BPE) slab for hadronic-cascade visualization.
+
+  World:  80 x 80 x 120 cm air box centred at the origin.
+  Slab:   60 x 60 x 50 cm BPE (5 wt-% natural boron in polyethylene),
+          density 0.96 g/cm3. Entrance face at z = 0, exit face at z = 50 cm
+          (the slab centre sits at z = 25 cm).
+
+  50 cm ~ 1 nuclear interaction length for PE (lambda_I ~ 47 cm), so roughly
+  63% of 1 GeV neutrons initiate a hadronic cascade; the rest punch through.
+  For full containment use a longer slab; for cascade-start topology this
+  depth is ideal for visualization.
+
+  Aim the beam along +z from negative z:
+    /gun/particle  neutron
+    /gun/position  0 0 -20 cm
+    /gun/direction 0 0 1
+
+  Depth in the slab = z  (0 at entrance, 50 cm at exit).
+-->
+<gdml>
+  <materials>
+    <!-- Elements for the BPE mixture -->
+    <element name="BPE_H" formula="H" Z="1">
+      <atom unit="g/mole" value="1.008"/>
+    </element>
+    <element name="BPE_C" formula="C" Z="6">
+      <atom unit="g/mole" value="12.011"/>
+    </element>
+    <element name="BPE_B" formula="B" Z="5">
+      <!-- natural boron: 19.9 % B-10 + 80.1 % B-11, mean A = 10.811 -->
+      <atom unit="g/mole" value="10.811"/>
+    </element>
+
+    <!--
+      BPE composition (mass fractions):
+        polyethylene (C2H4) base:  C 85.6 %,  H 14.4 %
+        5 wt-% boron loading:     → C 81.4 %, H 13.6 %, B 5.0 %
+    -->
+    <material name="BPE" state="solid">
+      <D unit="g/cm3" value="0.96"/>
+      <fraction n="0.814" ref="BPE_C"/>
+      <fraction n="0.136" ref="BPE_H"/>
+      <fraction n="0.050" ref="BPE_B"/>
+    </material>
+  </materials>
+
+  <solids>
+    <box name="WorldBox" x="80"  y="80"  z="120" lunit="cm"/>
+    <box name="BPEBox"   x="60"  y="60"  z="50"  lunit="cm"/>
+  </solids>
+
+  <structure>
+    <volume name="BPE_vol">
+      <materialref ref="BPE"/>
+      <solidref ref="BPEBox"/>
+    </volume>
+
+    <volume name="World">
+      <materialref ref="G4_AIR"/>
+      <solidref ref="WorldBox"/>
+      <physvol>
+        <volumeref ref="BPE_vol"/>
+        <!-- centre of slab at z = 25 cm → entrance face at z = 0 -->
+        <position x="0" y="0" z="25" unit="cm"/>
+      </physvol>
+    </volume>
+  </structure>
+
+  <setup name="Default" version="1.0">
+    <world ref="World"/>
+  </setup>
+</gdml>

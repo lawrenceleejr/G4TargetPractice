@@ -1,0 +1,48 @@
+# =============================================================================
+# protons_water_sobp.mac
+#
+# Crude spread-out Bragg peak (SOBP): superpose proton beams of several
+# energies, weighted so that the summed depth-dose is roughly flat over the
+# last few cm before the distal edge (~15.6 cm for the 150 MeV component).
+# Uses the arbitrary-histogram energy mode; weights increase with energy as
+# in clinical range modulation (the deepest peak needs the largest weight).
+#
+# Detector: gdml/water_phantom_30cm.gdml
+#   - World:   60×60×100 cm (G4_AIR)
+#   - Phantom: 30×30 cm water tank, 40 cm deep, entrance face at z = 0
+#
+# Beam:
+#   - Particle : proton
+#   - Energy   : 110-150 MeV discrete spectrum (see bins below)
+#   - Position : upstream on the beam axis (z = -20 cm)
+#   - Direction: along +z
+#
+# Depth-dose extraction (in ROOT, z in mm, edep in MeV):
+#   tree->Draw("step_z>>h(200,0,400)", "step_edep")
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/water_phantom_30cm.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    proton
+/gun/energyMode  arb
+/gun/clearEnergyBins
+/gun/addEnergyBin 110 MeV 0.04
+/gun/addEnergyBin 115 MeV 0.06
+/gun/addEnergyBin 120 MeV 0.07
+/gun/addEnergyBin 125 MeV 0.09
+/gun/addEnergyBin 130 MeV 0.11
+/gun/addEnergyBin 135 MeV 0.13
+/gun/addEnergyBin 140 MeV 0.16
+/gun/addEnergyBin 145 MeV 0.20
+/gun/addEnergyBin 150 MeV 0.40
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 100
+/run/beamOn 2000

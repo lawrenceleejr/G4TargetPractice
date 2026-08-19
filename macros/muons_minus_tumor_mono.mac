@@ -1,0 +1,46 @@
+# =============================================================================
+# muons_minus_tumor_mono.mac
+#
+# Exploratory muon-therapy study: shoot a monoenergetic 48 MeV negative-muon
+# pencil beam at a water phantom with a 1.5 cm radius tumor at 10 cm depth.
+# Like protons, muons show a Bragg peak (~10 cm range for 48 MeV in water),
+# but a stopped mu- is captured on a nucleus (muMinusCaptureAtRest), which
+# releases neutrons, gammas and nuclear fragments that deposit additional
+# dose at the end of range - one of the proposed attractions of mu- therapy.
+# Compare against muons_plus_tumor_mono.mac (mu+ decays instead of being
+# captured) and protons_tumor_mono.mac (same range, no capture).
+#
+# Detector: gdml/water_phantom_tumor.gdml
+#   - World:   60×60×100 cm (G4_AIR)
+#   - Phantom: 30×30 cm water tank, 40 cm deep, entrance face at z = 0
+#   - Tumor:   r = 1.5 cm soft-tissue sphere centred at 10 cm depth
+#
+# Beam:
+#   - Particle : mu-
+#   - Energy   : 48 MeV (monoenergetic; range in water ~10 cm, tune by a few
+#                MeV to scan the peak through the tumor)
+#   - Position : upstream on the beam axis (z = -20 cm)
+#   - Direction: along +z
+#
+# Analysis hints (in ROOT, positions in mm, edep in MeV):
+#   depth dose:   tree->Draw("step_z>>h(200,0,400)", "step_edep")
+#   tumor steps:  sqrt(step_x*step_x+step_y*step_y+
+#                      (step_z-100)*(step_z-100)) < 15
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/water_phantom_tumor.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    mu-
+/gun/energyMode  mono
+/gun/energy      48 MeV
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 200
+/run/beamOn 2000

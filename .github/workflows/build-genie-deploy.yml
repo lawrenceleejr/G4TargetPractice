@@ -1,0 +1,79 @@
+name: Build GENIE Image
+# Separate workflow: the GENIE image is heavy and its base/tunes/splines are
+# version-sensitive, so it builds on its own and is not a required check for
+# merges (the Python + Geant4 jobs in build-test-deploy.yml are). It runs on
+# every push -- the image ships gdmltp, the driver, and the entrypoint, all of
+# which change often -- and failures are REAL failures, shown red.
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      genie_base:
+        description: "GENIE base image"
+        required: false
+        default: "ghcr.io/lawrenceleejr/g4targetpractice-genie-base:latest"
+
+env:
+  # Base-image resolution: workflow_dispatch input > repo variable > our own
+  # from-source base (built by build-generator-bases.yml so nobody downstream
+  # compiles GENIE themselves). Red until that base workflow has published once.
+  GENIE_BASE: ${{ github.event.inputs.genie_base || vars.GENIE_BASE_IMAGE || 'ghcr.io/lawrenceleejr/g4targetpractice-genie-base:latest' }}
+
+jobs:
+  docker-genie:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-genie
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build (and push on non-PR) the GENIE image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/genie.Dockerfile
+          build-args: |
+            GENIE_BASE=${{ env.GENIE_BASE }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test
+        run: |
+          set -x
+          IMG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          mkdir -p run && cp gdml/liquid_argon_1m3.gdml run/
+          # the image must expose gdmltp + the converter (a full generation
+          # smoke lands once the base image + baked splines are pinned)
+          docker run --rm -v "$PWD/run":/run -w /run --entrypoint python3 "$IMG" \
+            -c "from gdmltp.backends import genie_convert; import gdmltp; print('genie image OK', gdmltp.__version__)"
+          # the GENIE toolchain itself must be on PATH and fully linked --
+          # "image builds but gevgen can't run" must be red here, not at a user
+          docker run --rm --entrypoint bash "$IMG" -c \
+            'set -e; for b in gevgen gntpc gmkspl; do command -v "$b"; done; ! ldd "$(command -v gevgen)" | grep "not found"'

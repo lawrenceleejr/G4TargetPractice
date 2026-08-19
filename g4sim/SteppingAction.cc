@@ -2,379 +2,127 @@
 #include "RunAction.hh"
 #include "EventAction.hh"
 #include "G4Track.hh"
+#include "G4Step.hh"
 #include "G4VProcess.hh"
-#include "CLHEP/Units/PhysicalConstants.h"
-#include "G4Ions.hh"
-#include "G4SystemOfUnits.hh"
 #include "G4HadronicProcess.hh"
 #include "G4Nucleus.hh"
-#include "G4IonTable.hh"       // sometimes needed
-#include "G4ParticleDefinition.hh"
-#include "G4Step.hh"
-#include "G4Track.hh"
-#include "G4Material.hh"
-#include "G4Element.hh"
+#include "G4Ions.hh"
 #include "G4SystemOfUnits.hh"
+#include <cmath>
 
 SteppingAction::SteppingAction(EventAction* eventAction, RunAction* runAction)
 : fEventAction(eventAction), fRunAction(runAction) {}
 
-
-void SteppingAction::UserSteppingAction(const G4Step* step) 
+void SteppingAction::UserSteppingAction(const G4Step* step)
 {
-    if(!fRunAction || !fEventAction) return;
+    if (!fRunAction || !fEventAction) return;
 
     auto track = step->GetTrack();
-
-    
-    auto material = step->GetPreStepPoint()->GetMaterial();
-    auto element = material->GetElement(0); // first element
+    auto particle = track->GetDefinition();
 
     fEventAction->AddEdep(step->GetTotalEnergyDeposit());
     fEventAction->IncrementStep();
 
-    auto particle = track->GetDefinition();
-    
-    // Skip invalid nuclei
+    // Skip malformed nuclei (Z<=0 or A<=0)
     if (particle->GetParticleType() == "nucleus") {
-      auto ion = dynamic_cast<const G4Ions*>(particle);
-      if (ion && (ion->GetAtomicNumber() <= 0 || ion->GetAtomicMass() <= 0)) {
-        return;
-      }
+        auto ion = dynamic_cast<const G4Ions*>(particle);
+        if (ion && (ion->GetAtomicNumber() <= 0 || ion->GetAtomicMass() <= 0)) return;
     }
-    
 
-        // -----------------------------                                                                                                                                                                                                
-    // Primary particle information (ID = 0)                                                                                                                                                                                         
-    // -----------------------------                                                                                                                                                                                                 
+    const G4VProcess* stepProcess = step->GetPostStepPoint()->GetProcessDefinedStep();
+    const G4VProcess* creatorProcess = track->GetCreatorProcess();
 
-    if(track->GetParentID() == 0) { // primary final state                                  
-      if(track->GetCurrentStepNumber() == 1){ // when track just started                    
-        // Save initial info at first step
-	
-        auto particle = track->GetDefinition();
-        fEventAction->primaryTrackID = track->GetTrackID();
-        fEventAction->PDG = particle->GetPDGEncoding();
-        fEventAction->E     = track->GetKineticEnergy();
-        fEventAction->x  = track->GetPosition().x();
-        fEventAction->y  = track->GetPosition().y();
-        fEventAction->z  = track->GetPosition().z();
+    // -----------------------------
+    // Primary particle (parentID == 0)
+    // -----------------------------
+    if (track->GetParentID() == 0) {
+        if (track->GetCurrentStepNumber() == 1) {  // initial state
+            fEventAction->primaryTrackID = track->GetTrackID();
+            fEventAction->E  = track->GetKineticEnergy();
+            fEventAction->x  = track->GetPosition().x();
+            fEventAction->y  = track->GetPosition().y();
+            fEventAction->z  = track->GetPosition().z();
+            fEventAction->px = track->GetMomentum().x();
+            fEventAction->py = track->GetMomentum().y();
+            fEventAction->pz = track->GetMomentum().z();
+        }
 
-        fEventAction->px    = track->GetMomentum().x();
-        fEventAction->py    = track->GetMomentum().y();
-        fEventAction->pz    = track->GetMomentum().z();
-        fEventAction->theta  = track->GetMomentumDirection().theta();
-        fEventAction->phi    = track->GetMomentumDirection().phi();
-        fEventAction->costh  = track->GetMomentumDirection().z();
-      }
+        // Neutrino interaction vertex (feeds the nu_* branches; harmless when
+        // neutrino mode is off as those branches are simply not written).
+        int pdg = particle->GetPDGEncoding();
+        bool isPrimaryNeutrino =
+            std::abs(pdg) == 12 || std::abs(pdg) == 14 || std::abs(pdg) == 16;
 
+        if (isPrimaryNeutrino && stepProcess && !fEventAction->interactionRecorded) {
+            G4String procName = stepProcess->GetProcessName();
+            if (procName != "Transportation") {
+                fEventAction->nuInteractionProcess = procName;
+                auto vpos = step->GetPostStepPoint()->GetPosition();
+                fEventAction->vertexX = vpos.x();
+                fEventAction->vertexY = vpos.y();
+                fEventAction->vertexZ = vpos.z();
+                fEventAction->vertexT = step->GetPostStepPoint()->GetGlobalTime();
 
-      int pdg = track->GetDefinition()->GetPDGEncoding();
-bool isPrimaryNeutrino =
-    track->GetParentID() == 0 &&
-    (std::abs(pdg) == 12 || std::abs(pdg) == 14 || std::abs(pdg) == 16);
+                // Struck nucleus, if this is a hadronic (neutrino-nucleus) process
+                if (auto hadProc = dynamic_cast<const G4HadronicProcess*>(stepProcess)) {
+                    if (const G4Nucleus* tgt = hadProc->GetTargetNucleus()) {
+                        fEventAction->nuTargetZ = tgt->GetZ_asInt();
+                        fEventAction->nuTargetA = tgt->GetA_asInt();
+                    }
+                }
 
-auto process = step->GetPostStepPoint()->GetProcessDefinedStep();
+                int expectedLepton = 0;
+                if (std::abs(pdg) == 12) expectedLepton = (pdg > 0) ? 11 : -11;
+                if (std::abs(pdg) == 14) expectedLepton = (pdg > 0) ? 13 : -13;
+                if (std::abs(pdg) == 16) expectedLepton = (pdg > 0) ? 15 : -15;
 
-if(isPrimaryNeutrino && process && !fEventAction->interactionRecorded) {
-    G4String procName = process->GetProcessName();
-
-    if(procName != "Transportation") {
-        fEventAction->nuInteractionProcess = procName;
-
-	fEventAction->vertexX = step->GetPostStepPoint()->GetPosition().x();
-        fEventAction->vertexY = step->GetPostStepPoint()->GetPosition().y();
-        fEventAction->vertexZ = step->GetPostStepPoint()->GetPosition().z();
-        fEventAction->vertexT = step->GetPostStepPoint()->GetGlobalTime();
-
-        auto secondaries = step->GetSecondaryInCurrentStep();
-	int expectedLepton = 0;
-
-        if(std::abs(pdg) == 12) expectedLepton = (pdg > 0) ? 11 : -11;
-        if(std::abs(pdg) == 14) expectedLepton = (pdg > 0) ? 13 : -13;
-        if(std::abs(pdg) == 16) expectedLepton = (pdg > 0) ? 15 : -15;
-
-        for(auto sec : *secondaries) {
-	  int secPDG = sec->GetDefinition()->GetPDGEncoding();
-
-            fEventAction->finalStatePDG.push_back(secPDG);
-if(secPDG == expectedLepton) {
-                fEventAction->isCC = true;
-                fEventAction->isNC = false;
-
-                fEventAction->outgoingLeptonPDG = secPDG;
-                fEventAction->outgoingLeptonE =
-                    sec->GetKineticEnergy() + sec->GetDefinition()->GetPDGMass();
-
-                auto lp = sec->GetMomentum();
-
-                fEventAction->outgoingLeptonPx = lp.x();
-                fEventAction->outgoingLeptonPy = lp.y();
-                fEventAction->outgoingLeptonPz = lp.z();
+                for (auto sec : *step->GetSecondaryInCurrentStep()) {
+                    int secPDG = sec->GetDefinition()->GetPDGEncoding();
+                    if (secPDG == expectedLepton) {
+                        fEventAction->isCC = true;
+                        fEventAction->outgoingLeptonPDG = secPDG;
+                        fEventAction->outgoingLeptonE =
+                            sec->GetKineticEnergy() + sec->GetDefinition()->GetPDGMass();
+                        auto lp = sec->GetMomentum();
+                        fEventAction->outgoingLeptonPx = lp.x();
+                        fEventAction->outgoingLeptonPy = lp.y();
+                        fEventAction->outgoingLeptonPz = lp.z();
+                    }
+                }
+                fEventAction->isNC = !fEventAction->isCC;
+                fEventAction->interactionRecorded = true;
             }
         }
-if(!fEventAction->isCC) {
-            fEventAction->isNC = true;
-        }
 
-        fEventAction->interactionRecorded = true;
-    }
-}
-
-        // Update final info only at track end
-      if(track->GetTrackStatus() == fStopAndKill) {
-                                                                                    
-      fEventAction->finalE  = track->GetKineticEnergy();
-      auto p = track->GetMomentum();
-      double pMag = p.mag();
-      fEventAction->finalPx = p.x();
-      fEventAction->finalPy = p.y();
-      fEventAction->finalPz = p.z();
-      fEventAction->finalCosth = p.z()/pMag; // correct cos(theta)                                                                                                                                                                   
-      fEventAction->finalPhi = std::atan2(p.y(), p.x());
-      fEventAction->finalPhiDeg = fEventAction->finalPhi * 180.0 / CLHEP::pi;
-
-      //if(track->GetTrackStatus() == fStopAndKill) {
-        //      G4cout << "FINAL Primary: E=" << track->GetKineticEnergy()                                                                                                                                                           
-        //     << " Position=" << track->GetPosition() << G4endl;                                                                                                                                                                    
-        //      fEventAction->finalE  = track->GetKineticEnergy();                                                                                                                                                                   
-        fEventAction->finalX  = track->GetPosition().x();
-        fEventAction->finalY  = track->GetPosition().y();
-        fEventAction->finalZ  = track->GetPosition().z();
-
-      }}
-                                                                                              
-    // 2. Step-level info (all tracks)
-const G4VProcess* stepProcess =
-    step->GetPostStepPoint()->GetProcessDefinedStep();
-
-const G4VProcess* creatorProcess =
-    track->GetCreatorProcess();
-
-fEventAction->AddStepInfo(
-    track->GetTrackID(),
-    track->GetParentID(),
-    track->GetDefinition()->GetPDGEncoding(),
-
-    step->GetPreStepPoint()->GetPosition(),
-    step->GetPostStepPoint()->GetPosition(),
-
-    step->GetPreStepPoint()->GetMomentum(),
-    step->GetPostStepPoint()->GetMomentum(),
-
-    step->GetPreStepPoint()->GetKineticEnergy(),
-    step->GetTotalEnergyDeposit(),
-
-    step->GetPreStepPoint()->GetGlobalTime(),
-    step->GetStepLength(),
-
-    stepProcess ? stepProcess->GetProcessName() : "None",
-    creatorProcess ? creatorProcess->GetProcessName() : "Primary",
-
-    track->GetVertexPosition(),
-    track->GetVertexKineticEnergy()
-);
-
-     G4int trackID = track->GetTrackID();
-    G4int parentID = track->GetParentID();
-
-    /* if(track->GetParentID() == 1 && track->GetCurrentStepNumber() == 1) {
-	
-      fEventAction->finalStatePDG.push_back(
-                                            track->GetDefinition()->GetPDGEncoding()
-                                            );
-					    }*/
-    //if (step->IsFirstStepInVolume())
-    //          if (track->GetVertexPosition() == interactionVertex)
-    // {
-    /*	auto secondaries = step->GetSecondaryInCurrentStep();
-
-	for (auto sec : *secondaries)
-	  {
-	    int pdg = sec->GetDefinition()->GetPDGEncoding();
-	    fEventAction->finalStatePDG.push_back(pdg);
-	  }
-    */
-    //}
-
-    
-
-    if(track->GetCurrentStepNumber() > 0) {
-      auto proc = step->GetPostStepPoint()->GetProcessDefinedStep();
-      if(proc) {
-        G4String pname = proc->GetProcessName();
-        fEventAction->stepProcessNames.push_back(std::string(pname));
-      }}
-
-
-    //auto particle = track->GetDefinition();
-
-    // Skip invalid nuclei                                                                                                                                                                                                           
-    if (particle->GetParticleType() == "nucleus") {
-      auto ion = dynamic_cast<const G4Ions*>(particle);
-      if (ion && (ion->GetAtomicNumber() <= 0 || ion->GetAtomicMass() <= 0)) {
-        return;
-      }
-    }
-
-       // -----------------------------                                                                                                                                                                                                 
-    // Handle secondaries                                                                                                                                                                                                            
-    // -----------------------------                                                                                                                                                                                                 
-    if(track->GetParentID() > 0 && track->GetCurrentStepNumber() == 1 ) {
-      fEventAction->nSecondaries++;
-                                                                                            
-      double Esec = track->GetKineticEnergy();
-      if(Esec > 1*keV) {
-        fEventAction->totalSecondaryE += Esec;
-      }//fRunAction->secTotalE += Esec;                                                                                                                                                                                              
-
-        // Particle type                                                                                                                                                                                                             
-      //      auto name = track->GetDefinition()->GetParticleName();
-      // fEventAction->secNames.push_back(track->GetDefinition()->GetParticleName());
-
-	fEventAction->secEnergies.push_back(Esec);
-
-	int pdg = track->GetDefinition()->GetPDGEncoding();
-
-	if(pdg == 22)    fRunAction->nGamma++;
-	
-	if(pdg == 11)    fRunAction->nElectron++;
-	if(pdg == -11)   fRunAction->nPositron++;
-	
-	if(pdg == 2212)  fRunAction->nProtonSec++;
-	if(pdg == 2112)  fRunAction->nNeutron++;
-	
-	if(pdg == 211)   fRunAction->nPionPlus++;
-	if(pdg == -211)  fRunAction->nPionMinus++;
-	if(pdg == 111)   fRunAction->nPionZero++;
-	
-	if(pdg == 13)    fRunAction->nMuonMinus++;
-	if(pdg == -13)   fRunAction->nMuonPlus++;
-	
-	if(pdg == 15)    fRunAction->nTauMinus++;
-	if(pdg == -15)   fRunAction->nTauPlus++;
-	
-	if(pdg == 321)   fRunAction->nKaonPlus++;
-	if(pdg == -321)  fRunAction->nKaonMinus++;
-	
-	if(pdg == 311)   fRunAction->nKaonZero++;
-	if(pdg == 130)   fRunAction->nKaonZeroL++;
-	if(pdg == 310)   fRunAction->nKaonZeroS++;
-	/*
-	
-        if(name == "gamma") fRunAction->nGamma++;
-        if(name == "e-")    fRunAction->nElectron++;
-	if(name == "e+")    fRunAction->nPositron++;
-	if(name == "proton") fRunAction->nProtonSec++;
-        if(name == "neutron") fRunAction->nNeutron++;
-        if(name == "pi+")   fRunAction->nPionPlus++;
-        if(name == "pi-")   fRunAction->nPionMinus++;
-        if(name == "pi0")   fRunAction->nPionZero++;
-        if(name == "mu-")   fRunAction->nMuonMinus++;
-        if(name == "tau+")   fRunAction->nTauPlus++;
-        if(name == "tau-")   fRunAction->nTauMinus++;
-        if(name == "kaon+")  fRunAction->nKaonPlus++;
-        if(name == "kaon-")  fRunAction->nKaonMinus++;
-        if(name == "kaon0")  fRunAction->nKaonZero++;
-        if(name == "kaon0L") fRunAction->nKaonZeroL++;
-        if(name == "kaon0S") fRunAction->nKaonZeroS++;
-        if(name == "mu+")   fRunAction->nMuonPlus++;
-*/       // Identify parent                                                                                                                                                                                                          
-	//        auto parentTrack = track->GetParentID(); // this is just the ID                                                                                                                                                              
-	// auto creator = track->GetCreatorProcess(); // process that created this secondary                                                                                                                                            
-
-	//        G4cout << "mu+ created!" << G4endl;
-	// G4cout << "Parent ID: " << parentTrack << G4endl;
-	// if(creator){
-	//  G4cout << "Created by process: " << creator->GetProcessName() << G4endl;
-        //}
-        //else
-	//  G4cout << "No creator process (primary muon?)" << G4endl;
-	//}
-
-    
-	    // Save track info
-
-    
-        fEventAction->secTrackID.push_back(track->GetTrackID());
-        fEventAction->secParentID.push_back(track->GetParentID());
-        fEventAction->secPDG.push_back(track->GetDefinition()->GetPDGEncoding());
-
-        auto pos = track->GetPosition();
-        fEventAction->secStartX.push_back(pos.x());
-        fEventAction->secStartY.push_back(pos.y());
-        fEventAction->secStartZ.push_back(pos.z());
-
-        // Backward tracks                                                                                                                                                                                                           
-        if(track->GetMomentumDirection().z() < 0)
-          {  fRunAction->nBackward++;
-	  }
-        // Creator process                                                                                                                                                                                                           
-	// auto proc = track->GetCreatorProcess();
-	// if(proc) {
-	// auto pname = proc->GetProcessName();
-            //       G4cout << proc->GetProcessName() << G4endl;                                                                                                                                                                     
-
-	//  if(pname == "compt") fRunAction->nCompton++;
-	//   if(pname == "conv")  fRunAction->nPairProd++;
-	//   if(pname == "eIoni") fRunAction->nIonisation++;
-	//  if(pname == "eBrem") fRunAction->nBremsstrahlung++; //RunAction->nIonisation++;                                                                                                                                          
-	//  if (pname == "phot")     fRunAction->nPhotoElectric++;
-	//   if (pname == "annihil")  fRunAction->nAnnihilation++;
-	//  if(pname == "Decay") fRunAction->nDecay++;
-        //}
-    }
-
-    if(track->GetParentID() > 0 && track->GetTrackStatus() == fStopAndKill) {
-      auto pos = track->GetPosition();
-
-      fEventAction->secEndX.push_back(pos.x());
-      fEventAction->secEndY.push_back(pos.y());
-      fEventAction->secEndZ.push_back(pos.z());
-    }
-
-    auto proc1 = step->GetPostStepPoint()->GetProcessDefinedStep();
-
-    if(proc1)
-      {
-    // Try to cast to hadronic process                                                                                                                                                                                               
-	auto hadProc = dynamic_cast<const G4HadronicProcess*>(proc1);
-
-	if(hadProc)
-	  {
-	    const G4Nucleus* target = hadProc->GetTargetNucleus();
-	    
-	    if(target)
-	      {
-		int Z = target->GetZ_asInt();
-		int A = target->GetA_asInt();
-		
-       //            G4cout << "Struck nucleus: Z=" << Z << " A=" << A << G4endl;                                                                                                                                               
-
-		// Construct PDG code for the nucleus                                                                                                                                                                                   
-            int pdg = 1000000000 + 10000*Z + 10*A;
-
-
-            // Save in RunAction if you want                                                                                                                                                                                         
-            fRunAction->targetZ = Z;
-            fRunAction->targetA = A;
-	    fRunAction->targetPDG = pdg;
-
+        // Final state (track end)
+        if (track->GetTrackStatus() == fStopAndKill) {
+            auto p = track->GetMomentum();
+            fEventAction->finalE  = track->GetKineticEnergy();
+            fEventAction->finalPx = p.x();
+            fEventAction->finalPy = p.y();
+            fEventAction->finalPz = p.z();
+            fEventAction->finalX  = track->GetPosition().x();
+            fEventAction->finalY  = track->GetPosition().y();
+            fEventAction->finalZ  = track->GetPosition().z();
         }
     }
- }
 
-
-
-    // Track length accumulation (all tracks)
-    if(track->GetParentID() > 0)
-    {                                                                                
-    fRunAction->secTrackLength += step->GetStepLength();
-    }
-     // Accumulate total energy deposition and steps for all tracks                                                                                                                                                                  
-    // -----------------------------                                                                                                                                                                                                 
-    //    fEventAction->AddEdep(step->GetTotalEnergyDeposit());
-    // fEventAction->IncrementStep();
-    
-
+    // -----------------------------
+    // Record this step (all tracks). The per-track table is built from these.
+    // -----------------------------
+    fEventAction->AddStepInfo(
+        track->GetTrackID(),
+        track->GetParentID(),
+        particle->GetPDGEncoding(),
+        step->GetPreStepPoint()->GetPosition(),
+        step->GetPostStepPoint()->GetPosition(),
+        step->GetPreStepPoint()->GetKineticEnergy(),
+        step->GetPostStepPoint()->GetKineticEnergy(),
+        step->GetTotalEnergyDeposit(),
+        step->GetPreStepPoint()->GetGlobalTime(),
+        step->GetStepLength(),
+        stepProcess ? stepProcess->GetProcessName() : "None",
+        creatorProcess ? creatorProcess->GetProcessName() : "Primary",
+        track->GetVertexPosition(),
+        track->GetVertexKineticEnergy());
 }

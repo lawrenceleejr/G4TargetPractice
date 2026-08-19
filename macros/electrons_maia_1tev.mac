@@ -1,0 +1,48 @@
+# =============================================================================
+# electrons_maia_1tev.mac
+#
+# 1 TeV electron fired into the MAIA muon-collider detector from upstream.
+#
+# The electron starts well upstream on the +z beam axis and travels in the
+# -z direction (back toward the detector centre at the origin), entering
+# through the +z endcap face. Its direction is smeared by a Gaussian angular
+# spread of ~10 deg (see /gun/angleSigma), so repeated events fan out into a
+# realistic divergent beam rather than a perfect pencil.
+#
+# Detector: gdml/MAIA_v0.gdml
+#   - World:    60 x 60 x 60 m air
+#   - Detector: barrel + endcap calorimeters and yoke, beam axis = z,
+#               outer envelope reaches z = +/-620 cm, r ~ 590 cm.
+#
+# Source:
+#   - Particle       : e-
+#   - Energy         : 1 TeV (monoenergetic)
+#   - Position       : 0 0 +700 cm  (~80 cm upstream of the +z endcap face)
+#   - Direction      : 0 0 -1       (toward the detector centre)
+#   - Angular spread : 10 deg Gaussian about that direction
+#
+# ----- HOW MANY EVENTS -----------------------------------------------------
+# The run count is the {N} alias below. Set it to 1 for a single event
+# (event display) or 100 for an ensemble -- just edit that one number.
+# =============================================================================
+
+# --- Number of events: set to 1 or 100 ---
+/control/alias N 1
+
+# --- Geometry ---
+/detector/readGDML gdml/MAIA_v0.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Source ---
+/gun/particle    e-
+/gun/energyMode  mono
+/gun/energy      1 TeV
+/gun/position    0 0 700 cm
+/gun/direction   0 0 -1
+/gun/angleSigma  10 deg
+
+# --- Run ---
+/run/printProgress 1
+/run/beamOn {N}

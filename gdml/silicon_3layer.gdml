@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<!--
+  Three-layer silicon tracker. Each layer is a 10x10 cm G4_Si plane,
+  300 um (0.03 cm) thick, with 300 um air gaps between layers, in a
+  20 cm air world. The entrance face of layer 0 is at z = 0, so the
+  layer centres are at z = 0.15, 0.75, 1.35 mm:
+
+    layer 0: z = 0.00 - 0.30 mm   (centre 0.15 mm)
+    gap    : z = 0.30 - 0.60 mm
+    layer 1: z = 0.60 - 0.90 mm   (centre 0.75 mm)
+    gap    : z = 0.90 - 1.20 mm
+    layer 2: z = 1.20 - 1.50 mm   (centre 1.35 mm)
+
+  Aim the beam along +z from negative z (e.g. /gun/position 0 0 -2 cm).
+  Layer volumes are named *_sens so they register as the target region.
+-->
+<gdml>
+  <solids>
+    <box name="WorldBox" x="20" y="20" z="20"   lunit="cm"/>
+    <box name="SiLayer"  x="10" y="10" z="0.03" lunit="cm"/>
+  </solids>
+
+  <structure>
+    <volume name="SiLayer0_sens">
+      <materialref ref="G4_Si"/>
+      <solidref ref="SiLayer"/>
+    </volume>
+    <volume name="SiLayer1_sens">
+      <materialref ref="G4_Si"/>
+      <solidref ref="SiLayer"/>
+    </volume>
+    <volume name="SiLayer2_sens">
+      <materialref ref="G4_Si"/>
+      <solidref ref="SiLayer"/>
+    </volume>
+
+    <volume name="World">
+      <materialref ref="G4_AIR"/>
+      <solidref ref="WorldBox"/>
+      <physvol>
+        <volumeref ref="SiLayer0_sens"/>
+        <position x="0" y="0" z="0.015" unit="cm"/>
+      </physvol>
+      <physvol>
+        <volumeref ref="SiLayer1_sens"/>
+        <position x="0" y="0" z="0.075" unit="cm"/>
+      </physvol>
+      <physvol>
+        <volumeref ref="SiLayer2_sens"/>
+        <position x="0" y="0" z="0.135" unit="cm"/>
+      </physvol>
+    </volume>
+  </structure>
+
+  <setup name="Default" version="1.0">
+    <world ref="World"/>
+  </setup>
+</gdml>

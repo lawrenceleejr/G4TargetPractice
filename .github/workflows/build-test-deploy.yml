@@ -4,6 +4,35 @@ on:
   pull_request:
 
 jobs:
+  # ---- Unit tests: pure Python, no ROOT/Geant4/Docker (gating) ------------- #
+  python-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 floor: writing jagged-string branches with uproot (the test
+        # fixtures and the GENIE/Achilles converters do) needs uproot/awkward
+        # releases that no longer support 3.9.
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install gdmltp
+        run: pip install -e .[dev]
+
+      - name: Run unit test suite
+        run: pytest tests/ -v
+
+      - name: Deprecated g4tp alias still imports
+        run: python -c "import warnings; warnings.simplefilter('ignore'); import g4tp; from g4tp import cli, io; from g4tp.backends import genie_convert; print('g4tp shim OK', g4tp.__version__)"
+
+  # ---- Geant4 build + end-to-end integration (gating) --------------------- #
   build-and-test:
     runs-on: ubuntu-latest
     container:
@@ -11,29 +40,200 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: Configure CMake
+
+      - name: Install HepMC3 (generator->Geant4 hand-off interchange)
         run: |
-          mkdir -p build
-          cd build
-          cmake ../g4sim/
-          pwd; ls -lrt
-      
-      - name: Build
-        run: |
-          cd build
-          cmake --build . 
-          pwd; ls -lrt
-      
-      - name: Run executable with input file
-        run: |
-          pwd; ls -lrt
+          HEPMC3_VERSION=3.3.0
+          wget -q --tries=5 --retry-connrefused --waitretry=20 --timeout=30 \
+            --retry-on-http-error=429,500,502,503,504 \
+            https://gitlab.cern.ch/hepmc/HepMC3/-/archive/${HEPMC3_VERSION}/HepMC3-${HEPMC3_VERSION}.tar.gz
+          tar xzf HepMC3-${HEPMC3_VERSION}.tar.gz
+          cmake -S HepMC3-${HEPMC3_VERSION} -B hepmc3-build \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DHEPMC3_ENABLE_PYTHON=OFF -DHEPMC3_ENABLE_ROOTIO=OFF \
+            -DHEPMC3_ENABLE_TEST=OFF -DHEPMC3_BUILD_EXAMPLES=OFF
+          cmake --build hepmc3-build --target install -j"$(nproc)"
           ldconfig
-          ldd ./build/g4sim
-          echo $LD_LIBRARY_PATH
+
+      - name: Configure & build g4sim
+        run: |
+          mkdir -p build && cd build
+          cmake ../g4sim/
+          cmake --build .
+
+      - name: Install gdmltp in the container
+        # The container's stock pip predates PEP 621 pyproject metadata; upgrade
+        # the toolchain first so the install is real (deps included), not a
+        # silent UNKNOWN-0.0.0.
+        run: |
+          python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+          python3 -m pip install --no-cache-dir -e .
+          python3 -c "import gdmltp, numpy, uproot; print('gdmltp', gdmltp.__version__)"
+
+      - name: Run CI macro (direct g4sim)
+        run: |
+          ldconfig
           ./build/g4sim g4sim/run_ci.mac
-          pwd; ls -lrt
-      
+          test -f output.root && rm -f output.root
+
+      - name: Run an arb-mode macro (beta spectrum into the Si tracker)
+        run: |
+          ./build/g4sim macros/betas_silicon_sr90.mac
+          test -f output.root && rm -f output.root
+
+      - name: Beam-file replay (/gun/beamFile) smoke
+        run: |
+          cat > beam.dat << 'EOF'
+          # <name|pdg>  x y z [mm]  px py pz [MeV/c]
+          e- 0 0 -50 0 0 500
+          11 1 0 -50 0 0 500
+          2212 -1 0 -50 0 0 500
+          EOF
+          cat > beam.mac << 'EOF'
+          /detector/readGDML gdml/silicon_slab_1mm.gdml
+          /run/initialize
+          /gun/beamFile beam.dat
+          /run/beamOn 3
+          EOF
+          ./build/g4sim beam.mac
+          test -f output.root
+          python3 -c "import uproot,sys; n=uproot.open('output.root')['tree'].num_entries; print('events',n); sys.exit(0 if n==3 else 1)"
+          rm -f output.root beam.dat beam.mac
+
+      - name: Hand-off HepMC3 smoke (/gun/hepmcFile)
+        run: |
+          # Write the hand-off with the official library (pyhepmc), then g4sim
+          # reads it back with HepMC3::ReaderAscii -- the real interchange, both
+          # ends. Second event carries a vertex time that must reach step times.
+          python3 - << 'PY'
+          import pyhepmc
+          C = 299.792458  # mm/ns
+          specs = [([(13,0,0,900),(2212,50,0,300)], (0,0,-20), 0.0),
+                   ([(13,0,0,700),(211,-30,0,200),(2112,0,20,150)], (1,0,-20), 166.8)]
+          with pyhepmc.open("events.hepmc", "w") as w:
+              for i,(parts,v,tns) in enumerate(specs):
+                  ev = pyhepmc.GenEvent(pyhepmc.Units.MEV, pyhepmc.Units.MM)
+                  ev.event_number = i
+                  vtx = pyhepmc.GenVertex((v[0],v[1],v[2], tns*C))
+                  vtx.add_particle_in(pyhepmc.GenParticle((0,0,1000,1000), 14, 4))
+                  for pid,px,py,pz in parts:
+                      import math
+                      vtx.add_particle_out(pyhepmc.GenParticle(
+                          (px,py,pz, math.sqrt(px*px+py*py+pz*pz)+140.0), pid, 1))
+                  ev.add_vertex(vtx)
+                  w.write(ev)
+          print("wrote events.hepmc")
+          PY
+          cat > transport.mac << 'EOF'
+          /detector/readGDML gdml/liquid_argon_1m3.gdml
+          /run/initialize
+          /analysis/neutrinoMode off
+          /gun/hepmcFile events.hepmc
+          /run/beamOn 2
+          EOF
+          ./build/g4sim transport.mac
+          test -f output.root
+          python3 - << 'PY'
+          import uproot, awkward as ak
+          t = uproot.open('output.root')['tree']
+          assert t.num_entries == 2, f"events {t.num_entries}"
+          st = t['step_time'].array()
+          t0 = ak.min(st[1]) if len(st[1]) else 0.0
+          print('event 1 earliest step time:', t0)
+          assert t0 >= 166.8, "HepMC vertex time was not applied to the primaries"
+          PY
+          rm -f output.root events.hepmc transport.mac
+
+      - name: BSM decay smoke (/bsm/define -> G4Decay)
+        # Geant4 does the decay: define a 1 GeV neutral with a short sampled
+        # ctau, fire it into the LAr cube, and require in-flight decays with
+        # "Decay"-created daughters in the output.
+        run: |
+          cat > bsm.mac << 'EOF'
+          /bsm/define N1 9900014 1000.0 0 50.0
+          /bsm/channel 0.6 13 211
+          /bsm/channel 0.4 14 13 -13
+          /detector/readGDML gdml/liquid_argon_1m3.gdml
+          /run/initialize
+          /analysis/neutrinoMode off
+          /random/setSeeds 41 42
+          /gun/particlePDG 9900014
+          /gun/energy 10 GeV
+          /gun/position 0 0 -60 cm
+          /gun/direction 0 0 1
+          /run/beamOn 20
+          EOF
+          ./build/g4sim bsm.mac
+          test -f output.root
+          python3 - << 'PY'
+          import uproot, awkward as ak
+          t = uproot.open('output.root')['tree']
+          assert t.num_entries == 20
+          pdg = t['primaryPDG'].array(library='np')
+          assert (pdg == 9900014).all(), pdg[:5]
+          proc = t['trk_creatorProcess'].array()
+          parent = t['trk_parentID'].array()
+          decayed = ak.sum(ak.any((parent == 1) & (proc == 'Decay'), axis=1))
+          print('events with an in-flight decay:', decayed, '/ 20')
+          assert decayed > 0, "no G4Decay daughters found"
+          PY
+          rm -f output.root bsm.mac
+
+      - name: Neutrino-bias smoke (/gdmltp/neutrinoBias -> G4EmParameters)
+        # The bias command must be registered and drive the neutrino cross
+        # sections via the C++ API -- it must NOT abort the batch the way the
+        # optional /physics_lists/em/Nu* UI commands do in this Geant4 build.
+        run: |
+          cat > nubias.mac << 'EOF'
+          /gdmltp/neutrinoBias 1e10 1e10 1e10 DefaultRegionForTheWorld
+          /detector/readGDML gdml/liquid_argon_1m3.gdml
+          /run/initialize
+          /analysis/neutrinoMode on
+          /random/setSeeds 7 8
+          /gun/particle nu_mu
+          /gun/energy 5 GeV
+          /gun/position 0 0 -60 cm
+          /gun/direction 0 0 1
+          /run/beamOn 20
+          EOF
+          ./build/g4sim nubias.mac
+          test -f output.root
+          python3 -c "import uproot,sys; t=uproot.open('output.root')['tree']; n=t.num_entries; nu='nu_isCC' in [k.split(';')[0] for k in t.keys()]; print('events',n,'nu block',nu); sys.exit(0 if (n==20 and nu) else 1)"
+          rm -f output.root nubias.mac
+
+      - name: Particle-by-PDG smoke (/gun/particlePDG)
+        run: |
+          cat > pdg.mac << 'EOF'
+          /detector/readGDML gdml/silicon_slab_1mm.gdml
+          /run/initialize
+          /gun/particlePDG 2212
+          /gun/energy 200 MeV
+          /gun/position 0 0 -50 mm
+          /gun/direction 0 0 1
+          /run/beamOn 2
+          EOF
+          ./build/g4sim pdg.mac
+          test -f output.root
+          python3 -c "import uproot,sys; t=uproot.open('output.root')['tree']; import numpy as np; pdg=t['primaryPDG'].array(library='np'); print('primaries',pdg.tolist()); sys.exit(0 if (t.num_entries==2 and (pdg==2212).all()) else 1)"
+          rm -f output.root pdg.mac
+
+      - name: Integration - YAML config -> macro -> g4sim -> analyze
+        # Gating end-to-end check of the whole common frontend against the real
+        # engine (gdmltp installed in the container two steps up).
+        run: |
+          export PATH="$PWD/build:$PATH"
+          python3 -m gdmltp run --config examples/water_proton.yaml --local -n 5 -o run_out
+          test -f run_out/output.root
+          python3 -m gdmltp validate run_out/output.root
+          python3 -m gdmltp analyze run_out/output.root -o run_out/analysis
+          test -f run_out/analysis/summary.txt
+          # Twiss phase-space beam end to end (host samples -> beam.dat -> /gun/beamFile)
+          python3 -m gdmltp run --config examples/twiss_muon.yaml --local -n 20 -o twiss_out
+          test -f twiss_out/beam.dat
+          test -f twiss_out/output.root
+          python3 -m gdmltp validate twiss_out/output.root
+          echo "Geant4 YAML + Twiss integration OK"
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -41,27 +241,28 @@ jobs:
           path: build/g4sim
           retention-days: 1
 
+  # ---- Publish the Geant4 image (gated on both test jobs) ----------------- #
   docker:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: [build-and-test, python-tests]
     permissions:
       contents: read
       packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Extract metadata for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -72,34 +273,12 @@ jobs:
             type=ref,event=pr
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
-      
-      - name: Create Dockerfile
-        run: |
-          cat > Dockerfile << 'EOF'
-          FROM ghcr.io/lawrenceleejr/root-geant4-garfield:cpp17_root-v6-26-10_geant4-v11.4.1_garfield-e0a9f171
-          
-          # Set working directory
-          WORKDIR /app
-          
-          # Install Qt6 runtime libraries required by the Geant4 visualization drivers
-          RUN apt-get update && apt-get install -y --no-install-recommends \
-              libqt6core6 libqt6gui6 libqt6widgets6 libqt6opengl6 \
-              && rm -rf /var/lib/apt/lists/*
 
-          # Copy and build
-          COPY g4sim/ /app/g4sim/
-          RUN mkdir -p /app/build && cd /app/build && cmake /app/g4sim/ && cmake --build .
-          RUN if [ -f /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 ]; then strip --remove-section=.note.ABI-tag /usr/lib/x86_64-linux-gnu/libQt5Core.so.5; fi
-          RUN if [ -f /lib/x86_64-linux-gnu/libQt6Core.so.6 ]; then strip --remove-section=.note.ABI-tag /lib/x86_64-linux-gnu/libQt6Core.so.6; fi
-
-          # Set the entrypoint to the executable
-          ENTRYPOINT ["/app/build/g4sim"]
-          EOF
-      
-      - name: Build and push Docker image
+      - name: Build and push the Geant4 image
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: docker/geant4.Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

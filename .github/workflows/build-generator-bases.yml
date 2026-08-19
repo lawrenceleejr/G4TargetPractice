@@ -1,0 +1,206 @@
+name: Build Generator Base Images
+# Builds GENIE, Achilles and Pythia 8 FROM SOURCE into dedicated base images, so
+# nobody downstream (users or the per-push app-image workflows) ever compiles a
+# generator themselves. GENIE is the slow one (~2-3 h: Pythia6 + ROOT + LHAPDF +
+# GENIE); the Pythia 8 + HepMC3 base builds in minutes. They run only when the
+# base recipes change or on manual dispatch -- the per-push app images just layer
+# gdmltp on top of the published bases. Failures are real failures.
+#
+# The GENIE base is built WITH HEDIS support by default (enable_hedis=1): it
+# adds APFEL, installs the GHE19 tune's LHAPDF grid, and bakes the HEDIS
+# structure-function tables, so the multi-TeV muon-collider slice (GHE19 tunes)
+# runs on the published image with no manual setup. Dispatch with
+# enable_hedis=0 to skip it for a leaner/faster base.
+on:
+  push:
+    paths:
+      - "docker/genie-base.Dockerfile"
+      - "docker/achilles-base.Dockerfile"
+      - "docker/pythia-base.Dockerfile"
+      - ".github/workflows/build-generator-bases.yml"
+  workflow_dispatch:
+    inputs:
+      genie_version:
+        description: "GENIE Generator git tag"
+        required: false
+        default: "R-3_04_02"
+      root_version:
+        description: "ROOT version for the GENIE base"
+        required: false
+        default: "6.28.12"
+      enable_hedis:
+        description: "Build HEDIS support (APFEL + GHE19 tune inputs) into the GENIE base"
+        required: false
+        default: "1"
+      achilles_ref:
+        description: "Achilles git ref"
+        required: false
+        default: "main"
+      pythia_version:
+        description: "Pythia 8 version (e.g. 8315)"
+        required: false
+        default: "8315"
+
+concurrency:
+  group: generator-bases-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GENIE_VERSION: ${{ github.event.inputs.genie_version || 'R-3_04_02' }}
+  ROOT_VERSION: ${{ github.event.inputs.root_version || '6.28.12' }}
+  ACHILLES_REF: ${{ github.event.inputs.achilles_ref || 'main' }}
+  PYTHIA_VERSION: ${{ github.event.inputs.pythia_version || '8315' }}
+
+jobs:
+  genie-base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free disk space (ROOT + GENIE build needs it)
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache /usr/share/dotnet \
+                      /opt/ghc /usr/local/share/boost || true
+          docker system prune -af || true
+          df -h /
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-genie-base
+          flavor: |
+            latest=true
+          tags: |
+            type=raw,value=${{ env.GENIE_VERSION }}
+
+      - name: Build and push the GENIE base image
+        # Registry-backed build cache: the GHA cache backend rejects layers this
+        # large (the first run built GENIE fine in ~60 min, then died with
+        # "exporting to GitHub Actions Cache: not_found", cancelling the push).
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/genie-base.Dockerfile
+          build-args: |
+            GENIE_VERSION=${{ env.GENIE_VERSION }}
+            ROOT_VERSION=${{ env.ROOT_VERSION }}
+            ENABLE_HEDIS=${{ github.event.inputs.enable_hedis || '1' }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # buildcache2: the original :buildcache was poisoned -- it held a
+          # compiled GENIE `make` layer from before the HEDISStrucFunc
+          # setprecision(15) source patch, and BuildKit kept restoring that
+          # stale layer even after the patch RUN changed (the shipped binary's
+          # operator<< still truncated MassZ 90.34202->90.342, breaking the
+          # HEDIS SF metafile round-trip at the 1e-10 tolerance -> gevgen
+          # assert). Pointing at a fresh, empty cache ref makes the first build
+          # rebuild every layer from scratch (so the patched GENIE is actually
+          # compiled in); it then repopulates buildcache2 and later edits are
+          # incremental again.
+          cache-from: type=registry,ref=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:buildcache2
+          cache-to: type=registry,ref=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:buildcache2,mode=max
+
+  achilles-base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-achilles-base
+          flavor: |
+            latest=true
+          tags: |
+            type=raw,value=${{ env.ACHILLES_REF }}
+
+      - name: Build and push the Achilles base image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/achilles-base.Dockerfile
+          build-args: |
+            ACHILLES_REF=${{ env.ACHILLES_REF }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=achilles-base
+          cache-to: type=gha,mode=max,scope=achilles-base
+
+  pythia-base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-pythia-base
+          flavor: |
+            latest=true
+          tags: |
+            type=raw,value=${{ env.PYTHIA_VERSION }}
+
+      - name: Build and push the Pythia base image
+        # Cheap compared to the GENIE base: Pythia 8 + HepMC3 are self-contained
+        # C++ and build in minutes, so the plain GHA cache is fine here.
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/pythia-base.Dockerfile
+          build-args: |
+            PYTHIA_VERSION=${{ env.PYTHIA_VERSION }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=pythia-base
+          cache-to: type=gha,mode=max,scope=pythia-base

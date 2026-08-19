@@ -1,0 +1,39 @@
+# =============================================================================
+# alphas_dt_3p5MeV.mac
+#
+# Companion to neutrons_dt_14MeV.mac: each d-t fusion also releases a
+# 3.5 MeV alpha. The alpha deposits its energy within a fraction of a
+# millimetre of the fusion site (local heating of the D-T cell), and in
+# ~1% of cycles the muon sticks to it (alpha-mu)+ and is lost - the main
+# limit on the number of catalysis cycles per muon. This macro sources
+# the alphas isotropically from the muon stopping region for local
+# energy-deposition studies.
+#
+# Detector: gdml/dt_target_mucf.gdml
+#   - World:  60×60×100 cm vacuum
+#   - Vessel: stainless steel, 2 mm walls
+#   - Target: 10×10×20 cm liquid D-T (0.18 g/cm3), entrance face at z = 0
+#
+# Source:
+#   - Particle : alpha
+#   - Energy   : 3.5 MeV (monoenergetic)
+#   - Position : muon stopping region (0, 0, 7 cm)
+#   - Direction: isotropic (4pi)
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/dt_target_mucf.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Source ---
+/gun/particle    alpha
+/gun/energyMode  mono
+/gun/energy      3.5 MeV
+/gun/position    0 0 7 cm
+/gun/direction   0 0 0
+
+# --- Run ---
+/run/printProgress 500
+/run/beamOn 2000

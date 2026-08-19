@@ -1,0 +1,43 @@
+# =============================================================================
+# protons_graphite_muonprod.mac
+#
+# Stage 1 of the muon-catalyzed fusion (muCF) chain: pion/muon production.
+# GeV protons on a graphite target hadronize (mostly to pions); pi+ stop
+# and decay to mu+, pi- are captured, and in-flight decays feed a muon
+# beamline. 1.3 GeV matches the SNS proton energy after the PPU upgrade
+# (the muCF/VNS concept shares the beam with the Second Target Station).
+#
+# The per-track table in output.root gives the yields per proton on target;
+# count tracks by PDG (in ROOT):
+#   pi+: tree->Draw("Sum$(trk_pdg==211)")    pi-: Sum$(trk_pdg==-211)
+#   pi0: Sum$(trk_pdg==111)                  mu+: Sum$(trk_pdg==-13)
+#   mu-: Sum$(trk_pdg==13)
+# trk_startX/Y/Z give the production positions.
+#
+# Detector: gdml/graphite_target.gdml
+#   - World:  100×100×200 cm vacuum
+#   - Target: 10×10×60 cm graphite block, entrance face at z = 0
+#
+# Beam:
+#   - Particle : proton
+#   - Energy   : 1.3 GeV (monoenergetic)
+#   - Position : upstream on the beam axis (z = -20 cm)
+#   - Direction: along +z
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/graphite_target.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    proton
+/gun/energyMode  mono
+/gun/energy      1.3 GeV
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 100
+/run/beamOn 500

@@ -1,0 +1,60 @@
+# =============================================================================
+# muons_dt_energy_scan.mac
+#
+# Beam-energy scan for the muCF D-T cell: find which muon energies cross
+# the 2 mm stainless entrance window AND Bragg-peak stop inside the D-T
+# volume. Fires a comb of discrete mu- energies (equal weights) in a
+# single run; the per-event beam energy is stored in the E branch and
+# the primary's endpoint in primaryEndX/Y/Z (primaryEndE ~ 0 tags a genuine stop),
+# so stopping depth vs beam energy comes from one output.root.
+#
+# Range-budget estimate for this geometry (window 1.6 g/cm2, D-T rear at
+# 5.2 g/cm2): muons below ~16 MeV (p ~ 60 MeV/c) stop in the window;
+# above ~31 MeV (p ~ 88 MeV/c) they punch through the cell. The scan
+# spans 14-34 MeV to map both edges. Note this is decay-channel muon
+# territory: 29.8 MeV/c surface muons (4.1 MeV, mu+ only) would stop in
+# the first ~0.2 mm of steel - a mu- beam for muCF is a decay beam.
+#
+# Detector: gdml/dt_target_mucf.gdml
+#   - World:  60×60×100 cm vacuum
+#   - Vessel: stainless steel, 2 mm walls
+#   - Target: 10×10×20 cm liquid D-T (0.18 g/cm3), entrance face at z = 0
+#             (D-T spans 0 < z < 200 mm, |x|,|y| < 50 mm)
+#
+# Analysis (in ROOT; E in MeV, positions in mm):
+#   // endpoint depth vs beam energy
+#   tree->Draw("primaryEndZ:primaryE>>h(11,13,35,240,-20,220)", "", "colz");
+#   // stopping efficiency vs energy: stopped (primaryEndE~0) inside the D-T
+#   tree->Draw("primaryE>>hAll(11,13,35)");
+#   tree->Draw("primaryE>>hStop(11,13,35)",
+#              "primaryEndE<0.1 && primaryEndZ>0 && primaryEndZ<200 && abs(primaryEndX)<50 && abs(primaryEndY)<50");
+#   hStop->Divide(hAll);  hStop->Draw();
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/dt_target_mucf.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam: discrete energy comb, equal weights ---
+/gun/particle    mu-
+/gun/energyMode  arb
+/gun/clearEnergyBins
+/gun/addEnergyBin 14 MeV 1.0
+/gun/addEnergyBin 16 MeV 1.0
+/gun/addEnergyBin 18 MeV 1.0
+/gun/addEnergyBin 20 MeV 1.0
+/gun/addEnergyBin 22 MeV 1.0
+/gun/addEnergyBin 24 MeV 1.0
+/gun/addEnergyBin 26 MeV 1.0
+/gun/addEnergyBin 28 MeV 1.0
+/gun/addEnergyBin 30 MeV 1.0
+/gun/addEnergyBin 32 MeV 1.0
+/gun/addEnergyBin 34 MeV 1.0
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 500
+/run/beamOn 5500

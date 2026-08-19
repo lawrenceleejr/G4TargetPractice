@@ -9,6 +9,9 @@
 #include "G4LogicalVolumeStore.hh"
 #include "G4UserLimits.hh"
 #include "G4NistManager.hh"
+#include "G4UniformMagField.hh"
+#include "G4FieldManager.hh"
+#include "G4TransportationManager.hh"
 #include "G4Box.hh"
 #include "G4LogicalVolume.hh"
 #include "G4PVPlacement.hh"
@@ -60,6 +63,33 @@ void DetectorConstruction::ReadGDML(const G4String& filename)
 
     // Reinitialize geometry after macro reload
     G4RunManager::GetRunManager()->ReinitializeGeometry();
+}
+
+// Set (or clear, with a zero vector) a uniform magnetic field over the
+// whole geometry, e.g. a solenoid channel along z for muon capture.
+void DetectorConstruction::SetGlobalField(const G4ThreeVector& fieldValue)
+{
+    auto* fieldMgr =
+        G4TransportationManager::GetTransportationManager()->GetFieldManager();
+
+    G4MagneticField* oldField = fGlobalField;
+    if (fieldValue.mag2() > 0.) {
+        fGlobalField = new G4UniformMagField(fieldValue);
+        fieldMgr->SetDetectorField(fGlobalField);
+        fieldMgr->CreateChordFinder(static_cast<G4MagneticField*>(fGlobalField));
+        G4cout << "Global uniform magnetic field set: "
+               << fieldValue / tesla << " T" << G4endl;
+#ifdef USE_CELERITAS
+        G4cout << "WARNING: the Celeritas offload in this build assumes zero "
+                  "magnetic field for e-/e+/gamma transport.\n"
+                  "Set CELER_DISABLE=1 when running with a field." << G4endl;
+#endif
+    } else {
+        fGlobalField = nullptr;
+        fieldMgr->SetDetectorField(nullptr);
+        G4cout << "Global magnetic field disabled." << G4endl;
+    }
+    delete oldField;
 }
 
 G4VPhysicalVolume* DetectorConstruction::Construct()

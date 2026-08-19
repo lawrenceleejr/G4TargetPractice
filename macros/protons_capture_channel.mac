@@ -1,0 +1,56 @@
+# =============================================================================
+# protons_capture_channel.mac
+#
+# Muon production + simple capture system: 1.3 GeV protons (SNS post-PPU
+# energy) strike a thin graphite rod; the produced pions are captured by
+# a 5 T solenoid-like field along z and spiral down a 5 m vacuum decay
+# channel where pi+ -> mu+ nu (cT = 7.8 m; ~30-40% decay over 5 m at
+# typical momenta). A massless monitor plane 5 m downstream tags
+# everything that survives the channel.
+#
+# Rerun with the setGlobalField line commented out (or set to 0 0 0) to
+# see the capture gain: without the field only the forward cone reaches
+# the monitor.
+#
+# Detector: gdml/muon_capture_channel.gdml
+#   - World:   100×100×1200 cm vacuum
+#   - Target:  2×2×30 cm graphite rod, entrance face at z = 0
+#   - Monitor: vacuum plane at z = 530-531 cm
+#
+# Beam:
+#   - Particle : proton, 1.3 GeV, along +z from z = -50 cm
+#     (parallel to B, so the field does not disturb the primary)
+#
+# Analysis hints (in ROOT; positions in mm, energies in MeV; PDG codes:
+# pi+ 211, pi- -211, mu+ -13, mu- 13). The per-track table (trk_*) already
+# has one row per particle, so no first-step trick is needed:
+#   // pi+ production spectrum (birth kinetic energy, one entry per pion)
+#   tree->Draw("trk_startE", "trk_pdg==211");
+#   // muons arriving at the monitor plane, and their kinetic-energy spectrum
+#   tree->Draw("step_kinE", "abs(step_pdg)==13 && step_z>5300 && step_z<5310");
+#   // where the muons were born along the channel (decay vertices)
+#   tree->Draw("trk_startZ", "abs(trk_pdg)==13");
+#   // radial distribution at the monitor (capture aperture)
+#   tree->Draw("sqrt(step_x*step_x+step_y*step_y)",
+#              "abs(step_pdg)==13 && step_z>5300 && step_z<5310");
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/muon_capture_channel.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Capture solenoid field (comment out to compare without capture) ---
+/detector/setGlobalField 0 0 5 tesla
+
+# --- Beam ---
+/gun/particle    proton
+/gun/energyMode  mono
+/gun/energy      1.3 GeV
+/gun/position    0 0 -50 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 50
+/run/beamOn 300

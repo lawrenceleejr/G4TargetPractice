@@ -29,6 +29,10 @@
 # --- Physics initialise ---
 /run/initialize
 
+# --- Emit the nu_* neutrino-interaction branches (auto would also enable
+#     these for a neutrino primary; set explicitly for clarity) ---
+/analysis/neutrinoMode on
+
 # --- Beam ---
 /gun/particle    nu_mu
 /gun/energyMode  mono

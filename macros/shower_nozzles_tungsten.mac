@@ -1,0 +1,22 @@
+# =============================================================================
+# shower_nozzles_tungsten.mac
+#
+# Shower-stopping test: 50 GeV electrons into the TUNGSTEN nozzle (the MAIA
+# baseline material). Comparison partner for shower_nozzles_du.mac -- same
+# beam, same geometry, only the dense-shell material differs. Overlay with:
+#     gdmltp compare w.root du.root --labels W,DU
+#
+# See shower_nozzles_du.mac for the beam-geometry rationale.
+# =============================================================================
+
+/detector/readGDML gdml/nozzles_tungsten.gdml
+/run/initialize
+
+/gun/particle    e-
+/gun/energyMode  mono
+/gun/energy      50 GeV
+/gun/position    15 0 650 cm
+/gun/direction   0 0 -1
+
+/run/printProgress 20
+/run/beamOn 100

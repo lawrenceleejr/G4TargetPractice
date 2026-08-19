@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<!--
+  Simple muon production + capture channel: a graphite pion-production
+  rod followed by a 5 m vacuum decay channel and a (massless) monitor
+  plane. Apply a solenoid-like field along z with
+
+      /detector/setGlobalField 0 0 5 tesla
+
+  to capture the produced pions into helices: they spiral down the
+  channel and decay (pi+ -> mu+ nu, cT = 7.8 m), delivering muons to
+  the monitor plane. Without the field, only the forward cone reaches
+  the plane - rerun field-free to see the capture gain.
+
+  World:   100 x 100 x 1200 cm vacuum (G4_Galactic).
+  Target:  2 x 2 x 30 cm graphite rod, entrance face at z = 0
+           (thin radially so pions escape sideways, ~0.8 interaction
+           lengths longitudinally).
+  Monitor: 60 x 60 x 1 cm vacuum plane, 5 m downstream of the rod
+           (z = 530 to 531 cm). Being vacuum it is non-perturbing, but
+           its boundaries split tracks into steps, so particles
+           crossing it are selectable via 5300 < step_z < 5310 mm.
+-->
+<gdml>
+  <solids>
+    <box name="WorldBox"   x="100" y="100" z="1200" lunit="cm"/>
+    <box name="TargetRod"  x="2"   y="2"   z="30"   lunit="cm"/>
+    <box name="MonitorBox" x="60"  y="60"  z="1"    lunit="cm"/>
+  </solids>
+
+  <structure>
+    <volume name="ProductionTarget_vol">
+      <materialref ref="G4_GRAPHITE"/>
+      <solidref ref="TargetRod"/>
+    </volume>
+
+    <volume name="MuonMonitor_vol">
+      <materialref ref="G4_Galactic"/>
+      <solidref ref="MonitorBox"/>
+    </volume>
+
+    <volume name="World">
+      <materialref ref="G4_Galactic"/>
+      <solidref ref="WorldBox"/>
+      <physvol>
+        <volumeref ref="ProductionTarget_vol"/>
+        <position x="0" y="0" z="15" unit="cm"/>
+      </physvol>
+      <physvol>
+        <volumeref ref="MuonMonitor_vol"/>
+        <position x="0" y="0" z="530.5" unit="cm"/>
+      </physvol>
+    </volume>
+  </structure>
+
+  <setup name="Default" version="1.0">
+    <world ref="World"/>
+  </setup>
+</gdml>

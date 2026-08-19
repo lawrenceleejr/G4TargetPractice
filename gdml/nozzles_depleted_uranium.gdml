@@ -1,0 +1,167 @@
+<?xml version="1.0"?>
+<!--
+  MAIA shielding nozzles, standalone, with the tungsten replaced by
+  DEPLETED URANIUM.
+
+  Extracted from gdml/MAIA_v0.gdml: the two conical shielding nozzles that
+  hug the beampipe on either side of the interaction point of the muon-
+  collider detector. Each nozzle is three nested polycone shells:
+
+      NozzleW       - dense core            (MAIA: Tungsten_Alloy  -> here: DU)
+      NozzleBCH     - borated-polyethylene  (BCH2, unchanged)
+      NozzleWCludding - dense outer cladding (MAIA: Tungsten_Alloy -> here: DU)
+
+  Only the two tungsten shells become depleted uranium; the borated-poly
+  liner (a neutron moderator/absorber, not tungsten) is kept as-is.
+
+  Geometry (unchanged from MAIA, both arms, beam axis = z):
+    - right arm spans z = +6 .. +595 cm, left arm z = -595 .. -6 cm
+    - outer radius reaches ~55 cm at the far ends, tapering to ~1 cm at the tip
+  All shells are placed at the origin with no rotation (the z-offsets live in
+  the polycone z-planes), exactly as in the parent geometry.
+
+  World: 200 x 200 x 1400 cm air box (contains z = +/-595 cm, r ~ 55 cm).
+
+  Aim a beam down the axis, e.g. from upstream +z toward -z:
+    /gun/position  0 0 700 cm
+    /gun/direction 0 0 -1
+-->
+<gdml>
+  <materials>
+    <!-- Elements for the borated-polyethylene liner (verbatim from MAIA) -->
+    <element name="H_elm" formula="H" Z="1" N="1">
+      <atom unit="g/mole" value="1.00794"/>
+    </element>
+    <element name="C_elm" formula="C" Z="6" N="12">
+      <atom unit="g/mole" value="12.0107"/>
+    </element>
+    <element name="B_elm" formula="B" Z="5" N="10">
+      <atom unit="g/mole" value="10.811"/>
+    </element>
+
+    <!-- Depleted uranium: ~0.25 wt% U-235, balance U-238, rho = 19.05 g/cm3 -->
+    <isotope name="U235" Z="92" N="235">
+      <atom unit="g/mole" value="235.0439"/>
+    </isotope>
+    <isotope name="U238" Z="92" N="238">
+      <atom unit="g/mole" value="238.0508"/>
+    </isotope>
+    <element name="DepletedU">
+      <fraction n="0.0025" ref="U235"/>
+      <fraction n="0.9975" ref="U238"/>
+    </element>
+    <material name="DepletedUranium" state="solid">
+      <D unit="g/cm3" value="19.05"/>
+      <fraction n="1.0" ref="DepletedU"/>
+    </material>
+
+    <!-- Borated polyethylene liner (BCH2), verbatim from MAIA -->
+    <material name="BCH2">
+      <D unit="g/cm3" value="0.93"/>
+      <fraction n="0.25" ref="B_elm"/>
+      <fraction n="0.25" ref="C_elm"/>
+      <fraction n="0.5"  ref="H_elm"/>
+    </material>
+  </materials>
+
+  <solids>
+    <box name="WorldBox" x="200" y="200" z="1400" lunit="cm"/>
+
+    <polycone name="NozzleW_right_shape" startphi="0" deltaphi="360" aunit="deg" lunit="cm">
+      <zplane z="6"         rmin="1"            rmax="1"/>
+      <zplane z="15"        rmin="0.6"          rmax="2.58694"/>
+      <zplane z="100"       rmin="0.3"          rmax="17.57473619"/>
+      <zplane z="100"       rmin="0.3"          rmax="13.47473619"/>
+      <zplane z="204.48824" rmin="0.6124092832" rmax="13.47473619"/>
+      <zplane z="595"       rmin="1.78"         rmax="43"/>
+    </polycone>
+    <polycone name="NozzleW_left_shape" startphi="0" deltaphi="360" aunit="deg" lunit="cm">
+      <zplane z="-595"       rmin="1.78"         rmax="43"/>
+      <zplane z="-204.48824" rmin="0.6124092832" rmax="13.47473619"/>
+      <zplane z="-100"       rmin="0.3"          rmax="13.47473619"/>
+      <zplane z="-100"       rmin="0.3"          rmax="17.57473619"/>
+      <zplane z="-15"        rmin="0.6"          rmax="2.58694"/>
+      <zplane z="-6"         rmin="1"            rmax="1"/>
+    </polycone>
+
+    <polycone name="NozzleBCH_right_shape" startphi="0" deltaphi="360" aunit="deg" lunit="cm">
+      <zplane z="100"       rmin="13.48473619" rmax="13.57473619"/>
+      <zplane z="204.48824" rmin="13.48473619" rmax="21.3958448184"/>
+      <zplane z="595"       rmin="43.01"       rmax="51"/>
+    </polycone>
+    <polycone name="NozzleBCH_left_shape" startphi="0" deltaphi="360" aunit="deg" lunit="cm">
+      <zplane z="-595"       rmin="43.01"       rmax="51"/>
+      <zplane z="-204.48824" rmin="13.48473619" rmax="21.3958448184"/>
+      <zplane z="-100"       rmin="13.48473619" rmax="13.57473619"/>
+    </polycone>
+
+    <polycone name="NozzleWCludding_right_shape" startphi="0" deltaphi="360" aunit="deg" lunit="cm">
+      <zplane z="100" rmin="13.57473619" rmax="17.57473619"/>
+      <zplane z="595" rmin="51"          rmax="55"/>
+    </polycone>
+    <polycone name="NozzleWCludding_left_shape" startphi="0" deltaphi="360" aunit="deg" lunit="cm">
+      <zplane z="-595" rmin="51"          rmax="55"/>
+      <zplane z="-100" rmin="13.57473619" rmax="17.57473619"/>
+    </polycone>
+  </solids>
+
+  <structure>
+    <volume name="NozzleW_right">
+      <materialref ref="DepletedUranium"/>
+      <solidref ref="NozzleW_right_shape"/>
+    </volume>
+    <volume name="NozzleW_left">
+      <materialref ref="DepletedUranium"/>
+      <solidref ref="NozzleW_left_shape"/>
+    </volume>
+    <volume name="NozzleBCH_right">
+      <materialref ref="BCH2"/>
+      <solidref ref="NozzleBCH_right_shape"/>
+    </volume>
+    <volume name="NozzleBCH_left">
+      <materialref ref="BCH2"/>
+      <solidref ref="NozzleBCH_left_shape"/>
+    </volume>
+    <volume name="NozzleWCludding_right">
+      <materialref ref="DepletedUranium"/>
+      <solidref ref="NozzleWCludding_right_shape"/>
+    </volume>
+    <volume name="NozzleWCludding_left">
+      <materialref ref="DepletedUranium"/>
+      <solidref ref="NozzleWCludding_left_shape"/>
+    </volume>
+
+    <volume name="World">
+      <materialref ref="G4_AIR"/>
+      <solidref ref="WorldBox"/>
+      <physvol name="NozzleW_right_1">
+        <volumeref ref="NozzleW_right"/>
+        <position name="p1" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+      <physvol name="NozzleW_left_2">
+        <volumeref ref="NozzleW_left"/>
+        <position name="p2" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+      <physvol name="NozzleBCH_right_3">
+        <volumeref ref="NozzleBCH_right"/>
+        <position name="p3" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+      <physvol name="NozzleBCH_left_4">
+        <volumeref ref="NozzleBCH_left"/>
+        <position name="p4" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+      <physvol name="NozzleWCludding_right_5">
+        <volumeref ref="NozzleWCludding_right"/>
+        <position name="p5" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+      <physvol name="NozzleWCludding_left_6">
+        <volumeref ref="NozzleWCludding_left"/>
+        <position name="p6" x="0" y="0" z="0" unit="cm"/>
+      </physvol>
+    </volume>
+  </structure>
+
+  <setup name="Default" version="1.0">
+    <world ref="World"/>
+  </setup>
+</gdml>

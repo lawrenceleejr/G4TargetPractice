@@ -1,0 +1,25 @@
+# Twiss phase-space beam: sample N muons from a defined phase space at a point.
+#   gdmltp run --config examples/twiss_muon.yaml
+#
+# Geometric emittance in mm.mrad, beta in m, alpha dimensionless (per plane).
+# The host samples N correlated (x, x') and (y, y') pairs plus a momentum spread,
+# writes beam.dat, and g4sim replays one primary per event via /gun/beamFile.
+generator: geant4
+
+geometry:
+  gdml: gdml/water_phantom_30cm.gdml
+
+beam:
+  particle: mu-
+  twiss:
+    x: { alpha: -1.2, beta: 5.0, emittance: 3.0 }   # mm.mrad, beta [m]
+    y: { alpha:  0.4, beta: 2.0, emittance: 1.5 }
+    p0: "300 MeV/c"          # reference momentum magnitude
+    dp_over_p: 0.01          # fractional momentum spread (gaussian sigma)
+    reference:
+      position: "0 0 -20 cm" # where the phase space is defined
+      direction: "0 0 1"     # beam axis
+
+run:
+  events: 2000
+  seed: 12345

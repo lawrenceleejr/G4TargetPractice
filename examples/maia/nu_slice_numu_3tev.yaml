@@ -1,0 +1,39 @@
+# Neutrino slice at the sqrt(s) = 3 TeV muon collider stage (E_mu = 1.5 TeV).
+# Same slice into MAIA as nu_slice_numu.yaml but the earlier collider stage of
+# arXiv:2412.14115; the crossing angles are wider (0.6-6 degrees) and the
+# spectrum ends at 1.5 TeV. Compare the two stages directly:
+#
+#   gdmltp run --config examples/maia/nu_slice_numu.yaml      -o slice_10tev
+#   gdmltp run --config examples/maia/nu_slice_numu_3tev.yaml -o slice_3tev
+#   gdmltp compare slice_10tev/output.root slice_3tev/output.root \
+#                  --labels "10 TeV,3 TeV" -o stage_cmp
+generator: genie
+
+geometry:
+  gdml: gdml/MAIA_v0.gdml
+
+beam:
+  particle: nu_mu
+  energy: {mode: mudecay_numu, value: "1.5 TeV"}
+  # Same upstream slice as nu_slice_numu.yaml; only the parent-muon energy and
+  # (wider) ring-plane crossing fan differ at the 3 TeV stage.
+  position:
+    x: {dist: uniform, min: "-600 cm", max: "0 cm"}    # multi-meter x spread
+    y: {dist: gauss, sigma: "5 mm"}                     # very small y spread
+    z: "-2500 cm"                                        # far upstream (~25 m)
+  direction:
+    central: "0 0 1"                                     # downstream, into MAIA
+    xprime: {dist: gauss, sigma: "30 mrad"}      # wider ring-plane fan at 3 TeV
+    yprime: {dist: gauss, sigma: "0.3 mrad"}
+
+run:
+  events: 200
+  output: output.root
+  seed: 20241415
+
+genie:
+  tune: G18_10a_00_000
+  cross_sections: auto
+  event_generator_list: Default
+  length_units: cm
+  target: 1000741840

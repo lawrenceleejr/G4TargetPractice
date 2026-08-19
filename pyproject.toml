@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gdmltp"
+dynamic = ["version"]
+description = "GDMLTargetPractice tooling: define a GDML target + beam, run it in Geant4 or GENIE, then analyze/visualize the output (no ROOT needed)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Lawrence Lee", email = "llee@utk.edu" }]
+keywords = ["geant4", "genie", "gdml", "simulation", "hep", "uproot", "event-display"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = ["uproot>=5.4", "awkward>=2.5", "numpy", "matplotlib", "pyyaml>=5",
+                "pyhepmc>=2.13", "tqdm>=4.60"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+# pyg4ometry is the standard GDML reader (accurate solids/transforms + real
+# mesh bounding boxes for the display); optional because it pulls in vtk. When
+# installed, parse_gdml uses it automatically; otherwise the built-in
+# lightweight parser is used. Force either with GDMLTP_GDML_PARSER.
+geometry = ["pyg4ometry>=1.3"]
+
+[project.urls]
+Homepage = "https://github.com/lawrenceleejr/G4TargetPractice"
+Issues = "https://github.com/lawrenceleejr/G4TargetPractice/issues"
+
+[project.scripts]
+gdmltp = "gdmltp.cli:main"
+g4tp = "gdmltp.cli:main"                       # deprecated alias, kept for back-compat
+genie2root = "gdmltp.backends.genie_convert:main"
+achilles2root = "gdmltp.backends.achilles_convert:main"
+
+[tool.setuptools]
+packages = ["gdmltp", "gdmltp.assets", "gdmltp.backends", "g4tp"]
+
+[tool.setuptools.dynamic]
+version = { attr = "gdmltp.__version__" }
+
+[tool.setuptools.package-data]
+gdmltp = ["assets/*.js", "assets/*.html", "assets/*.py"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

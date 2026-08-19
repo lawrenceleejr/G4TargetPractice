@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<!--
+  Graphite production target for pion/muon production studies, loosely
+  following the proton-target stage of the SNS muCF/VNS concept (New
+  Science and Applications at SNS workshop, June 2026): GeV protons on
+  a light target produce pions, which decay to the muons that feed the
+  D-T fusion cell.
+
+  World:  100 x 100 x 200 cm vacuum (G4_Galactic) beamline.
+  Target: 10 x 10 x 60 cm graphite block (G4_GRAPHITE), entrance face
+          at z = 0, so depth in the target = z.
+
+  Aim the beam along +z from negative z (e.g. /gun/position 0 0 -20 cm).
+-->
+<gdml>
+  <solids>
+    <box name="WorldBox"    x="100" y="100" z="200" lunit="cm"/>
+    <box name="GraphiteBox" x="10"  y="10"  z="60"  lunit="cm"/>
+  </solids>
+
+  <structure>
+    <volume name="GraphiteTarget_vol">
+      <materialref ref="G4_GRAPHITE"/>
+      <solidref ref="GraphiteBox"/>
+    </volume>
+
+    <volume name="World">
+      <materialref ref="G4_Galactic"/>
+      <solidref ref="WorldBox"/>
+      <physvol>
+        <volumeref ref="GraphiteTarget_vol"/>
+        <position x="0" y="0" z="30" unit="cm"/>
+      </physvol>
+    </volume>
+  </structure>
+
+  <setup name="Default" version="1.0">
+    <world ref="World"/>
+  </setup>
+</gdml>

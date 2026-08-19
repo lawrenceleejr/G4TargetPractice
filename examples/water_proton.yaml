@@ -1,0 +1,24 @@
+# Geant4 backend: a 150 MeV proton pencil beam into a water phantom.
+#   g4tp run --config examples/water_proton.yaml
+generator: geant4
+
+geometry:
+  gdml: gdml/water_phantom_30cm.gdml
+
+beam:
+  particle: proton
+  energy:
+    mode: mono
+    value: "150 MeV"
+  position: "0 0 -20 cm"
+  direction: "0 0 1"
+
+run:
+  events: 500
+  output: output.root
+  seed: 12345
+
+geant4:
+  neutrino_mode: off
+  field: null
+  celeritas: false
