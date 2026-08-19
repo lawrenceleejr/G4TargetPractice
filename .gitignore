@@ -99,3 +99,21 @@ $RECYCLE.BIN/
 # Core dumps
 core
 core.*
+
+# gdmltp run artifacts. `gdmltp run` defaults -o to the current directory, so
+# running it from a checkout drops these next to the sources -- which is how
+# run/run.mac and run/MAIA_260211.gdml ended up tracked in this repo. Patterns
+# are the exact generated names (never a bare *.mac / *.gdml, which would
+# shadow macros/ and gdml/).
+gdmltp_run.mac
+gdmltp_transport.mac
+gdmltp_display/
+beam.dat
+events.hepmc
+scene.json
+*_job.json
+# the display copies the builder next to its output; keep the packaged source
+build_blend.py
+!gdmltp/assets/build_blend.py
+# staged geometry copies land in the run dir; real geometries live in gdml/
+/*.gdml
