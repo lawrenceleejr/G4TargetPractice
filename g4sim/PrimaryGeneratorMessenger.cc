@@ -16,6 +16,12 @@ PrimaryGeneratorMessenger::PrimaryGeneratorMessenger(PrimaryGenerator* gun)
     fParticleCmd->SetGuidance("Set particle type (e.g. e-, nu_mu, nu_e)");
     fParticleCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
 
+    fParticlePDGCmd = new G4UIcmdWithAnInteger("/gun/particlePDG", this);
+    fParticlePDGCmd->SetGuidance("Set the primary particle by PDG id "
+                                 "(standard particles and ions, e.g. 2212, 1000060120).");
+    fParticlePDGCmd->SetParameterName("pdg", false);
+    fParticlePDGCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+
     fEnergyCmd = new G4UIcmdWithADoubleAndUnit("/gun/energy", this);
     fEnergyCmd->SetGuidance("Set nominal particle energy (monoenergetic, or mean/E0)");
     fEnergyCmd->SetDefaultUnit("GeV");
@@ -71,12 +77,30 @@ PrimaryGeneratorMessenger::PrimaryGeneratorMessenger(PrimaryGenerator* gun)
     fClearEnergyBinsCmd = new G4UIcmdWithoutParameter("/gun/clearEnergyBins", this);
     fClearEnergyBinsCmd->SetGuidance("Clear all bins defined for the arb energy mode");
     fClearEnergyBinsCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+
+    fBeamFileCmd = new G4UIcmdWithAString("/gun/beamFile", this);
+    fBeamFileCmd->SetGuidance(
+        "Replay a host-sampled beam file (one primary per event):\n"
+        "  name  x y z [mm]  px py pz [MeV/c]\n"
+        "Overrides the /gun energy/position/direction sampling above.");
+    fBeamFileCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
+
+    fHepmcFileCmd = new G4UIcmdWithAString("/gun/hepmcFile", this);
+    fHepmcFileCmd->SetGuidance(
+        "Transport a generator hand-off given as a HepMC3 ASCII file: one event\n"
+        "per interaction, all final-state (status 1) particles fired from the\n"
+        "production vertex at its time. This is the standard generator->Geant4\n"
+        "interchange (read with the HepMC3 library).");
+    fHepmcFileCmd->AvailableForStates(G4State_PreInit, G4State_Idle);
 }
 
 void PrimaryGeneratorMessenger::SetNewValue(G4UIcommand* command, G4String newValue)
 {
     if (command == fParticleCmd) {
         fGun->SetParticleName(newValue);
+    }
+    else if (command == fParticlePDGCmd) {
+        fGun->SetParticlePDG(fParticlePDGCmd->GetNewIntValue(newValue));
     }
     else if (command == fEnergyCmd) {
         fGun->SetEnergy(fEnergyCmd->GetNewDoubleValue(newValue));
@@ -130,5 +154,11 @@ void PrimaryGeneratorMessenger::SetNewValue(G4UIcommand* command, G4String newVa
     }
     else if (command == fClearEnergyBinsCmd) {
         fGun->ClearEnergyBins();
+    }
+    else if (command == fBeamFileCmd) {
+        fGun->LoadBeamFile(newValue);
+    }
+    else if (command == fHepmcFileCmd) {
+        fGun->LoadEventFile(newValue);
     }
 }

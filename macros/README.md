@@ -87,7 +87,7 @@ containment depth, and energy leakage:
 ```bash
 docker run --rm -v $PWD:/run -w /run $IMG macros/shower_nozzles_du.mac       && mv output.root du.root
 docker run --rm -v $PWD:/run -w /run $IMG macros/shower_nozzles_tungsten.mac && mv output.root w.root
-g4tp compare du.root w.root --labels DU,W
+gdmltp compare du.root w.root --labels DU,W
 ```
 
 ### Muon-therapy studies with a tumor target

@@ -3,16 +3,27 @@
 #include "RunAction.hh"
 
 #include "G4ParticleTable.hh"
+#include "G4ParticleDefinition.hh"
+#include "G4IonTable.hh"
 #include "G4Event.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4RunManager.hh"
 #include "Randomize.hh"
 #include "CLHEP/Units/PhysicalConstants.h"
 
+#include "HepMC3/ReaderAscii.h"
+#include "HepMC3/GenEvent.h"
+#include "HepMC3/GenParticle.h"
+#include "HepMC3/GenVertex.h"
+#include "HepMC3/Units.h"
+
 #include "TTree.h"
 
 #include <cmath>
 #include <sstream>
+#include <fstream>
+#include <string>
+#include <algorithm>
 
 /*
  * Supported particle names (examples):
@@ -136,8 +147,138 @@ G4double PrimaryGenerator::SampleArbitrary() const
 
 G4int PrimaryGenerator::GetParticlePDG() const
 {
+    // In beam-file mode the species comes from the file; report the first entry
+    // so RunAction's neutrino auto-mode still resolves for a neutrino beam.
+    if (!fBeam.empty()) {
+        return fBeam.front().def ? fBeam.front().def->GetPDGEncoding() : 0;
+    }
     auto* particle = G4ParticleTable::GetParticleTable()->FindParticle(fParticleName);
     return particle ? particle->GetPDGEncoding() : 0;
+}
+
+// Resolve a PDG id to a definition; fall back to the ion table for nuclei
+// (ion codes 10LZZZAAAI, PDG > 1e9) which are not pre-instantiated.
+G4ParticleDefinition* PrimaryGenerator::ResolveByPDG(G4int pdg) const
+{
+    auto* table = G4ParticleTable::GetParticleTable();
+    if (auto* p = table->FindParticle(pdg)) return p;
+    if (std::abs(pdg) > 1000000000) {
+        const G4int Z = (std::abs(pdg) / 10000) % 1000;
+        const G4int A = (std::abs(pdg) / 10) % 1000;
+        return table->GetIonTable()->GetIon(Z, A, 0.0);
+    }
+    return nullptr;
+}
+
+// Resolve a beam-file token: a PDG id (all digits, optional sign) or a name.
+G4ParticleDefinition* PrimaryGenerator::ResolveToken(const G4String& token) const
+{
+    const std::string t(token);
+    std::size_t start = (t.size() && (t[0] == '-' || t[0] == '+')) ? 1 : 0;
+    bool numeric = t.size() > start &&
+                   t.find_first_not_of("0123456789", start) == std::string::npos;
+    if (numeric) return ResolveByPDG(std::stoi(t));
+    return G4ParticleTable::GetParticleTable()->FindParticle(token);
+}
+
+void PrimaryGenerator::SetParticlePDG(G4int pdg)
+{
+    auto* def = ResolveByPDG(pdg);
+    if (!def) {
+        G4Exception("PrimaryGenerator::SetParticlePDG", "NoParticle", FatalException,
+                    ("No particle for PDG id " + std::to_string(pdg)).c_str());
+        return;
+    }
+    fParticleName = def->GetParticleName();
+}
+
+// ---------------------------------------------------------------------------
+// Beam-file loader: "<name|pdg>  x y z [mm]  px py pz [MeV/c]" ('#' comments)
+// ---------------------------------------------------------------------------
+void PrimaryGenerator::LoadBeamFile(const G4String& path)
+{
+    std::ifstream in(path.c_str());
+    if (!in) {
+        G4Exception("PrimaryGenerator::LoadBeamFile", "NoBeamFile", FatalException,
+                    ("Could not open beam file: " + path).c_str());
+        return;
+    }
+    fBeam.clear();
+    std::string line;
+    while (std::getline(in, line)) {
+        // trim leading whitespace; skip blanks and comments
+        std::size_t s = line.find_first_not_of(" \t\r\n");
+        if (s == std::string::npos || line[s] == '#') continue;
+        std::istringstream iss(line);
+        std::string token;
+        G4double x, y, z, px, py, pz;
+        if (!(iss >> token >> x >> y >> z >> px >> py >> pz)) {
+            G4Exception("PrimaryGenerator::LoadBeamFile", "BadBeamLine", JustWarning,
+                        ("Malformed beam line ignored: " + line).c_str());
+            continue;
+        }
+        BeamEntry e;
+        e.def = ResolveToken(token);
+        if (!e.def) {
+            G4Exception("PrimaryGenerator::LoadBeamFile", "NoParticle", FatalException,
+                        ("Beam-file particle not found: " + token).c_str());
+        }
+        e.position = G4ThreeVector(x * mm, y * mm, z * mm);
+        e.momentum = G4ThreeVector(px * MeV, py * MeV, pz * MeV);
+        fBeam.push_back(e);
+    }
+    G4cout << "PrimaryGenerator: loaded " << fBeam.size()
+           << " primaries from beam file " << path << G4endl;
+}
+
+// ---------------------------------------------------------------------------
+// Hand-off event-file loader:
+//   E <nParticles> <vx> <vy> <vz>        [mm]
+//   <name|pdg> <px> <py> <pz>            [MeV/c]  x nParticles
+// ---------------------------------------------------------------------------
+void PrimaryGenerator::LoadEventFile(const G4String& path)
+{
+    // Read the generator->Geant4 hand-off as HepMC3 (the standard interchange),
+    // via the official HepMC3 library -- no bespoke parser. Each event's
+    // status-1 particles are fired from the production vertex at its time.
+    HepMC3::ReaderAscii reader(path.c_str());
+    if (reader.failed()) {
+        G4Exception("PrimaryGenerator::LoadEventFile", "NoEventFile", FatalException,
+                    ("Could not open HepMC3 file: " + path).c_str());
+        return;
+    }
+    fEvents.clear();
+    while (true) {
+        HepMC3::GenEvent evt(HepMC3::Units::MEV, HepMC3::Units::MM);
+        reader.read_event(evt);
+        if (reader.failed()) break;
+        evt.set_units(HepMC3::Units::MEV, HepMC3::Units::MM);  // normalize to ours
+
+        HandoffEvent h;
+        const auto& verts = evt.vertices();
+        if (!verts.empty()) {
+            const auto pos = verts.front()->position();
+            h.vertex = G4ThreeVector(pos.x() * mm, pos.y() * mm, pos.z() * mm);
+            // HepMC stores the position time as a length (c*t); recover ns.
+            h.time = (pos.t() * mm) / CLHEP::c_light;
+        }
+        for (const auto& p : evt.particles()) {
+            if (p->status() != 1) continue;      // final state only
+            auto* def = ResolveByPDG(p->pid());
+            if (!def) {
+                G4Exception("PrimaryGenerator::LoadEventFile", "NoParticle",
+                            FatalException,
+                            ("HepMC particle PDG not found: "
+                             + std::to_string(p->pid())).c_str());
+            }
+            const auto m = p->momentum();
+            h.particles.emplace_back(
+                def, G4ThreeVector(m.px() * MeV, m.py() * MeV, m.pz() * MeV));
+        }
+        fEvents.push_back(std::move(h));
+    }
+    G4cout << "PrimaryGenerator: loaded " << fEvents.size()
+           << " HepMC3 hand-off event(s) from " << path << G4endl;
 }
 
 G4double PrimaryGenerator::SampleEnergy() const
@@ -167,6 +308,39 @@ G4double PrimaryGenerator::SampleEnergy() const
 // ---------------------------------------------------------------------------
 void PrimaryGenerator::GeneratePrimaries(G4Event* event)
 {
+    // --- Hand-off replay: all final-state particles of one generator event ---
+    if (!fEvents.empty()) {
+        const std::size_t i = static_cast<std::size_t>(event->GetEventID());
+        if (i >= fEvents.size()) {
+            G4Exception("PrimaryGenerator", "EventsExhausted", JustWarning,
+                        "More events requested than event-file entries; reusing the last.");
+        }
+        const HandoffEvent& evt = fEvents[std::min(i, fEvents.size() - 1)];
+        fParticleGun->SetParticlePosition(evt.vertex);
+        fParticleGun->SetParticleTime(evt.time);   // decay/interaction time (ns)
+        for (const auto& [def, mom] : evt.particles) {
+            fParticleGun->SetParticleDefinition(def);
+            fParticleGun->SetParticleMomentum(mom);
+            fParticleGun->GeneratePrimaryVertex(event);
+        }
+        return;
+    }
+
+    // --- Beam-file replay: one host-sampled primary per event ---
+    if (!fBeam.empty()) {
+        const std::size_t i = static_cast<std::size_t>(event->GetEventID());
+        if (i >= fBeam.size()) {
+            G4Exception("PrimaryGenerator", "BeamExhausted", JustWarning,
+                        "More events requested than beam-file entries; reusing the last.");
+        }
+        const BeamEntry& e = fBeam[std::min(i, fBeam.size() - 1)];
+        fParticleGun->SetParticleDefinition(e.def);
+        fParticleGun->SetParticlePosition(e.position);
+        fParticleGun->SetParticleMomentum(e.momentum);  // sets direction + energy
+        fParticleGun->GeneratePrimaryVertex(event);
+        return;
+    }
+
     // --- Particle ---
     if (fParticleName.empty()) {
         G4Exception("PrimaryGenerator", "NoParticle", FatalException,

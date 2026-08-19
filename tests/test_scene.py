@@ -1,6 +1,6 @@
 import numpy as np
 
-from g4tp import scene
+from gdmltp import scene
 
 
 def test_build_scene(synth_event):
@@ -33,7 +33,7 @@ def test_polyline_step_points_grouped(synth_event):
 
 
 def test_scene_with_geometry(synth_event, repo_root):
-    from g4tp import geometry
+    from gdmltp import geometry
     prims = geometry.parse_gdml(repo_root / "gdml" / "bpe_slab.gdml")
     sc = scene.build_scene(prims, synth_event)
     assert sc.primitives

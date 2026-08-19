@@ -12,7 +12,7 @@ import awkward as ak
 import uproot
 import pytest
 
-from g4tp.io import MM_PER_CM
+from gdmltp.io import MM_PER_CM
 
 
 def write_synthetic(path, n_events=30, e0_mev=50000.0, x0_cm=3.0,
@@ -126,6 +126,123 @@ def write_synthetic(path, n_events=30, e0_mev=50000.0, x0_cm=3.0,
     return str(path)
 
 
+def write_synthetic_gst(path, n_events=25, seed=0):
+    """A synthetic GENIE 'gst' summary tree, faithful to the branches the
+    converter reads. Energies/momenta in GeV, Q2 in GeV^2, vertex in cm (the
+    geometry length units), matching real gst output -- so genie_convert exercises
+    the real branch names and units without needing GENIE installed.
+
+    Kinematics are mutually consistent like real gst output: y = 1 - El/Ev,
+    Q2 = 2*M*q0*x, W^2 = M^2 + 2*M*q0 - Q2, so validate's closure cross-checks
+    (which exist to catch unit-scaling bugs between backends) hold exactly."""
+    rng = np.random.default_rng(seed)
+    M = 0.939565                                         # GeV, matches the converters
+    is_cc = rng.random(n_events) < 0.7
+    qel = (rng.random(n_events) < 0.4) & is_cc
+    res = (rng.random(n_events) < 0.3) & is_cc & ~qel
+    dis = is_cc & ~qel & ~res
+    Ev = rng.uniform(0.5, 8.0, n_events)                 # GeV
+    ybj = rng.uniform(0.05, 0.9, n_events)
+    El = Ev * (1.0 - ybj)
+    q0 = Ev * ybj
+    xbj = rng.uniform(0.05, 0.9, n_events)
+    Q2 = 2.0 * M * q0 * xbj                              # GeV^2
+    W = np.sqrt(np.maximum(M * M + 2.0 * M * q0 - Q2, 0.0))
+
+    # Per-event final-state particle lists (GeV). Muon for CC, plus hadrons.
+    pdgf, Ef, pxf, pyf, pzf, nf = [], [], [], [], [], []
+    for i in range(n_events):
+        parts = [13 if is_cc[i] else 14]                 # mu- (CC) or nu_mu (NC)
+        energies = [max(El[i], 0.106)]
+        nhad = int(rng.integers(1, 5))
+        for _ in range(nhad):
+            parts.append(int(rng.choice([2212, 2112, 211, -211, 111])))
+            energies.append(float(rng.uniform(0.15, 1.5)))
+        p = np.array(parts, np.int64)
+        e = np.array(energies, float)
+        pdgf.append(p); Ef.append(e); nf.append(len(p))
+        pxf.append(rng.normal(0, 0.2, len(p)))
+        pyf.append(rng.normal(0, 0.2, len(p)))
+        pzf.append(np.abs(rng.normal(0.5, 0.3, len(p))))
+
+    data = {
+        "iev": np.arange(n_events, dtype=np.int64),
+        "neu": np.full(n_events, 14, np.int64),
+        "fspl": np.where(is_cc, 13, 14).astype(np.int64),
+        "tgt": np.full(n_events, 1000180400, np.int64),
+        "Z": np.full(n_events, 18, np.int64),
+        "A": np.full(n_events, 40, np.int64),
+        "cc": is_cc.astype(np.int32), "nc": (~is_cc).astype(np.int32),
+        "qel": qel.astype(np.int32), "res": res.astype(np.int32),
+        "dis": dis.astype(np.int32),
+        "coh": np.zeros(n_events, np.int32), "mec": np.zeros(n_events, np.int32),
+        "Ev": Ev, "pxv": np.zeros(n_events), "pyv": np.zeros(n_events), "pzv": Ev,
+        "El": El, "pxl": rng.normal(0, 0.1, n_events),
+        "pyl": rng.normal(0, 0.1, n_events), "pzl": El * 0.9,
+        "Q2": Q2, "W": W, "x": xbj, "y": ybj,
+        "vtxx": rng.normal(0, 5.0, n_events),            # cm
+        "vtxy": rng.normal(0, 5.0, n_events),
+        "vtxz": rng.uniform(-40, 40, n_events),
+        "vtxt": np.zeros(n_events),
+        "nf": np.array(nf, np.int32),
+        "pdgf": ak.Array(pdgf), "Ef": ak.Array(Ef),
+        "pxf": ak.Array(pxf), "pyf": ak.Array(pyf), "pzf": ak.Array(pzf),
+    }
+    with uproot.recreate(path) as f:
+        f["gst"] = data
+    return str(path)
+
+
+@pytest.fixture(scope="session")
+def synth_gst(tmp_path_factory):
+    p = tmp_path_factory.mktemp("gst") / "events.gst.root"
+    return write_synthetic_gst(p, seed=7)
+
+
+def write_synthetic_nuhepmc(path, n_events=6, seed=0, gz=False):
+    """A synthetic NuHepMC (HepMC3 ASCIIv3) file faithful to what the Achilles
+    converter reads: E/U/V/P lines, GEV+MM units, NuHepMC statuses (4 = beam,
+    11 = target, 1 = final state). Alternates CC (mu- out) and NC (nu_mu out)
+    nu_mu events on Ar-40, beam along +z, vertex on the V line."""
+    rng = np.random.default_rng(seed)
+    lines = ["HepMC::Version 3.02.05", "HepMC::Asciiv3-START_EVENT_LISTING"]
+    for i in range(n_events):
+        enu = 2.0 + 0.25 * i                              # GeV
+        cc = (i % 2 == 0)
+        vx, vy, vz = rng.normal(0, 50, 3)                 # mm
+        lines.append(f"E {i} 1 5")
+        lines.append("U GEV MM")
+        lines.append(f"V -1 0 [1,2] @ {vx:.3f} {vy:.3f} {vz:.3f} 0")
+        # beam nu_mu (status 4), target Ar-40 (status 11)
+        lines.append(f"P 1 0 14 0 0 {enu:.6f} {enu:.6f} 0 4")
+        lines.append("P 2 0 1000180400 0 0 0 37.2247 37.2247 11")
+        # outgoing lepton
+        el = 0.6 * enu
+        plz = 0.55 * enu; plx = 0.1 * enu
+        lep = 13 if cc else 14
+        m_l = 0.105658 if cc else 0.0
+        lines.append(f"P 3 -1 {lep} {plx:.6f} 0 {plz:.6f} {el:.6f} {m_l:.6f} 1")
+        # hadronic side: a proton and a pi+
+        lines.append(f"P 4 -1 2212 {-plx:.6f} 0 {0.3*enu:.6f} {0.3*enu+0.938:.6f} 0.938272 1")
+        lines.append(f"P 5 -1 211 0 0.05 {0.1*enu:.6f} {0.1*enu+0.14:.6f} 0.139570 1")
+    lines.append("HepMC::Asciiv3-END_EVENT_LISTING")
+    text = "\n".join(lines) + "\n"
+    if gz:
+        import gzip
+        with gzip.open(path, "wt") as f:
+            f.write(text)
+    else:
+        with open(path, "w") as f:
+            f.write(text)
+    return str(path)
+
+
+@pytest.fixture(scope="session")
+def synth_nuhepmc(tmp_path_factory):
+    p = tmp_path_factory.mktemp("nuhepmc") / "events.hepmc"
+    return write_synthetic_nuhepmc(p, seed=11)
+
+
 @pytest.fixture(scope="session")
 def synth_root(tmp_path_factory):
     """Standard synthetic run: 50 GeV e-, -z beam from z=650 cm, 2% leakage."""
@@ -136,7 +253,7 @@ def synth_root(tmp_path_factory):
 @pytest.fixture(scope="session")
 def synth_event(synth_root):
     """First event of synth_root, loaded once for scene/render tests."""
-    from g4tp import io
+    from gdmltp import io
     return io.load_events(synth_root, entry_start=0, entry_stop=1)[0]
 
 
@@ -169,3 +286,12 @@ def empty_root(tmp_path_factory):
 def repo_root():
     from pathlib import Path
     return Path(__file__).resolve().parent.parent
+
+
+@pytest.fixture(autouse=True)
+def _force_lightweight_gdml(monkeypatch):
+    """Keep the suite fast and parser-deterministic on any machine: the general
+    tests use the built-in lightweight GDML parser regardless of whether
+    pyg4ometry happens to be installed. The pyg4ometry path has its own
+    dedicated test (test_geometry_pyg4ometry.py)."""
+    monkeypatch.setenv("GDMLTP_GDML_PARSER", "lightweight")

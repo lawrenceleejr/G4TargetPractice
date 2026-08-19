@@ -3,7 +3,7 @@
 #
 # Shower-stopping test: 50 GeV electrons into the DEPLETED-URANIUM nozzle.
 # Pair this with shower_nozzles_tungsten.mac (identical beam, tungsten nozzle)
-# and overlay the two with:  g4tp compare du.root w.root --labels DU,W
+# and overlay the two with:  gdmltp compare du.root w.root --labels DU,W
 #
 # Beam geometry: the electron starts just downstream of the right nozzle's
 # thick end (entrance face at z = +595 cm, dense core annulus r = 1.78..43 cm)

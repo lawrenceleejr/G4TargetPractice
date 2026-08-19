@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from g4tp import io
+from gdmltp import io
 
 
 def test_num_events(synth_root):

@@ -1,4 +1,4 @@
-from g4tp import scene, render_web, render_png
+from gdmltp import scene, render_web, render_png
 
 
 def test_render_html(synth_event, tmp_path):
@@ -19,8 +19,8 @@ def test_render_png(synth_event, tmp_path):
 
 
 def test_render_geometry_only(repo_root, tmp_path):
-    from g4tp import geometry
-    from g4tp.scene import Scene, _fit
+    from gdmltp import geometry
+    from gdmltp.scene import Scene, _fit
     prims = geometry.parse_gdml(repo_root / "gdml" / "bpe_slab.gdml")
     sc = Scene(primitives=prims, event_id=0)
     _fit(sc)

@@ -1,0 +1,39 @@
+# Neutrino slice at a 10 TeV muon collider -- the anti-nu_e component.
+# Each mu- decay makes exactly one nu_mu AND one anti-nu_e, so this config is
+# the companion of nu_slice_numu.yaml: same slice geometry, same parent-muon
+# energy, but the softer anti-nu_e spectrum (<E> = 0.30 E_mu = 1.5 TeV):
+#   dN/dy = 2 - 6y^2 + 4y^3,  y = E/E_mu
+#
+#   gdmltp run --config examples/maia/nu_slice_nuebar.yaml -o slice_nuebar
+#   gdmltp compare slice_numu/output.root slice_nuebar/output.root \
+#                  --labels numu,nuebar -o slice_cmp   # Q2/W/x/y overlays
+generator: genie
+
+geometry:
+  gdml: gdml/MAIA_v0.gdml
+
+beam:
+  particle: anti_nu_e
+  energy: {mode: mudecay_nue, value: "5 TeV"}
+  # Same upstream slice as nu_slice_numu.yaml: injected from far upstream in z,
+  # multi-meter x spread across the negative-x half, very thin in y.
+  position:
+    x: {dist: uniform, min: "-600 cm", max: "0 cm"}    # multi-meter x spread
+    y: {dist: gauss, sigma: "5 mm"}                     # very small y spread
+    z: "-2500 cm"                                        # far upstream (~25 m)
+  direction:
+    central: "0 0 1"                                     # downstream, into MAIA
+    xprime: {dist: gauss, sigma: "10 mrad"}
+    yprime: {dist: gauss, sigma: "0.1 mrad"}
+
+run:
+  events: 200
+  output: output.root
+  seed: 20241413
+
+genie:
+  tune: G18_10a_00_000
+  cross_sections: auto
+  event_generator_list: Default
+  length_units: cm
+  target: 1000741840

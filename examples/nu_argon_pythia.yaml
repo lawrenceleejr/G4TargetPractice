@@ -1,0 +1,33 @@
+# Pythia 8 backend: a 500 GeV muon-neutrino DIS on liquid argon, then Geant4.
+#   gdmltp run --config examples/nu_argon_pythia.yaml    (requires the pythia image)
+#
+# The smallest useful pythia config: a pencil beam, the `dis` preset (weak-boson
+# exchange -> CC + NC), the struck nucleon inferred from the GDML material, and
+# `transport: true` so Geant4 carries the final state through the detector and
+# the output gains step_*/totalEdep on top of the interaction record.
+#
+# Pythia's niche here is high energy with no setup cost: unlike the GENIE HEDIS
+# path there are no cross-section splines to precompute, so this runs straight
+# away at 500 GeV (or 5 TeV). The cost is that Pythia scatters off a single FREE
+# nucleon -- no nuclear medium, Fermi motion or cascade. Use the genie or
+# achilles backends when those matter.
+generator: pythia
+
+geometry:
+  gdml: gdml/liquid_argon_1m3.gdml
+
+beam:
+  particle: nu_mu
+  energy: { mode: mono, value: "500 GeV" }
+  position: "0 0 -50 cm"
+  direction: "0 0 1"
+
+run:
+  events: 200
+  seed: 12345
+
+pythia:
+  process: dis               # WeakBosonExchange CC + NC
+  transport: true            # Geant4 transports the final state through the GDML
+  # target: 2212             # force a free proton (else inferred from the GDML)
+  # settings: ["PDF:pSet = 8"]

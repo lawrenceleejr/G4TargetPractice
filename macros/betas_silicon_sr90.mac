@@ -23,7 +23,7 @@
 #
 # Per-layer energy deposit (in ROOT/uproot; layer centres in mm):
 #   layer0: step_edep where abs(step_z-0.15)<0.15 ; similarly 0.75, 1.35
-# or just run `g4tp analyze output.root` / `g4tp display output.root --gdml ...`.
+# or just run `gdmltp analyze output.root` / `gdmltp display output.root --gdml ...`.
 # =============================================================================
 
 # --- Load geometry ---

@@ -1,0 +1,58 @@
+# The 10 TeV neutrino slice with GENIE's HIGH-ENERGY DIS (HEDIS) tune.
+#
+# The standard G18_10a tune's DIS model and splines top out around ~1 TeV --
+# gmkspl "refuses to exceed validity range: Emax = 1000" and no splines are
+# made (which is why nu_slice_numu.yaml, at E_mu = 5 TeV, fails to build
+# splines). For a multi-TeV muon-collider beam you must switch tune FAMILIES
+# to HEDIS (the GHE19 models), not merely raise the energy.
+#
+#   gdmltp run --config examples/maia/nu_slice_numu_hedis.yaml -o slice_hedis
+#
+# Tune GHE19_00c_00_000 = the LO high-energy-DIS model, valid E_nu > 100 GeV up
+# to ~1e9 GeV, so the 0.1-5 TeV slice sits well inside. LO -> it uses the
+# standard cteq6l1 PDF and needs no APFEL, which is why it is the tune baked
+# into the HEDIS genie image. The event-generator-list must be HEDIS on both
+# the spline build and generation (the driver handles that).
+#
+# This runs out of the box on the HEDIS-provisioned genie image (built with
+# ENABLE_HEDIS=1, which bakes cteq6l1 + the GHE19_00c structure-function
+# tables). On a non-HEDIS image the driver stops with a clear message.
+#
+# PERFORMANCE: this exact configuration runs WITHOUT a spline build. The HEDIS
+# image bakes both the structure-function tables and the cross-section spline
+# for numu(+bar) on W-184 up to 5 TeV, and the driver picks it up automatically
+# from $HEDIS_XSEC_DIR -- verified: gevgen runs straight off it. (Computing that
+# spline with gmkspl takes hours, which is why it is baked rather than left to
+# the first run.)
+#
+# Change the probe, target or raise the energy beyond 5 TeV and the driver falls
+# back to on-demand gmkspl -- slow the first time, then cached in the run
+# directory. To pre-seed those cases, point `cross_sections:` at a prebuilt
+# gxspl XML (a CVMFS path works; see docs/neutrino.md).
+# The NLO GHE19_00a (BGR18) tune needs APFEL + its NNPDF3.1sx PDF, which is not
+# on the LHAPDF server -- supply that set and switch the tune to use it.
+generator: genie
+
+geometry:
+  gdml: gdml/MAIA_v0.gdml
+
+beam:
+  particle: nu_mu
+  energy: {mode: mudecay_numu, value: "5 TeV"}   # E_mu = 5 TeV, <E_nu> ~ 1.75 TeV
+  # Fixed source point far upstream (negative x, y = 0, ~25 m back): keeps the
+  # single native-flux gevgen call (per-event replay of the full slice would
+  # re-run gmkhedissf + gevgen per event -- prohibitive for HEDIS).
+  position: "-300 0 -2500 cm"
+  direction: "0 0 1"
+
+run:
+  events: 500
+  output: output.root
+  seed: 20241418
+
+genie:
+  tune: GHE19_00c_00_000            # LO high-energy DIS (cteq6l1 PDF, no APFEL)
+  event_generator_list: HEDIS       # CC + NC HEDIS; must match on spline + gen
+  cross_sections: auto              # on-demand gmkhedissf + gmkspl, cached in run dir
+  length_units: cm
+  target: 1000741840                # W-184 (the tungsten nozzles)

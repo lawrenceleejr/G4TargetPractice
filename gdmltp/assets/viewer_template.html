@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gdmltp event display</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0e14;color:#e6e6e6;font-family:system-ui,sans-serif;overflow:hidden}
+  #c{position:fixed;inset:0}
+  #ui{position:fixed;top:8px;left:8px;background:rgba(20,24,32,.8);padding:10px 12px;border-radius:8px;font-size:13px;max-width:260px}
+  #legend{margin-top:8px;line-height:1.5}
+  .sw{display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:2px;vertical-align:middle}
+  select,button{background:#1b2230;color:#e6e6e6;border:1px solid #3a4a5a;border-radius:5px;padding:3px 6px;font-size:12px}
+  #hint{position:fixed;bottom:8px;left:8px;font-size:11px;color:#8a93a3}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div><b>gdmltp</b> event display</div>
+  <div id="meta"></div>
+  <div id="evsel"></div>
+  <div id="legend"></div>
+</div>
+<div id="hint">drag = orbit · scroll = zoom · right-drag = pan</div>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+<script>window.__SCENES__ = /*{{SCENE_JSON}}*/ [];</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const scenes = window.__SCENES__;
+const renderer = new THREE.WebGLRenderer({canvas: document.getElementById('c'), antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 1e7);
+const controls = new OrbitControls(camera, renderer.domElement);
+let scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0e14);
+
+function clear(){ while(scene.children.length) scene.remove(scene.children[0]); }
+// trapezoid (GDML trd): half-lengths x1/y1 at -z/2, x2/y2 at +z/2
+function makeTrd(g){
+  const a=g.x1/2,b=g.y1/2,c=g.x2/2,d=g.y2/2,h=g.z/2;
+  const v=new Float32Array([
+    -a,-b,-h, a,-b,-h, a,b,-h, -a,b,-h,   // -z face
+    -c,-d, h, c,-d, h, c,d, h, -c,d, h]); // +z face
+  const idx=[0,1,2,0,2,3, 4,6,5,4,7,6, 0,4,5,0,5,1, 1,5,6,1,6,2, 2,6,7,2,7,3, 3,7,4,3,4,0];
+  const bg=new THREE.BufferGeometry();
+  bg.setAttribute('position',new THREE.BufferAttribute(v,3));
+  bg.setIndex(idx); bg.computeVertexNormals(); return bg;
+}
+function build(idx){
+  clear();
+  scene.add(new THREE.AmbientLight(0xffffff,0.7));
+  const dl=new THREE.DirectionalLight(0xffffff,0.6); dl.position.set(1,1,1); scene.add(dl);
+  const S = scenes[idx];
+  // Build the faithful mesh surfaces once (shared by every placement that
+  // references them) so an instanced detector stays light.
+  const meshGeos=[];
+  for(const md of (S.meshes||[])){
+    const bg=new THREE.BufferGeometry();
+    bg.setAttribute('position',new THREE.Float32BufferAttribute(md.v,3));
+    bg.setIndex(md.f);
+    bg.computeVertexNormals();
+    meshGeos.push(bg);
+  }
+  // group placements by their referenced mesh so we can InstancedMesh them
+  const byMesh={};
+  for(const g of S.geometry){
+    if(g.type==='mesh'){ (byMesh[g.mesh]=byMesh[g.mesh]||[]).push(g); continue; }
+    let geo;
+    if(g.type==='box'||g.type==='bbox') geo=new THREE.BoxGeometry(g.sx,g.sy,g.sz);
+    else if(g.type==='orb') geo=new THREE.SphereGeometry(g.r,24,16);
+    else if(g.type==='tube') geo=new THREE.CylinderGeometry(g.rmax,g.rmax,g.z,24);
+    else if(g.type==='trd') geo=makeTrd(g);
+    else continue;
+    const mat=new THREE.MeshStandardMaterial({color:0x6688aa,transparent:true,opacity:g.type==='bbox'?0.06:0.22,depthWrite:false,side:THREE.DoubleSide});
+    const m=new THREE.Mesh(geo,mat); m.applyMatrix4(new THREE.Matrix4().fromArray(g.m)); scene.add(m);
+    const edges=new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0x3a4a5a,transparent:true,opacity:0.5})); edges.applyMatrix4(new THREE.Matrix4().fromArray(g.m)); scene.add(edges);
+  }
+  for(const mi in byMesh){
+    const insts=byMesh[mi], bg=meshGeos[mi];
+    if(!bg) continue;
+    const mat=new THREE.MeshStandardMaterial({color:0x6688aa,transparent:true,opacity:0.30,depthWrite:false,side:THREE.DoubleSide,metalness:0.1,roughness:0.7});
+    const im=new THREE.InstancedMesh(bg,mat,insts.length);
+    const mm=new THREE.Matrix4();
+    insts.forEach((g,k)=>{ mm.fromArray(g.m); im.setMatrixAt(k,mm); });
+    im.instanceMatrix.needsUpdate=true; scene.add(im);
+    // edges: draw once per placement (kept light -- realistic single targets
+    // have few solids; huge detectors are placement-capped upstream)
+    const eg=new THREE.EdgesGeometry(bg,25);
+    insts.forEach(g=>{ const e=new THREE.LineSegments(eg,new THREE.LineBasicMaterial({color:0x3a4a5a,transparent:true,opacity:0.45})); e.applyMatrix4(new THREE.Matrix4().fromArray(g.m)); scene.add(e); });
+  }
+  for(const t of S.tracks){
+    const pts=[]; for(let i=0;i<t.p.length;i+=3) pts.push(new THREE.Vector3(t.p[i],t.p[i+1],t.p[i+2]));
+    const lg=new THREE.BufferGeometry().setFromPoints(pts);
+    scene.add(new THREE.Line(lg,new THREE.LineBasicMaterial({color:t.c})));
+  }
+  const vg=[]; for(const v of S.vertices) vg.push(new THREE.Vector3(v[0],v[1],v[2]));
+  if(vg.length){ const pg=new THREE.BufferGeometry().setFromPoints(vg);
+    scene.add(new THREE.Points(pg,new THREE.PointsMaterial({color:0xffffff,size:Math.max(2,S.radius*0.01)}))); }
+  const c=S.center; controls.target.set(c[0],c[1],c[2]);
+  camera.position.set(c[0]+S.radius*1.4,c[1]+S.radius*0.9,c[2]+S.radius*1.4);
+  camera.near=S.radius*0.01; camera.far=S.radius*50; camera.updateProjectionMatrix(); controls.update();
+  document.getElementById('meta').innerHTML =
+    `event ${S.event_id} · primary ${S.meta.primaryPDG} @ ${(S.meta.primaryE||0).toFixed(1)} MeV<br>${S.meta.nTracks} tracks · Edep ${(S.meta.totalEdep||0).toFixed(1)} MeV`;
+  const leg={}; for(const t of S.tracks) leg[t.n]=t.c;
+  document.getElementById('legend').innerHTML = Object.entries(leg)
+    .map(([n,c])=>`<div><span class="sw" style="background:${c}"></span>${n}</div>`).join('');
+}
+if(scenes.length>1){
+  const sel=document.createElement('select');
+  scenes.forEach((s,i)=>{const o=document.createElement('option');o.value=i;o.text='event '+s.event_id;sel.add(o);});
+  sel.onchange=e=>build(+e.target.value);
+  const wrap=document.getElementById('evsel'); wrap.append('event: ',sel);
+}
+build(0);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+(function loop(){requestAnimationFrame(loop);controls.update();renderer.render(scene,camera);})();
+</script>
+</body>
+</html>

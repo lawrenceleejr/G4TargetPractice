@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from g4tp import geometry
+from gdmltp import geometry
 
 
 def test_bpe_slab(repo_root):
@@ -16,14 +16,16 @@ def test_bpe_slab(repo_root):
     assert hi[2] - lo[2] == pytest.approx(500.0)      # 50 cm -> 500 mm
 
 
-def test_nozzles_polycone_bbox(repo_root):
-    """Polycones are unsupported solids -> bbox fallback, extents sane."""
+def test_nozzles_polycone_extent(repo_root):
+    """Six nozzle polycones placed; extent reaches the meters z-scale. With
+    pyg4ometry they are faithful meshes, with the lightweight parser a bbox
+    fallback -- either way the placements and overall span must be right."""
     prims = geometry.parse_gdml(repo_root / "gdml" / "nozzles_tungsten.gdml")
     assert len(prims) >= 6                            # 6 nozzle volumes placed
     bb = geometry.bounding_box(prims)
     assert bb is not None
     lo, hi = bb
-    # nozzles span z = -595..595 cm; the bbox fallback must reach meters scale
+    # nozzles span z = -595..595 cm; must reach meters scale
     assert hi[2] - lo[2] > 2000.0
 
 

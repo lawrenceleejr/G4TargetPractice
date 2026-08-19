@@ -1,5 +1,5 @@
 """particles + run-macro generation."""
-from g4tp import particles, run
+from gdmltp import particles, run
 
 
 def test_particle_names():
