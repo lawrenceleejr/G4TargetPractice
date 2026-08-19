@@ -27,8 +27,12 @@
 /gdmltp/nu/nucleusE/mfpBias 1
 /gdmltp/nu/nucleusTau/mfpBias 1
 
-# Neutrino-electron scattering: the one family where Geant4 really does reweight
-# CC against NC (the pair reaches the separate CC and NC cross-section sets).
+# Neutrino-electron scattering. ccBias/ncBias set the PROCESS factor (max of the
+# two) plus the uniform vertex spread; to actually make nu+e- interact use
+# mfpBias (1e14 gives ~28/50 on argon). /gdmltp/nu/electron/xsecCcBias and
+# xsecNcBias are the only CC/NC reweighting Geant4 has, but they scale a data set
+# with no isotope-level cross section -- bias them enough that nu+e- interacts
+# and Geant4 aborts in G4CrossSectionDataStore::GetIsoCrossSection.
 /gdmltp/nu/electron/ccBias 1
 /gdmltp/nu/electron/ncBias 1
 

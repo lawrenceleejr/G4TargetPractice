@@ -140,7 +140,8 @@ def test_macro_neutrino_knobs_full_surface():
             "region_pattern": "LAr",
             "nucleus": {"lowest_energy": "1 MeV"},
             "nucleus_mu": {"mfp_bias": 1.0e9, "xsec_bias": 2},
-            "electron": {"enable": False, "cc_bias": 10, "nc_bias": 1},
+            "electron": {"enable": False, "cc_bias": 10, "nc_bias": 1,
+                         "xsec_cc_bias": 5},
             "oscillation": {"enable": True, "region": "tgtosc",
                             "region_pattern": "LAr", "distance_bias": 1.0e8},
         }}))
@@ -154,6 +155,7 @@ def test_macro_neutrino_knobs_full_surface():
         "/gdmltp/nu/nucleusMu/xsecBias 2",
         "/gdmltp/nu/electron/enable false",
         "/gdmltp/nu/electron/ccBias 10",
+        "/gdmltp/nu/electron/xsecCcBias 5",
         "/gdmltp/nu/oscillation/enable true",
         "/gdmltp/nu/oscillation/region tgtosc",
         "/gdmltp/nu/oscillation/distanceBias 1e+08",
@@ -247,3 +249,32 @@ def test_prepare_verbatim_mac_is_copied(tmp_path):
     prep = backends.get("geant4").prepare(cfg, out)
     assert prep.argv == ["my.mac"]
     assert (out / "my.mac").exists()
+
+
+def test_macro_neutrino_cc_nc_xsec_terms_are_electron_only():
+    """G4NeutrinoElectronTotXsc is the only cross-section data set with separate
+    CC and NC objects, so xsec_cc_bias/xsec_nc_bias exist only for the electron
+    group -- offering them on a nucleus family would be a knob that does nothing."""
+    mac = geant4.build_macro(config.RunConfig(
+        gdml="g.gdml", beam=config.Beam(particle="nu_mu"),
+        geant4={"neutrino": {"electron": {"xsec_cc_bias": 10, "xsec_nc_bias": 2}}}))
+    assert "/gdmltp/nu/electron/xsecCcBias 10" in mac
+    assert "/gdmltp/nu/electron/xsecNcBias 2" in mac
+
+    with pytest.raises(ValueError) as exc:
+        geant4.build_macro(config.RunConfig(
+            gdml="g.gdml", beam=config.Beam(particle="nu_mu"),
+            geant4={"neutrino": {"nucleus_mu": {"xsec_cc_bias": 10}}}))
+    assert "exist only for electron/all" in str(exc.value)
+
+
+def test_macro_neutrino_bias_shortcut_never_touches_the_xsec_table():
+    """The blunt shortcut must stay safe at any factor: biasing the nu+e- CROSS-
+    SECTION TABLE aborts Geant4 (G4NeutrinoElectronTotXsc has no isotope-level
+    cross section), so the shortcut may only drive process-level factors."""
+    mac = geant4.build_macro(config.RunConfig(
+        gdml="g.gdml", beam=config.Beam(particle="nu_mu"),
+        geant4={"neutrino_bias": {"factor": 1e12}}))
+    assert "/gdmltp/neutrinoBias 1e+12 1e+12 1e+12 DefaultRegionForTheWorld" in mac
+    for forbidden in ("xsecBias", "xsecCcBias", "xsecNcBias"):
+        assert forbidden not in mac

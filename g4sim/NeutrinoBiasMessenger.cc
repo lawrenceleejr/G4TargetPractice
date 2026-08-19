@@ -155,20 +155,37 @@ void NeutrinoBiasMessenger::AddGroup(const G4String& group, G4int targets,
         "IGNORES values <= 1, and it does not change the tabulated cross "
         "section -- only how often the process fires in that region.");
     Add(base + "ccBias", kCcBias, targets, 'd',
-        "Charged-current bias (G4*Process::SetBiasingFactors). The process "
-        "factor becomes max(cc, nc), and cc > 1 also makes the vertex be "
-        "sampled UNIFORMLY along the chord through the volume. For the "
-        "electron family it additionally scales the CC cross-section data set, "
-        "which is the only place Geant4 truly reweights CC against NC.");
+        "Charged-current bias (G4*Process::SetBiasingFactors). Two effects: the "
+        "process factor becomes max(cc, nc), and cc > 1 also makes the vertex be "
+        "sampled UNIFORMLY along the chord through the volume. It does NOT "
+        "reweight CC against NC -- the CC fraction comes from the physics. For "
+        "the electron family, xsecCcBias/xsecNcBias do reweight it.");
     Add(base + "ncBias", kNcBias, targets, 'd',
         "Neutral-current counterpart of ccBias -- same two effects.");
     Add(base + "xsecBias", kXsecBias, targets, 'd',
         "Scale the tabulated total cross section itself (the TotXsc data set's "
         "SetBiasingFactor), in EVERY region. Independent of mfpBias; "
-        "G4NeutrinoPhysics never sets this one.");
+        "G4NeutrinoPhysics never sets this one. On the electron family this can "
+        "abort Geant4 -- see the guidance for /gdmltp/nu/electron/xsecCcBias.");
     Add(base + "lowestEnergy", kLowestEnergy, targets, 'e',
         "Below this kinetic energy the process does nothing (Geant4 default "
         "1 keV).");
+
+    // Only G4NeutrinoElectronTotXsc has separate CC and NC cross-section
+    // objects, so these two exist only where they mean something.
+    if ((targets & tElectron) == 0) return;
+    const G4String warn =
+        " DANGER: G4NeutrinoElectronTotXsc implements no isotope-level cross "
+        "section, so a bias large enough to make nu+e- actually interact aborts "
+        "Geant4 in G4CrossSectionDataStore::GetIsoCrossSection. Bias nu+e- via "
+        "mfpBias or ccBias/ncBias instead unless you specifically want to "
+        "reweight the CC/NC ratio.";
+    Add(base + "xsecCcBias", kXsecCcBias, tElectron, 'd',
+        "Scale the CC nu-electron cross section (G4NeutrinoElectronTotXsc::"
+        "SetBiasingFactors). The ONLY term in Geant4 that genuinely changes a "
+        "CC/NC ratio." + warn);
+    Add(base + "xsecNcBias", kXsecNcBias, tElectron, 'd',
+        "NC counterpart of xsecCcBias." + warn);
 }
 
 G4UIcommand* NeutrinoBiasMessenger::Add(const G4String& path, Knob knob,
@@ -234,6 +251,12 @@ void NeutrinoBiasMessenger::Apply(const Entry& e, const G4String& value)
                 break;
             case kXsecBias:
                 k.xsecBias = G4UIcommand::ConvertToDouble(value.c_str());
+                break;
+            case kXsecCcBias:
+                k.xsecCcBias = G4UIcommand::ConvertToDouble(value.c_str());
+                break;
+            case kXsecNcBias:
+                k.xsecNcBias = G4UIcommand::ConvertToDouble(value.c_str());
                 break;
             case kLowestEnergy:
                 k.lowestEnergy =
@@ -304,8 +327,10 @@ void NeutrinoBiasMessenger::SetCompositeBias(const G4String& newValue)
     iss >> cc >> nc >> nuc;
     if (iss >> region) { /* optional region token consumed */ }
 
-    // nu-electron: the cc/nc pair, which for this family really does reweight
-    // CC against NC (it reaches the separate CC and NC cross-section sets).
+    // nu-electron: the PROCESS cc/nc pair only. Deliberately not the
+    // cross-section table (xsecCc/NcBias): that route makes nu+e- interact and
+    // then aborts Geant4, because G4NeutrinoElectronTotXsc has no isotope-level
+    // cross section. This shortcut must stay safe at any factor.
     auto& ele = fNuPhysics->Get(NeutrinoPhysics::kElectron);
     ele.ccBias = cc;
     ele.ncBias = nc;

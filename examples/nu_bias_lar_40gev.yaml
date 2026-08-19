@@ -57,13 +57,20 @@ geant4:
     nucleus_e:   {mfp_bias: 1}
     nucleus_tau: {mfp_bias: 1}
 
-    # Neutrino-electron scattering: the only family where Geant4 really
-    # reweights CC against NC (the pair reaches the separate CC and NC
-    # cross-section data sets). Setting either > 1 also makes the vertex be
-    # sampled uniformly along the neutrino's chord through the volume.
+    # Neutrino-electron scattering. cc_bias/nc_bias set the PROCESS factor
+    # (max of the two) and, when > 1, also make the vertex be sampled uniformly
+    # along the neutrino's chord. To actually make nu+e- interact use mfp_bias
+    # (electron.mfp_bias: 1e14 gives ~28/50 on argon).
+    #
+    # xsec_cc_bias/xsec_nc_bias are the ONLY CC/NC reweighting Geant4 has, but
+    # they scale a data set with no isotope-level cross section: bias them
+    # enough that nu+e- interacts and Geant4 aborts in
+    # G4CrossSectionDataStore::GetIsoCrossSection. See docs/neutrino.md.
     electron:
       cc_bias: 1
       nc_bias: 1
+      # mfp_bias: 1.0e14
+      # xsec_cc_bias: 10        # CC/NC reweighting; read the caveat first
 
     # Geant4 registers its vacuum-oscillation process by DEFAULT and upstream
     # offers no way to switch it off; here it is off, so the flavour that

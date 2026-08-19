@@ -322,10 +322,12 @@ transport record — analyze/display/Blender all just work.
     objects: `electron`, `nucleus_e`, `nucleus_mu`, `nucleus_tau` (plus
     `nucleus`/`all` aliases) and `oscillation`. Terms: `enable`, `region` (a
     `G4Region` name — the process is inert outside it), `mfp_bias`,
-    `cc_bias`/`nc_bias`, `xsec_bias`, `lowest_energy`, and
-    `oscillation.distance_bias`. These are genuinely different terms, not
-    aliases; see `docs/neutrino.md` for what each one does, measured
-    interaction rates for each, and `examples/nu_bias_lar_40gev.yaml`.
+    `cc_bias`/`nc_bias`, `xsec_bias`, `lowest_energy`,
+    `electron.xsec_cc_bias`/`xsec_nc_bias` (the only CC/NC reweighting Geant4
+    has), and `oscillation.distance_bias`. These are genuinely different terms,
+    not aliases; see `docs/neutrino.md` for what each one does, measured
+    interaction rates for each, the one abort edge case, and
+    `examples/nu_bias_lar_40gev.yaml`.
 
   Upstream `/physics_lists/nu/*` macros still run — g4sim re-registers those
   eight commands and translates them. Prefer the `genie` or `achilles` backends

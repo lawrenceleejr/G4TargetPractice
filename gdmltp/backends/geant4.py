@@ -96,6 +96,18 @@ _NU_TERMS = {
     "xsec_bias":     ("xsecBias", "num"),     # scales the tabulated cross section
     "lowest_energy": ("lowestEnergy", "raw"), # "10 MeV" -> value + unit
 }
+# Only G4NeutrinoElectronTotXsc has separate CC and NC cross-section objects, so
+# only the electron family can reweight the CC/NC ratio. DANGER: that data set
+# implements no isotope-level cross section, so a bias large enough to make
+# nu+e- actually interact aborts Geant4 in
+# G4CrossSectionDataStore::GetIsoCrossSection -- verified by running it. Bias
+# nu+e- with mfp_bias or cc_bias/nc_bias (process-only) unless you specifically
+# want the ratio changed.
+_NU_ELECTRON_TERMS = {
+    "xsec_cc_bias": ("xsecCcBias", "num"),
+    "xsec_nc_bias": ("xsecNcBias", "num"),
+}
+_NU_ELECTRON_GROUPS = ("electron", "all")
 # Oscillation has its own term names (its bias is a distance bias, not a
 # mean-free-path bias) but the same enable/region/lowest_energy.
 _NU_OSC_TERMS = dict(_NU_TERMS, distance_bias=("distanceBias", "num"))
@@ -145,6 +157,10 @@ def neutrino_knob_lines(raw):
     objects), nucleus (the three nucleus ones at once), all (all four), plus
     oscillation. Bare `region`/`enable`/... at the top of the block are
     shorthand for the `all` group.
+
+    `xsec_cc_bias`/`xsec_nc_bias` exist only for the electron group -- they are
+    the only CC/NC reweighting Geant4 has, and they carry an abort risk; see
+    _NU_ELECTRON_TERMS above.
     """
     if not raw:
         return []
@@ -164,7 +180,8 @@ def neutrino_knob_lines(raw):
         lines.append(f"/detector/oscRegionPattern {osc.pop('region_pattern')}")
     # bare terms at the top level are shorthand for the `all` group; they are
     # emitted first so a per-family entry can still override them
-    bare = {k: v for k, v in raw.items() if k in _NU_TERMS}
+    bare = {k: v for k, v in raw.items()
+            if k in _NU_TERMS or k in _NU_ELECTRON_TERMS}
     if bare:
         groups.setdefault("all", {})
         merged = dict(bare)
@@ -172,7 +189,7 @@ def neutrino_knob_lines(raw):
         groups["all"] = merged
 
     unknown = (set(raw) - set(NU_GROUPS) - set(_NU_TERMS)
-               - {"oscillation", "region_pattern"})
+               - set(_NU_ELECTRON_TERMS) - {"oscillation", "region_pattern"})
     if unknown:
         raise ValueError(
             "unknown key(s): "
@@ -183,12 +200,19 @@ def neutrino_knob_lines(raw):
         terms = groups.get(g)
         if not terms:
             continue
+        allowed = dict(_NU_TERMS)
+        if g in _NU_ELECTRON_GROUPS:
+            allowed.update(_NU_ELECTRON_TERMS)
         for key, value in terms.items():
-            if key not in _NU_TERMS:
+            if key not in allowed:
+                extra = ("" if g in _NU_ELECTRON_GROUPS else
+                         f" ({', '.join(_NU_ELECTRON_TERMS)} exist only for "
+                         f"{'/'.join(_NU_ELECTRON_GROUPS)}: Geant4's nucleus "
+                         f"cross-section sets have no CC/NC split)")
                 raise ValueError(
                     f"unknown key {key!r} under {g}; expected "
-                    f"one of {', '.join(_NU_TERMS)}")
-            cmd, kind = _NU_TERMS[key]
+                    f"one of {', '.join(allowed)}{extra}")
+            cmd, kind = allowed[key]
             lines.append(f"/gdmltp/nu/{_NU_GROUP_CMD[g]}/{cmd} "
                          f"{_fmt_nu_value(kind, value)}")
     if osc is not None:

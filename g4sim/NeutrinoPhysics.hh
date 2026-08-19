@@ -44,6 +44,22 @@
 ///             itself (`totXsc *= fBiasingFactor`), everywhere, in every region.
 ///             G4NeutrinoPhysics never calls this.
 ///
+///   xsecCc/NcBias  G4NeutrinoElectronTotXsc::SetBiasingFactors(cc, nc), which
+///             reaches the SEPARATE CC and NC cross-section objects -- the only
+///             term in Geant4 that genuinely changes a CC/NC ratio. Electron
+///             family only; the nucleus data sets have no CC/NC split.
+///
+/// DANGER, on the two xsec terms for the ELECTRON family: G4NeutrinoElectronTotXsc
+/// is the only one of the four data sets that implements no isotope-level cross
+/// section (no GetIsoCrossSection / IsIsoApplicable). Bias it hard enough that the
+/// nu+e- process actually interacts and Geant4 aborts inside
+/// G4CrossSectionDataStore::GetIsoCrossSection ("No isotope cross section found
+/// for nu_mu off target Element Ar Z= 18 A= 36 from G4_lAr") -- verified by
+/// running it. That is an upstream defect in a data set we do not own, so these
+/// knobs stay available but warn loudly, and nothing sets them implicitly. The
+/// mean-free-path route (mfpBias, or cc/ncBias, which only touch the process)
+/// biases nu+e- safely.
+///
 ///   lowestEnergy  G4*Process::SetLowestEnergy(E). Below it the process does
 ///             nothing. Default 1 keV for the interaction processes.
 ///
@@ -66,6 +82,9 @@ public:
         G4double ccBias = 1.0;
         G4double ncBias = 1.0;
         G4double xsecBias = 1.0;
+        // electron family only: the CC/NC-splitting cross-section term
+        G4double xsecCcBias = 1.0;
+        G4double xsecNcBias = 1.0;
         G4double lowestEnergy = -1.0;   // < 0 = leave Geant4's default
     };
 

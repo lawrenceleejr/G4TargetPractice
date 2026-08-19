@@ -22,6 +22,8 @@ class G4UIcommand;
 ///   /gdmltp/nu/<group>/ccBias       <double>
 ///   /gdmltp/nu/<group>/ncBias       <double>
 ///   /gdmltp/nu/<group>/xsecBias     <double>
+///   /gdmltp/nu/electron/xsecCcBias  <double>   (electron family only)
+///   /gdmltp/nu/electron/xsecNcBias  <double>   (electron family only)
 ///   /gdmltp/nu/<group>/lowestEnergy <double> <unit>
 ///
 /// <group> is one of: electron, nucleusE, nucleusMu, nucleusTau (the four
@@ -51,7 +53,8 @@ public:
 
 private:
     /// Which knob a command writes.
-    enum Knob { kEnable, kRegion, kMfpBias, kCcBias, kNcBias, kXsecBias, kLowestEnergy };
+    enum Knob { kEnable, kRegion, kMfpBias, kCcBias, kNcBias, kXsecBias,
+                kXsecCcBias, kXsecNcBias, kLowestEnergy };
 
     /// Bit per target: the four interaction families plus oscillation.
     enum Target {

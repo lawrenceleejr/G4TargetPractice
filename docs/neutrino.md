@@ -268,8 +268,9 @@ all four. Oscillation is its own group.
 | `enable` | (register the process or not) | drop a family entirely |
 | `region` | process envelope name | **a `G4Region` name.** Outside it the process never interacts, whatever the bias |
 | `mfp_bias` | `G4*Process::SetBiasingFactor` | scales the mean free path **inside `region` only**, and **only for values > 1**. The "guarantee an interaction here" knob |
-| `cc_bias` / `nc_bias` | `G4*Process::SetBiasingFactors` | process factor becomes `max(cc, nc)`; either > 1 also makes the vertex be sampled **uniformly along the chord** through the volume. For `electron` the pair additionally reaches the separate CC and NC cross-section sets — the only place Geant4 truly reweights CC against NC |
+| `cc_bias` / `nc_bias` | `G4*Process::SetBiasingFactors` | process factor becomes `max(cc, nc)`; either > 1 also makes the vertex be sampled **uniformly along the chord** through the volume. It does **not** reweight CC against NC — the CC fraction comes from the physics |
 | `xsec_bias` | `G4*TotXsc::SetBiasingFactor` | scales the **tabulated cross section itself**, in every region. Upstream `G4NeutrinoPhysics` never sets this |
+| `xsec_cc_bias` / `xsec_nc_bias` | `G4NeutrinoElectronTotXsc::SetBiasingFactors` | **`electron` only.** Reaches the separate CC and NC cross-section objects — the only CC/NC reweighting Geant4 has. Carries an abort risk, below |
 | `lowest_energy` | `G4*Process::SetLowestEnergy` | below it the process does nothing |
 | `oscillation.distance_bias` | `G4NuVacOscProcess::SetBiasingFactor` | divides the oscillation length inside `region`; ignored unless > 1 |
 
@@ -311,6 +312,27 @@ on for a neutrino primary), and stands down automatically when an explicit
 process changed the neutrino's flavour. It is what makes the oscillation knobs
 observable — and Geant4 keeps that process **on by default**, with no upstream
 command to disable it.
+
+### One sharp edge: biasing the ν+e⁻ cross-section *table*
+
+`G4NeutrinoElectronTotXsc` is the only one of the four cross-section data sets
+that implements no isotope-level cross section (no `GetIsoCrossSection` /
+`IsIsoApplicable`). Scale that table (`xsec_bias`, `xsec_cc_bias`,
+`xsec_nc_bias`) hard enough that ν+e⁻ actually interacts and Geant4 aborts:
+
+```
+*** G4Exception : had001
+      issued by : G4CrossSectionDataStore::GetIsoCrossSection
+No isotope cross section found for nu_mu off target Element Ar Z= 18 A= 36 from G4_lAr
+ - defined by : nuElectron
+```
+
+That is an upstream defect in a data set this repo does not own, so the knobs
+stay available and warn loudly rather than being hidden. **The mean-free-path
+route is safe**: `electron.mfp_bias: 1e14` on liquid argon gives 28/50 ν+e⁻
+interactions (CC 13 / NC 15) with no abort. `geant4.neutrino_bias`, the blunt
+shortcut, deliberately drives only the process factor for this reason — it must
+stay safe at any factor.
 
 ### Upstream `/physics_lists/nu/*` macros still run
 

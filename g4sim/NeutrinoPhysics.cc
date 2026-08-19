@@ -92,6 +92,9 @@ void NeutrinoPhysics::Print() const
                << "  ccBias=" << k.ccBias
                << "  ncBias=" << k.ncBias
                << "  xsecBias=" << k.xsecBias;
+        if (i == kElectron && (k.xsecCcBias != 1.0 || k.xsecNcBias != 1.0))
+            G4cout << "  xsecCcBias=" << k.xsecCcBias
+                   << "  xsecNcBias=" << k.xsecNcBias;
         if (k.lowestEnergy >= 0.)
             G4cout << "  lowestEnergy=" << k.lowestEnergy / CLHEP::MeV << " MeV";
         G4cout << G4endl;
@@ -139,15 +142,28 @@ void NeutrinoPhysics::ConstructProcess()
 
             // Independent terms, applied independently -- unlike
             // G4NeutrinoPhysics, which picks ONE of these two paths.
-            if (k.ccBias != 1.0 || k.ncBias != 1.0) {
+            if (k.ccBias != 1.0 || k.ncBias != 1.0)
                 proc->SetBiasingFactors(k.ccBias, k.ncBias);
-                // The only place in Geant4 where CC and NC are biased apart:
-                // this reaches the separate CC and NC cross-section data sets.
-                xsc->SetBiasingFactors(k.ccBias, k.ncBias);
-            }
             if (k.mfpBias != 1.0) proc->SetBiasingFactor(k.mfpBias);
-            if (k.xsecBias != 1.0) xsc->SetBiasingFactor(k.xsecBias);
             if (k.lowestEnergy >= 0.) proc->SetLowestEnergy(k.lowestEnergy);
+            // The two cross-section-table terms. xsecCc/NcBias reaches the
+            // separate CC and NC objects -- the only real CC/NC reweighting in
+            // Geant4 -- but see the DANGER note in NeutrinoPhysics.hh: this data
+            // set has no isotope-level cross section, so a bias large enough to
+            // make nu+e- actually interact aborts inside Geant4.
+            if (k.xsecBias != 1.0 || k.xsecCcBias != 1.0 || k.xsecNcBias != 1.0) {
+                G4cout << "*** WARNING: biasing the nu+e- CROSS-SECTION TABLE "
+                       << "(xsecBias/xsecCcBias/xsecNcBias). "
+                       << "G4NeutrinoElectronTotXsc provides no isotope-level "
+                       << "cross section, so if the process then interacts "
+                       << "Geant4 aborts in G4CrossSectionDataStore::"
+                       << "GetIsoCrossSection. Use mfpBias (or ccBias/ncBias, "
+                       << "which touch only the process) to bias nu+e- safely."
+                       << G4endl;
+            }
+            if (k.xsecBias != 1.0) xsc->SetBiasingFactor(k.xsecBias);
+            if (k.xsecCcBias != 1.0 || k.xsecNcBias != 1.0)
+                xsc->SetBiasingFactors(k.xsecCcBias, k.xsecNcBias);
 
             proc->AddDataSet(xsc);
             proc->RegisterMe(new G4NeutrinoElectronCcModel());

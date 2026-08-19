@@ -201,6 +201,87 @@ jobs:
           python3 -c "import uproot,sys; t=uproot.open('output.root')['tree']; n=t.num_entries; nu='nu_isCC' in [k.split(';')[0] for k in t.keys()]; print('events',n,'nu block',nu); sys.exit(0 if (n==20 and nu) else 1)"
           rm -f output.root nubias.mac
 
+      - name: Neutrino knob-surface smoke (/gdmltp/nu/*)
+        # Every fine-grained knob must be registered AND actually change the
+        # physics. This step pins the three things that have broken before: the
+        # "target" region must be non-empty (an empty region silently biases
+        # nothing), biasing nu+e- must not abort the batch, and the region /
+        # threshold knobs must genuinely suppress interactions.
+        run: |
+          set -e
+          nurun() {
+            label=$1; shift
+            rm -f nu_$label.mac
+            for l in "$@"; do echo "$l" >> nu_$label.mac; done
+            cat >> nu_$label.mac << 'EOF'
+          /gdmltp/nu/list
+          /detector/readGDML gdml/liquid_argon_1m3.gdml
+          /run/initialize
+          /analysis/neutrinoMode on
+          /random/setSeeds 7 8
+          /gun/particle nu_mu
+          /gun/energy 40 GeV
+          /gun/position -10 0 0 cm
+          /gun/direction 0 0 1
+          /run/beamOn 200
+          EOF
+            if ! ./build/g4sim nu_$label.mac > nu_$label.log 2>&1; then
+              echo "::error::g4sim aborted on nu_$label.mac"; tail -40 nu_$label.log; exit 1
+            fi
+            if grep -q "G4Exception" nu_$label.log; then
+              echo "::error::G4Exception in nu_$label"
+              grep -A6 "G4Exception" nu_$label.log | head -24; exit 1
+            fi
+            mv output.root out_$label.root
+          }
+          nurun region    "/gdmltp/nu/nucleus/region target" "/gdmltp/nu/oscillation/enable false"
+          nurun mfp       "/gdmltp/nu/nucleus/region target" "/gdmltp/nu/nucleusMu/mfpBias 1e10"  "/gdmltp/nu/oscillation/enable false"
+          nurun xsec      "/gdmltp/nu/nucleus/region target" "/gdmltp/nu/nucleusMu/xsecBias 1e10" "/gdmltp/nu/oscillation/enable false"
+          nurun ccnc      "/gdmltp/nu/nucleus/region target" "/gdmltp/nu/nucleusMu/ccBias 1e10" "/gdmltp/nu/nucleusMu/ncBias 1e10" "/gdmltp/nu/oscillation/enable false"
+          nurun ele       "/gdmltp/nu/electron/region target" "/gdmltp/nu/electron/mfpBias 1e14" "/gdmltp/nu/nucleus/enable false" "/gdmltp/nu/oscillation/enable false"
+          nurun noregion  "/gdmltp/nu/nucleus/region nosuchregion" "/gdmltp/nu/nucleusMu/mfpBias 1e10" "/gdmltp/nu/oscillation/enable false"
+          nurun lowe      "/gdmltp/nu/nucleus/region target" "/gdmltp/nu/nucleusMu/mfpBias 1e10" "/gdmltp/nu/nucleusMu/lowestEnergy 100 TeV" "/gdmltp/nu/oscillation/enable false"
+          nurun osc       "/gdmltp/nu/oscillation/region target" "/gdmltp/nu/oscillation/distanceBias 1e8" "/gdmltp/nu/nucleus/enable false" "/gdmltp/nu/electron/enable false"
+
+          grep -q "target region: 2 volume(s)" nu_region.log || {
+            echo "::error::the \"target\" region is not populated -- biasing would be inert"
+            grep -i region nu_region.log | head; exit 1; }
+
+          python3 - << 'PY'
+          import sys, uproot, numpy as np
+
+          def counts(label):
+              t = uproot.open(f"out_{label}.root")["tree"]
+              a = t.arrays(["nu_isCC", "nu_isNC", "nu_nOscillations"], library="np")
+              return (int((a["nu_isCC"].astype(bool) | a["nu_isNC"].astype(bool)).sum()),
+                      int(a["nu_nOscillations"].sum()))
+
+          bad = []
+          # each interaction term must produce interactions on its own; nu+e- via
+          # the mean-free-path route included (the cross-section-table route on
+          # that family aborts inside Geant4 -- see docs/neutrino.md)
+          for label in ("mfp", "xsec", "ccnc", "ele"):
+              n, _ = counts(label)
+              print(f"{label:9s} interactions={n}")
+              if n == 0:
+                  bad.append(f"{label}: expected interactions, got 0")
+          # region scoping and the energy threshold must suppress them entirely
+          for label in ("region", "noregion", "lowe"):
+              n, _ = counts(label)
+              print(f"{label:9s} interactions={n} (expect 0)")
+              if n != 0:
+                  bad.append(f"{label}: expected 0 interactions, got {n}")
+          # a biased oscillation distance must actually change flavour
+          n, osc = counts("osc")
+          print(f"osc       interactions={n} oscillations={osc}")
+          if osc == 0:
+              bad.append("osc: biased oscillation produced no flavour changes")
+          for b in bad:
+              print(f"::error::{b}")
+          sys.exit(1 if bad else 0)
+          PY
+          rm -f nu_*.mac nu_*.log out_*.root
+
       - name: Particle-by-PDG smoke (/gun/particlePDG)
         run: |
           cat > pdg.mac << 'EOF'
