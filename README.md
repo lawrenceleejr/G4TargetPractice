@@ -45,6 +45,7 @@ git clone https://github.com/lawrenceleejr/G4TargetPractice && cd G4TargetPracti
 GEANT4=ghcr.io/lawrenceleejr/g4targetpractice:main
 GENIE=ghcr.io/lawrenceleejr/g4targetpractice-genie:main
 ACHILLES=ghcr.io/lawrenceleejr/g4targetpractice-achilles:main
+PYTHIA=ghcr.io/lawrenceleejr/g4targetpractice-pythia:main
 
 # a tiny wrapper: mounts the repo, and runs as YOU so outputs are owned by you
 # (not root), with a writable HOME for in-container caches

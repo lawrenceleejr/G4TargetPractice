@@ -57,7 +57,7 @@ def _build_parser():
 
     p = argparse.ArgumentParser(
         prog="gdmltp",
-        description="G4TargetPractice tooling: run sims, analyze output.root, "
+        description="GDMLTargetPractice: run sims, analyze output.root, "
                     "make event displays (no ROOT needed).",
         epilog="run 'gdmltp <command> --help' for command-specific examples")
     p.add_argument("--version", action="version", version=f"gdmltp {__version__}")
@@ -77,8 +77,14 @@ def _build_parser():
     r = _sub("run", "run a simulation (Docker or local g4sim)")
     r.add_argument("--config", help="YAML run config (common frontend for any backend); "
                                      "flags below override individual fields")
+    # choices come from config.GENERATORS -- a hand-copied list here silently
+    # drifted once already (the pythia backend worked from YAML but --generator
+    # pythia was rejected), so there is exactly one source of truth. Imported
+    # locally: config pulls in yaml, and module-level import would pay that on
+    # every `--help`.
+    from .config import GENERATORS
     r.add_argument("--generator", default="geant4",
-                   choices=["geant4", "genie", "achilles", "decay", "external"],
+                   choices=list(GENERATORS),
                    help="physics backend (default: geant4)")
     r.add_argument("--mac", help="existing macro; if omitted, one is generated from the flags below")
     r.add_argument("--gdml", help="geometry file (required if no --mac references one)")
