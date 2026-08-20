@@ -1,5 +1,11 @@
-# GENIE backend: a 2 GeV muon-neutrino beam on a liquid-argon target.
-#   g4tp run --config examples/nu_argon.yaml     (requires the genie image)
+# GENIE backend: a 2 GeV muon-neutrino beam on a liquid-argon target, with the
+# final state transported through the argon by Geant4 (the default for every
+# generator -- add `transport: false` under `genie:` for a vertex-level run).
+#
+#   gdmltp run --config examples/nu_argon.yaml -o out       # chains both images
+#   # or, from bare Docker (two engines, so two commands):
+#   gtp $GENIE  run --config examples/nu_argon.yaml -o out --stage generator
+#   gtp $GEANT4 transport -o out
 generator: genie
 
 geometry:
@@ -24,3 +30,5 @@ genie:
   event_generator_list: Default
   length_units: cm
   target: 1000180400          # optional; else inferred from the GDML material
+  transport: true             # hand the final state to Geant4 (the default;
+                              # `false` = vertex-level, no propagation)

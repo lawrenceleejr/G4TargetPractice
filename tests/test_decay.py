@@ -260,7 +260,11 @@ def test_external_convert_and_validate(synth_nuhepmc, tmp_path):
 
 def test_external_backend_end_to_end(synth_nuhepmc, tmp_path):
     """generator: external runs host-side through run_config (no Docker) and
-    the result carries the beam particle as primary + weights/time."""
+    the result carries the beam particle as primary + weights/time.
+
+    transport: false keeps it a one-stage, Docker-free run -- the default is a
+    Geant4 transport stage (covered by test_external_transport_handoff and the
+    two-stage orchestration tests)."""
     from gdmltp import run as runmod
     import uproot
     gdml = tmp_path / "g.gdml"
@@ -268,7 +272,7 @@ def test_external_backend_end_to_end(synth_nuhepmc, tmp_path):
     cfg = _cfg(f"""
 generator: external
 geometry: {{gdml: g.gdml}}
-external: {{file: {synth_nuhepmc}}}
+external: {{file: {synth_nuhepmc}, transport: false}}
 """)
     cfg.gdml = str(gdml)
     runmod.run_config(cfg, outdir=tmp_path)

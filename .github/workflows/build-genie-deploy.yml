@@ -187,6 +187,38 @@ jobs:
           path: xsec_cache
           key: genie-xsec-${{ hashFiles('.github/ci/nu_water_transport.yaml') }}
 
+      - name: Bare-docker two-command flow (generator image -> Geant4 image)
+        # The README path for someone with no local install: the GENIE image
+        # writes the HepMC3 hand-off, the Geant4 image replays it. Nothing here
+        # may touch the front-end -- that is the point. The splines are already
+        # in the run directory from the step above, so this is quick.
+        env:
+          GENIE: ${{ steps.images.outputs.genie }}
+          GEANT4: ${{ steps.images.outputs.geant4 }}
+        run: |
+          set -euxo pipefail
+          gtp() { docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+                             -v "$PWD:/run" -w /run "$@"; }
+          mkdir -p bare_out
+          cp nu_out/gxspl_*.xml bare_out/ 2>/dev/null || true
+          gtp "$GENIE" run --config "$CONFIG" -o bare_out --stage generator
+          # stage 1 leaves the hand-off and NO output.root: the run is not done
+          test -f bare_out/events.hepmc
+          test -f bare_out/gdmltp_transport.json
+          test ! -f bare_out/output.root
+          gtp "$GEANT4" transport -o bare_out
+          test -f bare_out/output.root
+          # ... and asking the generator image for the whole run must fail loudly
+          # rather than leave an untransported file behind
+          rm -rf half_out && mkdir -p half_out
+          cp nu_out/gxspl_*.xml half_out/ 2>/dev/null || true
+          if gtp "$GENIE" run --config "$CONFIG" -o half_out; then
+            echo "expected the generator image to refuse a full run" >&2
+            exit 1
+          fi
+          test ! -f half_out/output.root
+          test -f half_out/events.hepmc
+
       - name: Validate and analyze the merged ntuple (README commands)
         env:
           GEANT4: ${{ steps.images.outputs.geant4 }}
@@ -213,6 +245,12 @@ jobs:
             .github/scripts/ci_ntuple_plots.py nu_out/output.root \
             -o nu_out/plots --label "2 GeV numu -> water" \
             --min-events "$EVENTS" --require-steps --require-nu
+          # the bare-docker product must carry the same two records
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD:/run" -w /run --entrypoint python3 "$GEANT4" \
+            .github/scripts/ci_ntuple_plots.py bare_out/output.root \
+            -o bare_out/plots --label "2 GeV numu -> water (bare docker)" \
+            --min-events "$EVENTS" --require-steps --require-nu
 
       - name: Upload the plots and reports
         if: always()
@@ -222,5 +260,6 @@ jobs:
           path: |
             nu_out/plots/
             nu_out/analysis/
+            bare_out/plots/
           if-no-files-found: warn
           retention-days: 14

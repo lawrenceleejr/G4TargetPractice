@@ -24,3 +24,5 @@ achilles:
   # nuclear_model: QESpectral
   # processes: [[13], [14]]  # final-state leptons (default: CC + NC)
   # run_card: my_card.yml    # verbatim Achilles run card (escape hatch)
+  transport: true             # hand the final state to Geant4 (the default;
+                              # `false` = vertex-level, no propagation)

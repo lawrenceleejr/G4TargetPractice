@@ -3,9 +3,9 @@
 # The point of this config: Pythia 8 does TeV-scale deep-inelastic scattering
 # with NO cross-section splines to precompute. The GENIE/HEDIS route to the same
 # physics (nu_slice_numu_hedis.yaml) needs a gmkspl step that costs hours on
-# tungsten; here the first run starts generating immediately. `transport: true`
-# then hands every final-state particle to Geant4, so one output.root carries
-# both the interaction record and the full detector response.
+# tungsten; here the first run starts generating immediately. The default
+# hand-off then gives every final-state particle to Geant4, so one output.root
+# carries both the interaction record and the full detector response.
 #
 #   gdmltp run --config examples/maia/nu_slice_pythia.yaml -o slice_pythia
 #   gdmltp analyze slice_pythia/output.root
@@ -49,7 +49,8 @@ run:
 pythia:
   process: dis               # weak-boson exchange: CC (W) + NC (gamma*/Z)
   target: 1000741840         # W-184 (tungsten nozzles) -> reduced to its majority nucleon
-  transport: true            # hand the final state to Geant4 for full transport
+  transport: true            # hand the final state to Geant4 (the default;
+                             # `false` = vertex-level, no propagation)
   # q2_min: 1.0              # DIS phase-space cut [GeV^2]
   # settings:                # raw Pythia settings, appended last (they win)
   #   - "PDF:pSet = 8"

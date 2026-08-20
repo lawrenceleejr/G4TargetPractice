@@ -5,17 +5,21 @@
 # that an unbiased run through even a kt detector records essentially nothing.
 # This config drives the geant4 backend with a single biasing factor of 1e10,
 # so the neutrino interacts inside MAIA and you see the shower -- one engine,
-# one stage, full transport and energy deposition (unlike the vertex-level
-# GENIE/Achilles backends, which stop at the interaction).
+# one stage (the generator backends reach the same place in two: their
+# interaction, then the same Geant4 transport).
 #
 #   gdmltp run --config examples/maia/nu_slice_geant4_biased.yaml -o slice_g4
 #   gdmltp analyze slice_g4/output.root      # depth-dose, secondaries, CC/NC
 #   gdmltp display slice_g4/output.root --gdml gdml/MAIA_v0.gdml --events 0:10
 #
-# Caveats: this is Geant4's thin neutrino model, not a real neutrino event
-# generator -- use it to see energy deposition / detector response, and use
-# the genie/achilles slice configs for interaction-physics accuracy. The 1e10
-# bias enhances the interaction RATE; per-event kinematics are Geant4's.
+# THIS IS THE ONE EXAMPLE THAT DELIBERATELY LETS GEANT4 DO THE NEUTRINO
+# INTERACTION, so running it prints the "neutrino beam on the bare Geant4
+# backend" banner -- that warning is correct and expected here, and
+# GDMLTP_NO_WARNINGS=1 silences it. Geant4's neutrino model is thin: the 1e10
+# bias enhances the interaction RATE and the per-event kinematics are Geant4's,
+# not an event generator's. Use it for energy deposition / detector response and
+# as the contrast run; use the genie/achilles/pythia slice configs (which end in
+# Geant4 anyway, via the HepMC3 hand-off) for interaction physics.
 generator: geant4
 
 geometry:

@@ -23,9 +23,9 @@
 #    nucleus so the example runs; set achilles.nucleus to any Achilles-supported
 #    isotope (e.g. 16O, 40Ar, 40Ca) to explore the nuclear dependence.
 #
-# The interaction is placed at the sampled slice vertex (vertex-only, like the
-# GENIE backend). Add `transport: true` under a geant4 hand-off to push the
-# final-state particles through the MAIA geometry (see docs/neutrino.md).
+# The interaction is placed at the sampled slice vertex, and Geant4 then pushes
+# the final-state particles through the MAIA geometry -- the default hand-off
+# (see docs/neutrino.md). `achilles: {transport: false}` keeps it vertex-level.
 generator: achilles
 
 geometry:
@@ -58,3 +58,5 @@ achilles:
   cascade: true              # intranuclear cascade on final-state hadrons
   # nuclear_model: QESpectral
   # processes: [[13], [14]]  # final-state leptons (default: CC + NC)
+  transport: true             # hand the final state to Geant4 (the default;
+                              # `false` = vertex-level, no propagation)

@@ -16,7 +16,7 @@ COPY gdmltp/ /app/pysrc/gdmltp/
 COPY g4tp/ /app/pysrc/g4tp/
 COPY pyproject.toml README.md /app/pysrc/
 RUN python3 -m pip install --no-cache-dir /app/pysrc && \
-    python3 -c "import gdmltp; from gdmltp.backends import achilles_convert, pythia; print('gdmltp', gdmltp.__version__)"
+    python3 -c "import gdmltp, pyhepmc; from gdmltp import handoff; from gdmltp.backends import achilles_convert, pythia; print('gdmltp', gdmltp.__version__, 'pyhepmc', pyhepmc.__version__)"
 
 # Pythia driver + the generator binary it shells out to.
 COPY pythia/ /app/pythia/

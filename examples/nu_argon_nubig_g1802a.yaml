@@ -37,4 +37,5 @@ genie:
   event_generator_list: Default
   length_units: cm
   target: 1000180400          # Ar-40
-  transport: true             # GENIE vertex -> Geant4 transport -> merged ntuple
+  transport: true             # hand the final state to Geant4 (the default;
+                              # `false` = vertex-level, no propagation)

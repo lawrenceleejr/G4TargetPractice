@@ -20,6 +20,7 @@
 #include "TTree.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <sstream>
 #include <fstream>
 #include <string>
@@ -303,6 +304,51 @@ G4double PrimaryGenerator::SampleEnergy() const
     return fEnergy; // unreachable
 }
 
+namespace {
+
+/// A Standard-Model neutrino fired by the GUN (not a hand-off replay) means the
+/// user is asking GEANT4 to do neutrino INTERACTION physics, which it barely
+/// does: the cross sections need ~1e12 biasing to interact at all and the final
+/// states are not event-generator quality. Say so unmissably, once per run --
+/// the Python front-end prints the same advice, but a raw
+/// `docker run <image> my.mac` never goes through it. Mute: GDMLTP_NO_WARNINGS=1.
+bool IsSMNeutrino(const G4ParticleDefinition* def)
+{
+    if (!def) return false;
+    const G4int pdg = std::abs(def->GetPDGEncoding());
+    return pdg == 12 || pdg == 14 || pdg == 16;
+}
+
+void WarnNeutrinoOnGeant4(const std::string& name)
+{
+    const char* mute = std::getenv("GDMLTP_NO_WARNINGS");
+    if (mute) {
+        const std::string m(mute);
+        if (!m.empty() && m != "0" && m != "false") return;
+    }
+    const std::string bar(78, '!');
+    G4cout << bar << G4endl
+      << "!! NEUTRINO BEAM (" << name << ") ON THE BARE GEANT4 BACKEND" << G4endl
+      << bar << G4endl
+      << "!! You are firing " << name << " with GEANT4'S OWN neutrino interactions."
+      << G4endl
+      << "!! Geant4 is a TRANSPORT engine: its neutrino cross sections are so tiny"  << G4endl
+      << "!! that they must be biased by ~1e12 to interact at all, and the final"    << G4endl
+      << "!! states are not event-generator quality -- no nuclear initial state, no" << G4endl
+      << "!! tuned resonance/DIS models, no intranuclear cascade. Treat interaction" << G4endl
+      << "!! physics from this run as a transport artefact, not as neutrino physics."<< G4endl
+      << "!!"                                                                        << G4endl
+      << "!! USE A NEUTRINO EVENT GENERATOR INSTEAD -- it still ends in Geant4:"      << G4endl
+      << "!!     gdmltp run --config examples/nu_argon.yaml -o out     (GENIE)"      << G4endl
+      << "!! the generator makes the interaction, Geant4 propagates the final state" << G4endl
+      << "!! through this same geometry, and one output.root carries both records."  << G4endl
+      << "!!"                                                                        << G4endl
+      << "!! Continuing with Geant4. Mute with GDMLTP_NO_WARNINGS=1."                << G4endl
+      << bar << G4endl;
+}
+
+}  // namespace
+
 // ---------------------------------------------------------------------------
 // GeneratePrimaries
 // ---------------------------------------------------------------------------
@@ -350,6 +396,14 @@ void PrimaryGenerator::GeneratePrimaries(G4Event* event)
     if (!particle) {
         G4Exception("PrimaryGenerator", "NoParticle", FatalException,
                     ("Particle not found: " + fParticleName).c_str());
+    }
+
+    // Warn once per run, here rather than at /gun/particle time, so it reflects
+    // the beam that actually fires (the macro may set the gun several times) and
+    // never fires for a hand-off/beam-file replay -- both return above.
+    if (!fWarnedNeutrinoBeam && IsSMNeutrino(particle)) {
+        fWarnedNeutrinoBeam = true;
+        WarnNeutrinoOnGeant4(particle->GetParticleName());
     }
 
     // --- Direction ---

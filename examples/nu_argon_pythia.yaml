@@ -3,8 +3,8 @@
 #
 # The smallest useful pythia config: a pencil beam, the `dis` preset (weak-boson
 # exchange -> CC + NC), the struck nucleon inferred from the GDML material, and
-# `transport: true` so Geant4 carries the final state through the detector and
-# the output gains step_*/totalEdep on top of the interaction record.
+# the default Geant4 hand-off, so the output gains step_*/totalEdep on top of
+# the interaction record.
 #
 # Pythia's niche here is high energy with no setup cost: unlike the GENIE HEDIS
 # path there are no cross-section splines to precompute, so this runs straight
@@ -28,6 +28,7 @@ run:
 
 pythia:
   process: dis               # WeakBosonExchange CC + NC
-  transport: true            # Geant4 transports the final state through the GDML
+  transport: true            # hand the final state to Geant4 (the default;
+                             # `false` = vertex-level, no propagation)
   # target: 2212             # force a free proton (else inferred from the GDML)
   # settings: ["PDF:pSet = 8"]

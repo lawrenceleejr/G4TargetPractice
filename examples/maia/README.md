@@ -17,10 +17,11 @@ z** (the muon-decay straight sits many meters back) and flies downstream into
 MAIA: a **multi-meter-wide ribbon in x** across the negative-x half, **very thin
 in y** (x ∈ [−600, 0] cm, y ≈ 0 with a 5 mm spread, launched at z = −25 m).
 The `geant4` backend transports the neutrinos from that source plane and the
-biased interaction fires inside the detector. The vertex-only `genie`/`achilles`
-backends place the interaction *at* the source point (25 m upstream) — the
-interaction *kinematics* are unaffected, but to see the interactions **inside**
-MAIA use `nu_slice_geant4_biased.yaml` or add `transport: true`. The neutrino
+biased interaction fires inside the detector. The `genie`/`achilles` backends
+place the *interaction* at the source point (25 m upstream) and Geant4 then
+transports its final state from there — the interaction *kinematics* are
+unaffected, but for interactions that happen **inside** MAIA use
+`nu_slice_geant4_biased.yaml`. The neutrino
 *energy* still follows the exact muon-decay spectrum (the physical origin of the
 flux); only the spatial model is the direct-injection slice.
 
@@ -82,10 +83,11 @@ gdmltp validate slice_numu/output.root                 # schema + physics checks
 gdmltp compare  slice_numu/output.root slice_nuebar/output.root \
                 --labels numu,nuebar -o slice_cmp      # Q2/W/x/y overlays
 
-# see the events inside MAIA (momentum rays for the vertex-level final state)
+# see the events inside MAIA (tracks from the Geant4 transport)
 gdmltp display slice_numu/output.root --gdml gdml/MAIA_v0.gdml --events 0:20
 
-# full detector response: add `transport: true` to the genie block and rerun --
-# final-state particles are transported through MAIA by Geant4 and the file
-# gains step_*/totalEdep on top of the GENIE interaction record.
+# every run above already carries the full detector response: the final-state
+# particles are transported through MAIA by Geant4 (via events.hepmc), so the
+# file has step_*/totalEdep on top of the GENIE interaction record. Put
+# `transport: false` in the genie block for a vertex-level run instead.
 ```

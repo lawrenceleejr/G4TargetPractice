@@ -2,8 +2,11 @@
 
 The host writes a `genie_job.json` describing the probe, target, flux and run;
 the GENIE container's driver reads it, runs the generation + conversion pipeline
-(gevgen -> gntpc gst -> genie_convert), and writes `output.root` in the shared
-schema. GENIE is a neutrino generator, so the projectile must be a neutrino.
+(gevgen -> gntpc gst -> genie_convert), and writes the interaction record in the
+shared schema. GENIE is a neutrino generator, so the projectile must be a
+neutrino -- and it transports nothing, so this is stage 1 of two: the orchestrator
+exports the final state to HepMC3 and Geant4 propagates it (see handoff.py).
+`genie: {transport: false}` stops after this stage.
 """
 import json
 from pathlib import Path
