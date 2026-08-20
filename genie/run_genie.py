@@ -205,7 +205,8 @@ def run(job_path):
     subprocess.run(["gntpc", "-i", ghep, "-f", "gst", "-o", gst], cwd=workdir, check=True)
     print("[run_genie] converting gst -> output.root ...", flush=True)
     from gdmltp.backends import genie_convert
-    genie_convert.convert(gst, str(workdir / out), vtx_units=vtx_units)
+    genie_convert.convert(gst, str(workdir / out), vtx_units=vtx_units,
+                          position=job.get("position"), direction=job.get("direction"))
     print(f"[run_genie] done -> {workdir / out}", flush=True)
     return 0
 

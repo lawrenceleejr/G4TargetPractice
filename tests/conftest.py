@@ -149,11 +149,15 @@ def write_synthetic_gst(path, n_events=25, seed=0):
     Q2 = 2.0 * M * q0 * xbj                              # GeV^2
     W = np.sqrt(np.maximum(M * M + 2.0 * M * q0 - Q2, 0.0))
 
-    # Per-event final-state particle lists (GeV). Muon for CC, plus hadrons.
+    # Per-event final-state particle lists (GeV). HADRONS ONLY -- real gst keeps
+    # the primary lepton out of pdgf/Ef/p*f and reports it separately in
+    # fspl/El/pxl/pyl/pzl. The fixture used to include the lepton here, which
+    # made genie_convert look correct while it was silently dropping the CC muon
+    # from the final state it hands to Geant4.
     pdgf, Ef, pxf, pyf, pzf, nf = [], [], [], [], [], []
     for i in range(n_events):
-        parts = [13 if is_cc[i] else 14]                 # mu- (CC) or nu_mu (NC)
-        energies = [max(El[i], 0.106)]
+        parts = []
+        energies = []
         nhad = int(rng.integers(1, 5))
         for _ in range(nhad):
             parts.append(int(rng.choice([2212, 2112, 211, -211, 111])))
@@ -185,6 +189,7 @@ def write_synthetic_gst(path, n_events=25, seed=0):
         "vtxz": rng.uniform(-40, 40, n_events),
         "vtxt": np.zeros(n_events),
         "nf": np.array(nf, np.int32),
+        "wght": np.linspace(0.5, 1.5, n_events),
         "pdgf": ak.Array(pdgf), "Ef": ak.Array(Ef),
         "pxf": ak.Array(pxf), "pyf": ak.Array(pyf), "pzf": ak.Array(pzf),
     }
