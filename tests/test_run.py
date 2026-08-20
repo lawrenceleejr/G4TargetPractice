@@ -68,6 +68,26 @@ def test_dry_run_genie_dispatch(repo_root, tmp_path, capsys):
     assert (tmp_path / "genie_job.json").exists()
 
 
+def test_dry_run_two_stage_image_env_overrides(repo_root, tmp_path, capsys, monkeypatch):
+    """Both stages of a genie->Geant4 transport run can be pinned by env, which
+    is how CI points a two-stage run at the images it just built (the transport
+    stage takes no --image of its own)."""
+    monkeypatch.setenv("GDMLTP_IMAGE_GENIE", "ghcr.io/x/genie:ci")
+    monkeypatch.setenv("GDMLTP_IMAGE_GEANT4", "ghcr.io/x/g4:ci")
+    cfg = config.RunConfig(
+        generator="genie",
+        gdml=str(repo_root / "gdml" / "liquid_argon_1m3.gdml"),
+        beam=config.Beam(particle="nu_mu",
+                         energy=config.Energy(mode="mono", value="2 GeV")),
+        run=config.RunSettings(events=5),
+        genie={"tune": "G18_10a_00_000", "transport": True})
+    run.run_config(cfg, outdir=str(tmp_path), dry_run=True)
+    out = capsys.readouterr().out
+    assert "ghcr.io/x/genie:ci" in out                    # generator stage
+    assert "ghcr.io/x/g4:ci" in out                       # transport stage
+    assert "gdmltargetpractice" not in out                # no published default
+
+
 def test_output_rename(repo_root, tmp_path, monkeypatch):
     """The engine always writes output.root; run.output != output.root renames it."""
     outdir = tmp_path

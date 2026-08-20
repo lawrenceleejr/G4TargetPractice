@@ -25,6 +25,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      # the exact tag the docker-run test below pulls
+      image: ${{ steps.image.outputs.ref }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -77,3 +80,131 @@ jobs:
           # "image builds but gevgen can't run" must be red here, not at a user
           docker run --rm --entrypoint bash "$IMG" -c \
             'set -e; for b in gevgen gntpc gmkspl; do command -v "$b"; done; ! ldd "$(command -v gevgen)" | grep "not found"'
+
+      - name: Publish the pushed tag for the downstream test job
+        id: image
+        run: |
+          echo "ref=$(head -n1 <<< '${{ steps.meta.outputs.tags }}')" >> "$GITHUB_OUTPUT"
+
+  # ---- Docker-based run test: GENIE vertex + Geant4 transport -------------- #
+  #
+  # The two-stage path from the README/docs (docs/neutrino.md, step 4): the
+  # pure-Python front-end chains both images -- GENIE generates the interaction,
+  # Geant4 replays each event's final state through the GDML detector via
+  # /gun/hepmcFile, and the nu_* block is grafted back on. It is the only path
+  # that exercises BOTH images together, so it lives here, after the GENIE image
+  # is published.
+  #
+  # The Geant4 image it transports with is this branch's build when that workflow
+  # has already published it, else the released :main -- both images ship gdmltp,
+  # so a mismatched pair is exactly what we want to catch.
+  docker-run-genie-geant4:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    needs: [docker-genie]
+    # the first run on a new probe/target computes cross-section splines with
+    # gmkspl (cached below, so later runs skip it)
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the gdmltp front-end (it chains the two images)
+        # pure Python -- no ROOT/Geant4/GENIE on the runner; the engines run in
+        # the containers, exactly as on a user's laptop
+        run: pip install -e .
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve the image pair
+        id: images
+        run: |
+          set -euxo pipefail
+          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          BRANCH_TAG="${GITHUB_REF_NAME//\//-}"
+          GEANT4="ghcr.io/$REPO:$BRANCH_TAG"
+          docker pull -q "$GEANT4" || GEANT4="ghcr.io/$REPO:main"
+          docker pull -q "$GEANT4"
+          echo "genie=${{ needs.docker-genie.outputs.image }}" >> "$GITHUB_OUTPUT"
+          echo "geant4=$GEANT4" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the cross-section splines
+        uses: actions/cache@v4
+        with:
+          path: xsec_cache
+          key: genie-xsec-${{ hashFiles('.github/ci/nu_water_transport.yaml') }}
+          # a changed config still restores the old splines: their filename
+          # encodes probe/target/tune/energy, so a non-matching one is ignored
+          restore-keys: genie-xsec-
+
+      - name: Generate with GENIE, transport with Geant4 (two images, one command)
+        env:
+          # --image only sets the FIRST stage; these pin every stage, so the
+          # transport runs in the image resolved above rather than the default
+          GDMLTP_IMAGE_GENIE: ${{ steps.images.outputs.genie }}
+          GDMLTP_IMAGE_GEANT4: ${{ steps.images.outputs.geant4 }}
+        run: |
+          set -euxo pipefail
+          mkdir -p nu_out xsec_cache
+          # gmkspl caches its splines in the run directory: seed it from the
+          # GitHub cache so only the first run on a probe/target pays for them
+          cp xsec_cache/gxspl_*.xml nu_out/ 2>/dev/null || true
+          gdmltp run --config .github/ci/nu_water_transport.yaml -o nu_out
+          test -f nu_out/output.root
+
+      - name: Keep the computed splines for the next run
+        # even when the run above failed after gmkspl -- they cost the most and
+        # are independent of whatever broke downstream
+        if: always()
+        run: |
+          mkdir -p xsec_cache
+          cp nu_out/gxspl_*.xml xsec_cache/ 2>/dev/null || true
+          ls -la xsec_cache/ || true
+
+      - name: Validate and analyze the merged ntuple (README commands)
+        env:
+          GEANT4: ${{ steps.images.outputs.geant4 }}
+        run: |
+          set -euxo pipefail
+          gtp() { docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+                             -v "$PWD:/run" -w /run "$@"; }
+          gtp "$GEANT4" validate nu_out/output.root
+          gtp "$GEANT4" analyze nu_out/output.root -o nu_out/analysis
+          test -f nu_out/analysis/summary.txt
+
+      - name: Plot the output ntuple (independent uproot read, inside the image)
+        env:
+          GEANT4: ${{ steps.images.outputs.geant4 }}
+        run: |
+          set -euxo pipefail
+          # --require-nu AND --require-steps together are the hand-off itself:
+          # the generator's interaction record on top of Geant4's transport
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD:/run" -w /run --entrypoint python3 "$GEANT4" \
+            .github/scripts/ci_ntuple_plots.py nu_out/output.root \
+            -o nu_out/plots --label "2 GeV numu -> water" \
+            --min-events 40 --require-steps --require-nu
+
+      - name: Upload the plots and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-run-genie-geant4-plots
+          path: |
+            nu_out/plots/
+            nu_out/analysis/
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,37 @@
+# CI-scale GENIE -> Geant4 run: the two-stage hand-off the README/neutrino guide
+# describe (generator makes the vertex, Geant4 transports the final state, the
+# nu_* block is grafted back on), sized to run inside a GitHub runner.
+#
+# Two deliberate CI-only choices, both physics-honest:
+#   * target: the free PROTON in the water (H-1) rather than a nucleus -- gmkspl
+#     computes the on-demand cross-section splines in minutes instead of the
+#     ~hour a 40-nucleon target costs. examples/nu_argon.yaml is the physics
+#     example (Ar-40); this one exists to exercise the pipeline.
+#   * the vertex sits 5 cm INSIDE the phantom, so the final-state particles have
+#     35 cm of water ahead of them and the transport stage has real steps and
+#     energy deposition to record.
+generator: genie
+
+geometry:
+  gdml: gdml/water_phantom_30cm.gdml
+
+beam:
+  particle: nu_mu
+  energy:
+    mode: mono
+    value: "2.0 GeV"
+  position: "0 0 5 cm"
+  direction: "0 0 1"
+
+run:
+  events: 40
+  output: output.root
+  seed: 12345
+
+genie:
+  tune: G18_10a_00_000
+  cross_sections: auto        # on-demand gmkspl, cached in the run directory
+  event_generator_list: Default
+  length_units: cm
+  target: 1000010010          # free proton (the H in H2O)
+  transport: true             # GENIE vertex -> Geant4 transport -> merged ntuple

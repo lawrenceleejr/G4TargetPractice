@@ -402,7 +402,7 @@ GDMLTargetPractice/
 ├── gdml/                    # example GDML geometries
 ├── macros/                  # example Geant4 macros + README (branch reference)
 ├── tests/                   # pytest suite (pure Python; no Geant4/GENIE/Docker needed)
-└── .github/workflows/       # CI: python tests, geant4 build+integration, image builds
+└── .github/                 # CI: workflows/, plus ci/ + scripts/ for the docker-run tests
 ```
 
 ## Development & tests
@@ -421,6 +421,20 @@ full YAML→macro→engine→analyze integration, and publishes the Geant4 image
 if both pass. The GENIE image and the Celeritas image build in separate
 workflows.
 
+**Docker-run tests.** After each image is published, CI runs it the way this
+README does — `docker run <image> run --config <yaml>`, then `validate` and
+`analyze` — and plots the resulting ntuple, keeping the plots + reports as job
+artifacts:
+
+| Job | What it runs |
+|---|---|
+| `docker-run-geant4` (Build, Test, Deploy) | pure Geant4: `examples/water_proton.yaml` on the image just pushed |
+| `docker-run-genie-geant4` (Build GENIE Image) | the two-stage hand-off: GENIE vertex + Geant4 transport (`.github/ci/nu_water_transport.yaml`), driven by the front-end chaining both images |
+
+Plots come from `.github/scripts/ci_ntuple_plots.py`, which reads `output.root`
+with uproot only (no `gdmltp` import) so it checks the shipped image's ntuple
+independently of the library that wrote it.
+
 ## Building from source (Geant4)
 
 Requires Geant4 ≥ 11 with GDML support and ROOT:
@@ -433,6 +447,19 @@ cmake ../g4sim/ && cmake --build .
 
 Docker images are built from the checked-in `docker/geant4.Dockerfile` (and
 `docker/geant4-celeritas.Dockerfile`, `docker/genie.Dockerfile`).
+
+**Pinning images.** `gdmltp run --image IMG` sets the image of the *first*
+stage. To pin every stage — including the Geant4 transport stage of a two-stage
+`transport: true` run — set `GDMLTP_IMAGE_GEANT4` / `GDMLTP_IMAGE_GENIE` /
+`GDMLTP_IMAGE_ACHILLES` / `GDMLTP_IMAGE_PYTHIA`:
+
+```bash
+export GDMLTP_IMAGE_GEANT4=ghcr.io/lawrenceleejr/gdmltargetpractice:my-branch
+gdmltp run --config examples/nu_argon_nubig_g1802a.yaml -o out   # both stages pinned
+```
+
+That is how the docker-run CI jobs test a freshly built image pair instead of
+the published `:main` defaults.
 
 ## Physics
 
