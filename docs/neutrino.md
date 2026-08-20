@@ -12,6 +12,10 @@ the engines run in containers that `gdmltp run` pulls automatically).
 
 ## 1. Generate: the same beam and target, four engines
 
+Each of these is a **full run**: the generator makes the interaction and Geant4
+transports its final state through the geometry (§4). The `gdmltp` front-end
+chains the two containers; from bare `docker run` it is two commands.
+
 ```bash
 # GENIE (neutrino event generator; the reference for oscillation-experiment physics)
 gdmltp run --config examples/nu_argon.yaml -o genie_out

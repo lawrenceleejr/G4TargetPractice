@@ -246,18 +246,26 @@ def _here(outdir):
 
 
 def _no_engine_error(outdir, image):
+    """The generator ran but Geant4 cannot: say so, and give the command that
+    finishes the run. Worded for where we actually are -- inside a generator
+    image (no g4sim in it) or on a host asked for --local without a build."""
+    in_image = os.path.exists("/app/entrypoint.sh")
+    why = ("this image ships no Geant4 engine" if in_image else
+           "there is no g4sim on PATH for --local")
     return RuntimeError(
-        f"the generator stage finished, but this image ships no Geant4 engine, "
-        f"so the transport stage cannot run here.\n"
+        f"the generator stage finished, but {why}, so the transport stage "
+        f"cannot run here.\n"
         f"Its inputs are ready in {outdir} ({handoff.EVENT_FILE}, "
-        f"{handoff.STAGE_SPEC}); finish the run with a Geant4 image:\n"
+        f"{handoff.STAGE_SPEC}); finish the run in a Geant4 image:\n"
         f"    docker run --rm --user \"$(id -u):$(id -g)\" -e HOME=/tmp \\\n"
         f"        -v \"$PWD:/run\" -w /run {image} transport -o {_here(outdir)}\n"
-        f"or run the whole thing from the host front-end, which chains the two "
-        f"images itself:\n"
-        f"    gdmltp run --config <config> -o {_here(outdir)}\n"
-        f"(add --stage generator to this command to make stopping here the "
-        f"intended outcome rather than an error)")
+        + (f"or run the whole thing from the host front-end, which chains the "
+           f"two images itself:\n"
+           f"    gdmltp run --config <config> -o {_here(outdir)}\n"
+           if in_image else
+           f"or drop --local so the transport stage runs in {image}.\n")
+        + f"(add --stage generator to make stopping here the intended outcome "
+          f"rather than an error)")
 
 
 def _transport_stage(cfg, prep, outdir, local, dry_run, stage="full"):
