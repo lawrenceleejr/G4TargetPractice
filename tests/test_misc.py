@@ -30,3 +30,19 @@ def test_generate_macro_field_and_order():
 def test_generate_macro_no_field():
     mac = run.generate_macro("geo.gdml")
     assert "setGlobalField" not in mac
+
+
+def test_no_test_module_imports_the_tests_package():
+    """`from tests.conftest import ...` resolves under `python -m pytest` (the
+    repo root lands on sys.path) but NOT under CI's bare `pytest tests/`, so it
+    is a green-locally / red-in-CI trap. pytest already exposes tests/conftest.py
+    as the top-level module `conftest`; use that."""
+    import pathlib
+    offenders = []
+    for f in sorted(pathlib.Path(__file__).parent.glob("test_*.py")):
+        for i, line in enumerate(f.read_text().splitlines(), 1):
+            stripped = line.strip()
+            if stripped.startswith(("from tests.", "import tests.")):
+                offenders.append(f"{f.name}:{i}: {stripped}")
+    assert not offenders, (
+        "import from `conftest`, not `tests.conftest`:\n  " + "\n  ".join(offenders))

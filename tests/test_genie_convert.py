@@ -249,7 +249,7 @@ def test_event_weight_is_carried_from_gst(tmp_path):
     reweighting knob it is not 1, and every rate computed downstream is wrong if
     it is dropped."""
     import uproot
-    from tests.conftest import write_synthetic_gst
+    from conftest import write_synthetic_gst
 
     gst = write_synthetic_gst(tmp_path / "w.gst.root", n_events=12, seed=3)
     with uproot.open(gst) as f:
@@ -267,7 +267,7 @@ def test_event_weight_defaults_to_one_without_a_wght_branch(tmp_path):
     """An unweighted gst has no wght branch; that means weight 1, not 0 -- a
     zero would silently annihilate every event downstream."""
     import uproot
-    from tests.conftest import write_synthetic_gst
+    from conftest import write_synthetic_gst
 
     gst = write_synthetic_gst(tmp_path / "nw.gst.root", n_events=5, seed=4,
                               weights=False)
@@ -283,7 +283,7 @@ def test_fixed_ray_places_and_orients_the_events(tmp_path):
     mode always vertexes at (0,0,0) along +z, so the converter has to move and
     rotate the event. The interaction KINEMATICS must be untouched."""
     import uproot
-    from tests.conftest import write_synthetic_gst
+    from conftest import write_synthetic_gst
 
     gst = write_synthetic_gst(tmp_path / "r.gst.root", n_events=8, seed=11)
     plain, moved, turned = (tmp_path / f"{n}.root" for n in ("plain", "moved", "turned"))
