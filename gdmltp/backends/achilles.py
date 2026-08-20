@@ -14,10 +14,11 @@ import json
 from pathlib import Path
 
 from .base import Backend, Prepared
+from .. import images
 from ..config import ConfigError
 from .genie import infer_target, _as_pdg
 
-ACHILLES_IMAGE = "ghcr.io/lawrenceleejr/g4targetpractice-achilles:main"
+ACHILLES_IMAGE = images.image("achilles")
 JOB_FILE = "achilles_job.json"
 BEAM_FILE = "beam.dat"
 

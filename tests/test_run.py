@@ -37,7 +37,7 @@ def test_dry_run_docker_command(repo_root, tmp_path, capsys):
     run.run_config(_geant4_cfg(repo_root), outdir=str(tmp_path), dry_run=True)
     out = capsys.readouterr().out
     assert "docker run --rm --init" in out
-    assert "g4targetpractice:main" in out          # default geant4 image
+    assert "gdmltargetpractice:main" in out          # default geant4 image
     assert "gdmltp_run.mac" in out
     assert "CELER_DISABLE" not in out               # no field -> no offload disable
 
@@ -51,7 +51,7 @@ def test_dry_run_field_sets_celer_disable(repo_root, tmp_path, capsys):
 def test_dry_run_celeritas_image(repo_root, tmp_path, capsys):
     run.run_config(_geant4_cfg(repo_root, celeritas=True),
                    outdir=str(tmp_path), dry_run=True)
-    assert "g4targetpractice:main-celeritas" in capsys.readouterr().out
+    assert "gdmltargetpractice:main-celeritas" in capsys.readouterr().out
 
 
 def test_dry_run_genie_dispatch(repo_root, tmp_path, capsys):
@@ -63,7 +63,7 @@ def test_dry_run_genie_dispatch(repo_root, tmp_path, capsys):
         run=config.RunSettings(events=5), genie={"tune": "G18_10a_00_000"})
     run.run_config(cfg, outdir=str(tmp_path), dry_run=True)
     out = capsys.readouterr().out
-    assert "g4targetpractice-genie:main" in out
+    assert "gdmltargetpractice-genie:main" in out
     assert "genie_job.json" in out
     assert (tmp_path / "genie_job.json").exists()
 

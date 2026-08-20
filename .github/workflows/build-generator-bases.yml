@@ -114,8 +114,11 @@ jobs:
           # rebuild every layer from scratch (so the patched GENIE is actually
           # compiled in); it then repopulates buildcache2 and later edits are
           # incremental again.
-          cache-from: type=registry,ref=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:buildcache2
-          cache-to: type=registry,ref=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:buildcache2,mode=max
+          # Renamed with the repository: the first build after the rename is a
+          # cache MISS (the ref does not exist yet) and so runs cold, then
+          # populates it. A miss is a slow build, not a failure.
+          cache-from: type=registry,ref=ghcr.io/lawrenceleejr/gdmltargetpractice-genie-base:buildcache2
+          cache-to: type=registry,ref=ghcr.io/lawrenceleejr/gdmltargetpractice-genie-base:buildcache2,mode=max
 
   achilles-base:
     runs-on: ubuntu-latest

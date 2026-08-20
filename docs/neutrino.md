@@ -6,7 +6,7 @@ so generating, validating, and comparing neutrino interactions is a
 three-command workflow. This page walks the canonical study: **2 GeV νμ on
 liquid argon**.
 
-Requirements: Docker + `pip install "git+https://github.com/lawrenceleejr/G4TargetPractice"`
+Requirements: Docker + `pip install "git+https://github.com/lawrenceleejr/GDMLTargetPractice"`
 (the frontend is pure Python — no ROOT, no Geant4, no GENIE on your machine;
 the engines run in containers that `gdmltp run` pulls automatically).
 

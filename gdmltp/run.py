@@ -17,7 +17,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from . import config, backends
+from . import config, backends, images
 from .backends.geant4 import DEFAULT_IMAGE, build_macro
 
 # Geant4 prints "--> Event N" (or "Event N starts") per printProgress modulo;
@@ -289,6 +289,12 @@ def run_config(cfg, image=None, outdir=".", local=False, dry_run=False):
     _stage_gdml(cfg, outdir)
 
     backend = backends.get(cfg.generator)
+    # An explicitly pinned image from a retired repository pulls fine and then
+    # silently behaves like an old release -- say so rather than let the user
+    # debug the symptoms.
+    stale = images.retired_repo_warning(image)
+    if stale:
+        print(f"[gdmltp] WARNING: {stale}")
     prep = backend.prepare(cfg, outdir, image=image)
 
     if not cfg.mac and (outdir / "gdmltp_run.mac").exists() and cfg.generator == "geant4":

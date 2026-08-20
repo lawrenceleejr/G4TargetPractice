@@ -9,9 +9,10 @@ import json
 from pathlib import Path
 
 from .base import Backend, Prepared
+from .. import images
 from ..config import ConfigError
 
-GENIE_IMAGE = "ghcr.io/lawrenceleejr/g4targetpractice-genie:main"
+GENIE_IMAGE = images.image("genie")
 JOB_FILE = "genie_job.json"
 BEAM_FILE = "beam.dat"
 

@@ -288,12 +288,12 @@ def test_transport_image_is_the_generator_image_sibling():
     cfg = config.RunConfig(gdml="g.gdml", beam=config.Beam(particle="nu_mu"))
     g4 = geant4.Geant4Backend()
 
-    assert g4.image_for(cfg, generator_image="ghcr.io/o/g4targetpractice-genie:brnch") \
-        == "ghcr.io/o/g4targetpractice:brnch"
-    assert g4.image_for(cfg, generator_image="ghcr.io/o/g4targetpractice-achilles:v2") \
-        == "ghcr.io/o/g4targetpractice:v2"
-    assert g4.image_for(cfg, generator_image="ghcr.io/o/g4targetpractice-pythia:main") \
-        == "ghcr.io/o/g4targetpractice:main"
+    assert g4.image_for(cfg, generator_image="ghcr.io/o/gdmltargetpractice-genie:brnch") \
+        == "ghcr.io/o/gdmltargetpractice:brnch"
+    assert g4.image_for(cfg, generator_image="ghcr.io/o/gdmltargetpractice-achilles:v2") \
+        == "ghcr.io/o/gdmltargetpractice:v2"
+    assert g4.image_for(cfg, generator_image="ghcr.io/o/gdmltargetpractice-pythia:main") \
+        == "ghcr.io/o/gdmltargetpractice:main"
     # untagged, and a registry with a port (the ":" is not a tag separator)
     assert g4.image_for(cfg, generator_image="myrepo/thing-genie") == "myrepo/thing"
     assert g4.image_for(cfg, generator_image="reg:5000/thing-genie") == "reg:5000/thing"
@@ -304,8 +304,8 @@ def test_transport_image_is_the_generator_image_sibling():
     # an explicit geant4.image always wins
     pinned = config.RunConfig(gdml="g.gdml", geant4={"image": "my/engine:1"})
     assert g4.image_for(
-        pinned, generator_image="ghcr.io/o/g4targetpractice-genie:x") == "my/engine:1"
+        pinned, generator_image="ghcr.io/o/gdmltargetpractice-genie:x") == "my/engine:1"
     # celeritas still applies its tag variant on top of the derived image
     celer = config.RunConfig(gdml="g.gdml", geant4={"celeritas": True})
-    assert g4.image_for(celer, generator_image="ghcr.io/o/g4targetpractice-genie:b") \
-        == "ghcr.io/o/g4targetpractice:b-celeritas"
+    assert g4.image_for(celer, generator_image="ghcr.io/o/gdmltargetpractice-genie:b") \
+        == "ghcr.io/o/gdmltargetpractice:b-celeritas"

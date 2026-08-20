@@ -11,13 +11,13 @@ on:
       genie_base:
         description: "GENIE base image"
         required: false
-        default: "ghcr.io/lawrenceleejr/g4targetpractice-genie-base:latest"
+        default: "ghcr.io/lawrenceleejr/gdmltargetpractice-genie-base:latest"
 
 env:
   # Base-image resolution: workflow_dispatch input > repo variable > our own
   # from-source base (built by build-generator-bases.yml so nobody downstream
   # compiles GENIE themselves). Red until that base workflow has published once.
-  GENIE_BASE: ${{ github.event.inputs.genie_base || vars.GENIE_BASE_IMAGE || 'ghcr.io/lawrenceleejr/g4targetpractice-genie-base:latest' }}
+  GENIE_BASE: ${{ github.event.inputs.genie_base || vars.GENIE_BASE_IMAGE || 'ghcr.io/lawrenceleejr/gdmltargetpractice-genie-base:latest' }}
 
 jobs:
   docker-genie:

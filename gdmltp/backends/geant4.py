@@ -9,8 +9,9 @@ import shutil
 from pathlib import Path
 
 from .base import Backend, Prepared
+from .. import images
 
-DEFAULT_IMAGE = "ghcr.io/lawrenceleejr/g4targetpractice:main"
+DEFAULT_IMAGE = images.image("geant4")
 GENERATED_MACRO = "gdmltp_run.mac"
 BEAM_FILE = "beam.dat"
 
@@ -298,11 +299,12 @@ def build_macro(cfg, beam_file=None) -> str:
 
 # Generator images are named "<geant4-repo>-<generator>"; strip the suffix to
 # get the engine image built from the same commit, keeping the tag.
-_GENERATOR_IMAGE_SUFFIXES = ("-genie", "-achilles", "-pythia")
+_GENERATOR_IMAGE_SUFFIXES = tuple(
+    v for v in images.SUFFIXES.values() if v)
 
 
 def _sibling_geant4_image(generator_image):
-    """`ghcr.io/o/g4targetpractice-genie:brnch` -> `ghcr.io/o/g4targetpractice:brnch`.
+    """`ghcr.io/o/gdmltargetpractice-genie:brnch` -> `ghcr.io/o/gdmltargetpractice:brnch`.
     None when `generator_image` is not a recognizable generator sibling (a
     locally-built or renamed image), so the caller falls back to its default."""
     if not generator_image:

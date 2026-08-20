@@ -14,13 +14,13 @@ on:
       pythia_base:
         description: "Pythia base image"
         required: false
-        default: "ghcr.io/lawrenceleejr/g4targetpractice-pythia-base:latest"
+        default: "ghcr.io/lawrenceleejr/gdmltargetpractice-pythia-base:latest"
 
 env:
   # Base-image resolution: workflow_dispatch input > repo variable > our own
   # from-source base (built by build-generator-bases.yml so nobody downstream
   # compiles Pythia themselves). Red until that base workflow has published once.
-  PYTHIA_BASE: ${{ github.event.inputs.pythia_base || vars.PYTHIA_BASE_IMAGE || 'ghcr.io/lawrenceleejr/g4targetpractice-pythia-base:latest' }}
+  PYTHIA_BASE: ${{ github.event.inputs.pythia_base || vars.PYTHIA_BASE_IMAGE || 'ghcr.io/lawrenceleejr/gdmltargetpractice-pythia-base:latest' }}
 
 jobs:
   docker-pythia:

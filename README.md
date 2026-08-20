@@ -7,9 +7,18 @@ front-end (a YAML config or CLI flags), one common output ntuple, and the same
 analysis/visualization tools regardless of which engine ran. No local install —
 just Docker.
 
-> Formerly **G4TargetPractice**. The Python package moved from `g4tp` to
-> `gdmltp`; `import g4tp` and the `g4tp` command still work as deprecated
-> aliases.
+> Formerly **G4TargetPractice**. The rename is complete: the repository is
+> `GDMLTargetPractice`, the Python package moved from `g4tp` to `gdmltp`, and the
+> container images from `ghcr.io/lawrenceleejr/gdmltargetpractice*` to
+> `ghcr.io/lawrenceleejr/gdmltargetpractice*`. `import g4tp` and the `g4tp`
+> command still work as deprecated aliases.
+>
+> **The old image repositories are frozen, not aliases.** GHCR left
+> `g4targetpractice*` behind as separate packages when the repository was
+> renamed, so they stopped receiving pushes: `g4targetpractice:main` is a
+> **May 2026** build. Pinning one gets you a stale engine — for example one with
+> no `/gun/hepmcFile`, which makes a generator→Geant4 hand-off fail. Use the
+> `gdmltargetpractice*` names.
 
 ## The idea
 
@@ -39,13 +48,13 @@ with a single `docker run`. No macros, no local build. Clone the repo (so you
 have the example YAMLs and geometries) and run from its root.
 
 ```bash
-git clone https://github.com/lawrenceleejr/G4TargetPractice && cd G4TargetPractice
+git clone https://github.com/lawrenceleejr/GDMLTargetPractice && cd GDMLTargetPractice
 
 # one image per backend (all on GHCR; :main is the released tag)
-GEANT4=ghcr.io/lawrenceleejr/g4targetpractice:main
-GENIE=ghcr.io/lawrenceleejr/g4targetpractice-genie:main
-ACHILLES=ghcr.io/lawrenceleejr/g4targetpractice-achilles:main
-PYTHIA=ghcr.io/lawrenceleejr/g4targetpractice-pythia:main
+GEANT4=ghcr.io/lawrenceleejr/gdmltargetpractice:main
+GENIE=ghcr.io/lawrenceleejr/gdmltargetpractice-genie:main
+ACHILLES=ghcr.io/lawrenceleejr/gdmltargetpractice-achilles:main
+PYTHIA=ghcr.io/lawrenceleejr/gdmltargetpractice-pythia:main
 
 # a tiny wrapper: mounts the repo, and runs as YOU so outputs are owned by you
 # (not root), with a writable HOME for in-container caches
@@ -127,7 +136,7 @@ the display writes `scene.json` + `build_blend.py` and prints the one command
 to turn them into the `.blend`. `display --image $GEANT4 …` runs the whole
 display in the container for you.
 
-**Prefer your laptop?** `pip install "gdmltp @ git+https://github.com/lawrenceleejr/G4TargetPractice"`
+**Prefer your laptop?** `pip install "gdmltp @ git+https://github.com/lawrenceleejr/GDMLTargetPractice"`
 installs the thin front-end (pure Python, **no ROOT**). Then `gdmltp run
 --config …` launches the right container for you and handles multi-stage runs
 (e.g. generator→Geant4 transport); `gdmltp display …` builds the Blender scene
@@ -244,16 +253,18 @@ gdmltp run --generator genie --gdml gdml/liquid_argon_1m3.gdml --particle nu_mu 
 
 | Backend | Image | Status |
 |---|---|---|
-| `geant4` | `ghcr.io/lawrenceleejr/g4targetpractice` | full transport |
-| `genie` | `ghcr.io/lawrenceleejr/g4targetpractice-genie` | neutrino vertices (v1) |
-| `achilles` | `ghcr.io/lawrenceleejr/g4targetpractice-achilles` | ν / e∓ vertices (v1) |
-| `pythia` | `ghcr.io/lawrenceleejr/g4targetpractice-pythia` | Pythia 8 free-nucleon collisions; TeV DIS with no splines |
+| `geant4` | `ghcr.io/lawrenceleejr/gdmltargetpractice` | full transport |
+| `genie` | `ghcr.io/lawrenceleejr/gdmltargetpractice-genie` | neutrino vertices (v1) |
+| `achilles` | `ghcr.io/lawrenceleejr/gdmltargetpractice-achilles` | ν / e∓ vertices (v1) |
+| `pythia` | `ghcr.io/lawrenceleejr/gdmltargetpractice-pythia` | Pythia 8 free-nucleon collisions; TeV DIS with no splines |
 | `decay` | the geant4 image | BSM decay-in-flight **by Geant4** (G4DecayTable + G4Decay), one stage incl. transport |
 | `external` | *(none — host conversion)* | HepMC3 events from Pythia8/MadGraph etc.; `transport: true` uses the geant4 image |
 
 `gdmltp run` picks the image automatically from the `generator`; override with
-`--image`. (Image repositories keep the `g4targetpractice` name until the GitHub
-repository itself is renamed.)
+`--image`. Every image is published from `ghcr.io/lawrenceleejr/gdmltargetpractice`
+(the repository name, lowercased) with a tag per branch plus `main`, so
+`--image …-genie:<branch>` and the engine image the transport stage derives from
+it always come from the same commit.
 
 > **Nobody compiles generators.** GENIE, Achilles and Pythia 8 are built **from source in
 > CI** into dedicated base images (`docker/genie-base.Dockerfile`: Pythia6 →

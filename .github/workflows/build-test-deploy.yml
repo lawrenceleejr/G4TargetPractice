@@ -29,6 +29,32 @@ jobs:
       - name: Run unit test suite
         run: pytest tests/ -v
 
+      - name: Image names match the repository CI publishes to
+        # The failure this catches is silent: renaming the GitHub repository
+        # moves CI's pushes (images: ghcr.io/${{ github.repository }}) while the
+        # code keeps asking for the old name, which GHCR leaves behind as a
+        # separate FROZEN package. docker pull still succeeds and quietly serves
+        # a months-old engine -- that is how a g4sim with no /gun/hepmcFile got
+        # used and broke the generator->Geant4 hand-off. Assert the stem here.
+        env:
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import os, sys
+          from gdmltp import images
+          want = f"ghcr.io/{os.environ['GH_REPOSITORY'].lower()}"
+          print(f"code stem: {images.STEM}\nCI pushes: {want}")
+          if images.STEM != want:
+              print(f"::error::gdmltp/images.py STEM is {images.STEM!r} but CI "
+                    f"publishes to {want!r}. Update REPO/OWNER in "
+                    f"gdmltp/images.py (and the base-image names in "
+                    f"docker/*.Dockerfile and the generator workflows).")
+              sys.exit(1)
+          # every published suffix must resolve to a real package name
+          for generator in images.SUFFIXES:
+              print(" ", generator, "->", images.image(generator))
+          PY
+
       - name: Deprecated g4tp alias still imports
         run: python -c "import warnings; warnings.simplefilter('ignore'); import g4tp; from g4tp import cli, io; from g4tp.backends import genie_convert; print('g4tp shim OK', g4tp.__version__)"
 
