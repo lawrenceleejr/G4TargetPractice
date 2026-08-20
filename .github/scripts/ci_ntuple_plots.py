@@ -120,10 +120,13 @@ def main(argv=None):
     label = a.label.replace("->", r"$\rightarrow$")
     tag = f" ({label})" if label else ""
 
-    t = uproot.open(a.root)["tree"]
+    f = uproot.open(a.root)
+    classname = f.classnames().get("tree;1", "?")
+    t = f["tree"]
     have = {k.split(";")[0] for k in t.keys()}
     n = t.num_entries
     lines = [f"file:     {a.root}",
+             f"format:   {classname}",
              f"events:   {n}",
              f"branches: {len(have)}"]
 
@@ -176,6 +179,11 @@ def main(argv=None):
 
     # --- requirements: what this CI job claims the docker run produced ------- #
     fails = []
+    # a TTree is part of the contract: uproot reads an RNTuple happily, but
+    # `root output.root` cannot, so a format slip is invisible without this
+    if classname != "TTree":
+        fails.append(f"'tree' is a {classname}, not a TTree "
+                     f"(plain ROOT cannot open it)")
     if n < a.min_events:
         fails.append(f"only {n} events (need >= {a.min_events})")
     if edep.size and not (edep > 0).any():

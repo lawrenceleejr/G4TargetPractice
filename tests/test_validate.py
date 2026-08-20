@@ -7,7 +7,7 @@ one) and a regression can't hide behind another check tripping first.
 import numpy as np
 import uproot
 
-from gdmltp import validate as val
+from gdmltp import io, validate as val
 from conftest import write_synthetic_gst
 
 
@@ -19,8 +19,7 @@ def _rewrite(src, dst, drop=(), **overrides):
     for k in drop:
         data.pop(k, None)
     data.update(overrides)
-    with uproot.recreate(str(dst)) as f:
-        f["tree"] = data
+    io.write_tree(dst, data)
     return str(dst)
 
 

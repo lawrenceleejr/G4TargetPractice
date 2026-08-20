@@ -240,6 +240,46 @@ jobs:
           python3 -c "import uproot,sys; t=uproot.open('output.root')['tree']; import numpy as np; pdg=t['primaryPDG'].array(library='np'); print('primaries',pdg.tolist()); sys.exit(0 if (t.num_entries==2 and (pdg==2212).all()) else 1)"
           rm -f output.root pdg.mac
 
+      - name: Python-written ntuples must open in REAL ROOT as a TTree
+        # The regression this guards: uproot 5.7 writes an RNTuple for
+        # `f["tree"] = data`, which uproot itself reads back fine (so every
+        # Python test passes) while `root output.root` reports
+        #   Error in <TKey::ReadObj>: Unknown class ROOT::RNTuple
+        # This container has ROOT, so the check is the real thing, not a proxy.
+        run: |
+          python3 - << 'PY'
+          import numpy as np, awkward as ak
+          from gdmltp import io
+          io.write_tree("pywritten.root", {
+              "eventID": np.arange(4, dtype=np.int32),
+              "primaryE": np.full(4, 150.0),
+              "totalEdep": np.linspace(1.0, 4.0, 4),
+              "trk_pdg": ak.Array([[11, 22], [2212], [], [13]]),
+              # jagged strings: uproot cannot put vector<string> in a TTree, so
+              # these become int codes + the gdmltp_strings legend
+              "trk_creatorProcess": ak.Array([["Primary", "eBrem"], ["Decay"],
+                                              [], ["Primary"]]),
+          })
+          print("wrote pywritten.root")
+          PY
+          root -l -b -q '.github/scripts/check_ttree.C("pywritten.root", 4)' \
+            > root_check.log 2>&1 || { cat root_check.log; exit 1; }
+          cat root_check.log
+          if grep -q "Unknown class" root_check.log; then
+            echo "ROOT could not read a class in the file (RNTuple?)" >&2
+            exit 1
+          fi
+          grep -q "holds a classic TTree" root_check.log
+          # and the round trip our own tools rely on
+          python3 -c "
+          from gdmltp import io
+          import awkward as ak
+          assert io.string_legend('pywritten.root')['trk_creatorProcess'] == ['Decay', 'Primary', 'eBrem']
+          got = ak.to_list(io.read_string_branch('pywritten.root', 'trk_creatorProcess'))
+          assert got == [['Primary', 'eBrem'], ['Decay'], [], ['Primary']], got
+          print('legend round-trip OK')"
+          rm -f pywritten.root root_check.log
+
       - name: Integration - YAML config -> macro -> g4sim -> analyze
         # Gating end-to-end check of the whole common frontend against the real
         # engine (gdmltp installed in the container two steps up).
@@ -248,6 +288,9 @@ jobs:
           python3 -m gdmltp run --config examples/water_proton.yaml --local -n 5 -o run_out
           test -f run_out/output.root
           python3 -m gdmltp validate run_out/output.root
+          root -l -b -q '.github/scripts/check_ttree.C("run_out/output.root", 5)' \
+            > g4_root_check.log 2>&1 || { cat g4_root_check.log; exit 1; }
+          grep -q "holds a classic TTree" g4_root_check.log
           python3 -m gdmltp analyze run_out/output.root -o run_out/analysis
           test -f run_out/analysis/summary.txt
           # Twiss phase-space beam end to end (host samples -> beam.dat -> /gun/beamFile)

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from gdmltp import analyze
+from gdmltp import io, analyze
 
 
 def test_longitudinal_profile_units_and_shape(synth_root):
@@ -100,11 +100,10 @@ def test_spectrum_beam_normalization(tmp_path):
         w = rng.gamma(2.0, 1.0, m)
         se.append((w / w.sum() * E0[i]).astype(np.float64))  # fully absorbed
     p = tmp_path / "spec.root"
-    with uproot.recreate(p) as f:
-        f["tree"] = {"primaryE": E0, "totalEdep": E0.copy(),
-                     "primaryStartZ": np.full(n, z0_mm),
-                     "primaryStartPz": np.full(n, -1.0),
-                     "step_z": ak.Array(sz), "step_edep": ak.Array(se)}
+    io.write_tree(p, {"primaryE": E0, "totalEdep": E0.copy(),
+                      "primaryStartZ": np.full(n, z0_mm),
+                      "primaryStartPz": np.full(n, -1.0),
+                      "step_z": ak.Array(sz), "step_edep": ak.Array(se)})
     _, _, absorbed, stats = analyze.longitudinal_profile(str(p), verbose=False)
     assert stats["absorbed_fraction"] <= 1.0 + 1e-9
     assert stats["absorbed_fraction"] > 0.95        # everything was deposited
@@ -114,10 +113,9 @@ def test_summarize_without_totaledep_does_not_fabricate_leakage(tmp_path):
     """A trimmed file without totalEdep must not claim '100% leakage'."""
     import uproot
     p = tmp_path / "trimmed.root"
-    with uproot.recreate(p) as f:
-        f["tree"] = {"eventID": np.arange(5, dtype=np.int32),
-                     "primaryE": np.full(5, 1000.0),
-                     "primaryPDG": np.full(5, 11, np.int32)}
+    io.write_tree(p, {"eventID": np.arange(5, dtype=np.int32),
+                      "primaryE": np.full(5, 1000.0),
+                      "primaryPDG": np.full(5, 11, np.int32)})
     out = analyze.summarize(str(p), outdir=tmp_path / "out", make_plots=False)
     text = (out / "summary.txt").read_text()
     assert "leakage" not in text

@@ -427,11 +427,33 @@ animated Blender export.
 
 ## Output
 
-Each run writes `output.root` (TTree `tree`, one entry per event) with **event
-scalars**, **per-track vectors** `trk_*`, **per-step vectors** `step_*`, and — for
-neutrino runs — a `nu_*` interaction block (CC/NC, vertex, struck nucleus,
-outgoing lepton, Q²/W/x/y). Units are Geant4-internal: **mm, MeV, ns, MeV/c**.
-See `macros/README.md` for the full branch reference.
+Each run writes `output.root` (**a classic ROOT TTree** named `tree`, one entry
+per event) with **event scalars**, **per-track vectors** `trk_*`, **per-step
+vectors** `step_*`, and — for neutrino runs — a `nu_*` interaction block (CC/NC,
+vertex, struck nucleus, outgoing lepton, Q²/W/x/y). Units are Geant4-internal:
+**mm, MeV, ns, MeV/c**. See `macros/README.md` for the full branch reference.
+
+**Always a TTree, never an RNTuple.** `root output.root` and RDataFrame open
+every file this project writes, whichever engine produced it. (uproot ≥ 5.7
+writes an RNTuple for the natural `f["tree"] = data` spelling — readable by
+uproot, but `Unknown class ROOT::RNTuple` in ROOT — so the Python writers go
+through `gdmltp.io.write_tree`, which uses `mktree`. CI opens the output with
+real ROOT to keep it that way.)
+
+**Process names.** uproot cannot write `std::vector<std::string>` into a TTree,
+so in files written on the Python side (generator vertex records and the merged
+generator+transport output) `trk_creatorProcess` and `step_process` hold **int32
+codes**, with a small `gdmltp_strings` legend tree in the same file mapping
+(branch, code) → name. Files written by g4sim keep real strings. Either way
+`gdmltp` decodes transparently — `io.read_string_branch(path, name)` and
+`io.load_events` return names — and from ROOT you read the codes plus the
+legend:
+
+```cpp
+root output.root
+tree->Scan("trk_creatorProcess")        // codes
+gdmltp_strings->Scan("branch:code:value")   // what they mean
+```
 
 ## Analysis & Event Display
 

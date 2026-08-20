@@ -1,4 +1,4 @@
-from gdmltp import compare
+from gdmltp import io, compare
 
 
 def test_compare_end_to_end(synth_pair, tmp_path):
@@ -27,8 +27,7 @@ def test_compare_negative_leakage_does_not_crash(tmp_path):
         data = {k.split(";")[0]: f["tree"][k.split(";")[0]].array()
                 for k in f["tree"].keys()}
     data["totalEdep"] = np.asarray(data["primaryE"]) * 1.02
-    with uproot.recreate(str(b)) as f:
-        f["tree"] = data
+    io.write_tree(b, data)
     out = compare.compare(a, str(b), labels=("A", "B"), outdir=tmp_path / "cmp")
     assert (out / "leakage.png").exists()
 

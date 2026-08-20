@@ -12,6 +12,7 @@ import awkward as ak
 import uproot
 import pytest
 
+from gdmltp import io
 from gdmltp.io import MM_PER_CM
 
 
@@ -121,8 +122,9 @@ def write_synthetic(path, n_events=30, e0_mev=50000.0, x0_cm=3.0,
             "nu_q0": rng2.gamma(2.0, 300.0, n_events),
         })
 
-    with uproot.recreate(path) as f:
-        f["tree"] = data
+    # the same writer the package uses, so fixtures are classic TTrees with the
+    # process names stored exactly as a real run stores them
+    io.write_tree(path, data)
     return str(path)
 
 
@@ -193,8 +195,7 @@ def write_synthetic_gst(path, n_events=25, seed=0):
         "pdgf": ak.Array(pdgf), "Ef": ak.Array(Ef),
         "pxf": ak.Array(pxf), "pyf": ak.Array(pyf), "pzf": ak.Array(pzf),
     }
-    with uproot.recreate(path) as f:
-        f["gst"] = data
+    io.write_tree(path, data, tree="gst")
     return str(path)
 
 
@@ -281,9 +282,8 @@ def synth_nu(tmp_path_factory):
 def empty_root(tmp_path_factory):
     """A tree with the scalar schema but zero entries."""
     p = tmp_path_factory.mktemp("empty") / "empty.root"
-    with uproot.recreate(p) as f:
-        f.mktree("tree", {"eventID": np.int32, "primaryE": np.float64,
-                          "totalEdep": np.float64})
+    io.write_tree(p, {"eventID": np.array([], np.int32),
+                      "primaryE": np.array([]), "totalEdep": np.array([])})
     return str(p)
 
 

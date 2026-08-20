@@ -219,6 +219,25 @@ jobs:
           test ! -f half_out/output.root
           test -f half_out/events.hepmc
 
+      - name: The merged ntuple must open in REAL ROOT as a TTree
+        # exactly what a user does after downloading output.root; the Geant4
+        # image ships ROOT, so this runs the genuine reader
+        env:
+          GEANT4: ${{ steps.images.outputs.geant4 }}
+        run: |
+          set -euxo pipefail
+          EVENTS=$(python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG'))['run']['events'])")
+          for out in nu_out bare_out; do
+            docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+              -v "$PWD:/run" -w /run --entrypoint root "$GEANT4" \
+              -l -b -q ".github/scripts/check_ttree.C(\"$out/output.root\", $EVENTS)" \
+              | tee "root_$out.log"
+            grep -q "holds a classic TTree" "root_$out.log"
+            if grep -q "Unknown class" "root_$out.log"; then
+              echo "$out/output.root has a class ROOT cannot read" >&2; exit 1
+            fi
+          done
+
       - name: Validate and analyze the merged ntuple (README commands)
         env:
           GEANT4: ${{ steps.images.outputs.geant4 }}

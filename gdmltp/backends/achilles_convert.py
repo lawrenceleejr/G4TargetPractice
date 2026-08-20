@@ -28,6 +28,7 @@ import tempfile
 import numpy as np
 import awkward as ak
 import uproot
+from ..io import write_tree
 
 from .genie_convert import _empty_jagged, _empty_jagged_str
 from ..masses import mass_mev
@@ -265,8 +266,7 @@ def convert(hepmc_path, out_path, out_tree="tree", beam=None, process_label="Ach
         "nu_Q2": Q2, "nu_W": W, "nu_x": xbj, "nu_y": ybj, "nu_q0": q0,
     }
 
-    with uproot.recreate(out_path) as f:
-        f[out_tree] = data
+    write_tree(out_path, data, tree=out_tree)
     return out_path
 
 
