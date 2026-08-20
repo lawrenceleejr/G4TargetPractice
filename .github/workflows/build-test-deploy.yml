@@ -102,6 +102,7 @@ jobs:
 
       - name: Hand-off HepMC3 smoke (/gun/hepmcFile)
         run: |
+          set -o pipefail          # `g4sim | tee` must not hide a crash
           # Write the hand-off with the official library (pyhepmc), then g4sim
           # reads it back with HepMC3::ReaderAscii -- the real interchange, both
           # ends. Second event carries a vertex time that must reach step times.
@@ -193,6 +194,7 @@ jobs:
         # sections via the C++ API -- it must NOT abort the batch the way the
         # optional /physics_lists/em/Nu* UI commands do in this Geant4 build.
         run: |
+          set -o pipefail          # `g4sim | tee` must not hide a crash
           cat > nubias.mac << 'EOF'
           /gdmltp/neutrinoBias 1e10 1e10 1e10 DefaultRegionForTheWorld
           /detector/readGDML gdml/liquid_argon_1m3.gdml
