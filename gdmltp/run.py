@@ -228,7 +228,7 @@ def _wants_transport(cfg):
         bool(getattr(cfg, cfg.generator).get("transport"))
 
 
-def _transport_stage(cfg, outdir, local, dry_run):
+def _transport_stage(cfg, outdir, local, dry_run, generator_image=None):
     """Stage 2 of the generator->Geant4 hand-off: replay the vertex-level
     events through g4sim (fills step_*/totalEdep/trk_end*), then graft the
     generator's nu_* block + primary identity back on."""
@@ -236,9 +236,13 @@ def _transport_stage(cfg, outdir, local, dry_run):
     from .backends.geant4 import Geant4Backend
 
     g4 = Geant4Backend()
+    # The engine image built from the same commit as the generator image the
+    # first stage used -- not the default tag, which may be older than the
+    # /gun/hepmcFile hand-off itself.
+    g4_image = g4.image_for(cfg, generator_image=generator_image)
     if dry_run:
         print(f"[gdmltp] (dry-run:transport) would replay the generator events "
-              f"through {g4.image_for(cfg)} via /gun/hepmcFile and merge the "
+              f"through {g4_image} via /gun/hepmcFile and merge the "
               f"nu_* block into {cfg.run.output}")
         return
 
@@ -253,7 +257,7 @@ def _transport_stage(cfg, outdir, local, dry_run):
     print(f"[gdmltp] transport: replaying {n} generator event(s) through Geant4 ...")
 
     env = {"CELER_DISABLE": "1"} if cfg.geant4.get("field") else {}
-    _exec_stage([handoff.TRANSPORT_MACRO], g4.image_for(cfg), env,
+    _exec_stage([handoff.TRANSPORT_MACRO], g4_image, env,
                 outdir, local, dry_run=False, label=":transport", events=n)
 
     transported = outdir / "output.root"
@@ -304,7 +308,11 @@ def run_config(cfg, image=None, outdir=".", local=False, dry_run=False):
         prep.post()
 
     if _wants_transport(cfg):
-        _transport_stage(cfg, outdir, local, dry_run)
+        # prep.image is the image the generator stage actually ran in (the
+        # --image the user gave, if any) -- the transport stage derives its
+        # sibling engine image from it.
+        _transport_stage(cfg, outdir, local, dry_run,
+                         generator_image=getattr(prep, "image", None))
         return 0
 
     if executed:

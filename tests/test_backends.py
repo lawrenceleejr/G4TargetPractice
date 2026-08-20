@@ -278,3 +278,34 @@ def test_macro_neutrino_bias_shortcut_never_touches_the_xsec_table():
     assert "/gdmltp/neutrinoBias 1e+12 1e+12 1e+12 DefaultRegionForTheWorld" in mac
     for forbidden in ("xsecBias", "xsecCcBias", "xsecNcBias"):
         assert forbidden not in mac
+
+
+def test_transport_image_is_the_generator_image_sibling():
+    """A generator hand-off runs stage 2 in the ENGINE image built from the same
+    commit as the generator image. Deriving it from --image is what makes
+    `--image <repo>-genie:<branch>` work end to end -- the default engine tag can
+    easily be older than the /gun/hepmcFile hand-off itself."""
+    cfg = config.RunConfig(gdml="g.gdml", beam=config.Beam(particle="nu_mu"))
+    g4 = geant4.Geant4Backend()
+
+    assert g4.image_for(cfg, generator_image="ghcr.io/o/g4targetpractice-genie:brnch") \
+        == "ghcr.io/o/g4targetpractice:brnch"
+    assert g4.image_for(cfg, generator_image="ghcr.io/o/g4targetpractice-achilles:v2") \
+        == "ghcr.io/o/g4targetpractice:v2"
+    assert g4.image_for(cfg, generator_image="ghcr.io/o/g4targetpractice-pythia:main") \
+        == "ghcr.io/o/g4targetpractice:main"
+    # untagged, and a registry with a port (the ":" is not a tag separator)
+    assert g4.image_for(cfg, generator_image="myrepo/thing-genie") == "myrepo/thing"
+    assert g4.image_for(cfg, generator_image="reg:5000/thing-genie") == "reg:5000/thing"
+    # unrecognizable / absent -> the backend default, not a wrong guess
+    assert g4.image_for(cfg, generator_image="some/local-build:latest") == \
+        g4.default_image
+    assert g4.image_for(cfg) == g4.default_image
+    # an explicit geant4.image always wins
+    pinned = config.RunConfig(gdml="g.gdml", geant4={"image": "my/engine:1"})
+    assert g4.image_for(
+        pinned, generator_image="ghcr.io/o/g4targetpractice-genie:x") == "my/engine:1"
+    # celeritas still applies its tag variant on top of the derived image
+    celer = config.RunConfig(gdml="g.gdml", geant4={"celeritas": True})
+    assert g4.image_for(celer, generator_image="ghcr.io/o/g4targetpractice-genie:b") \
+        == "ghcr.io/o/g4targetpractice:b-celeritas"

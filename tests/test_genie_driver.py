@@ -60,6 +60,14 @@ def test_driver_builds_gevgen_and_converts(repo_root, tmp_path, monkeypatch):
     # conversion invoked with the geometry's length units
     assert converted["kw"].get("vtx_units") == "cm"
     assert converted["out"].endswith("output.root")
+    # gevgen point mode ignores source position/axis entirely, so the requested
+    # beam.position / beam.direction must reach the converter -- otherwise every
+    # vertex sits at (0,0,0), usually outside the detector, and the transport
+    # stage that replays them finds nothing to do.
+    assert converted["kw"].get("origin") == "0 0 -50 cm"
+    assert converted["kw"].get("direction") == "0 0 1"
+    assert not any(a in gevgen for a in ("-x", "--vertex")), \
+        "gevgen has no source-position flag here; placement is the converter's job"
 
 
 def test_driver_exp_flux(repo_root, tmp_path, monkeypatch):

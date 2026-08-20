@@ -296,12 +296,44 @@ def build_macro(cfg, beam_file=None) -> str:
     return "\n".join(lines) + "\n"
 
 
+# Generator images are named "<geant4-repo>-<generator>"; strip the suffix to
+# get the engine image built from the same commit, keeping the tag.
+_GENERATOR_IMAGE_SUFFIXES = ("-genie", "-achilles", "-pythia")
+
+
+def _sibling_geant4_image(generator_image):
+    """`ghcr.io/o/g4targetpractice-genie:brnch` -> `ghcr.io/o/g4targetpractice:brnch`.
+    None when `generator_image` is not a recognizable generator sibling (a
+    locally-built or renamed image), so the caller falls back to its default."""
+    if not generator_image:
+        return None
+    repo, sep, tag = generator_image.rpartition(":")
+    if not sep or "/" in tag:          # no tag (a "/" in the "tag" means a port)
+        repo, tag = generator_image, None
+    for suffix in _GENERATOR_IMAGE_SUFFIXES:
+        if repo.endswith(suffix):
+            base = repo[: -len(suffix)]
+            return f"{base}:{tag}" if tag else base
+    return None
+
+
 class Geant4Backend(Backend):
     name = "geant4"
     default_image = DEFAULT_IMAGE
 
-    def image_for(self, cfg) -> str:
-        img = self.default_image
+    def image_for(self, cfg, generator_image=None) -> str:
+        """The g4sim image to use.
+
+        `generator_image` is the image the FIRST stage ran in, when this is the
+        transport half of a generator hand-off. The two images are siblings built
+        from the same commit (`<repo>-genie:TAG` next to `<repo>:TAG`), so a user
+        who selected a generator image with --image means the matching engine
+        too: deriving it here is what makes `--image <...>-genie:<branch>` work
+        end-to-end instead of silently transporting with a stale default tag.
+        `geant4.image` in the config overrides everything.
+        """
+        img = cfg.geant4.get("image") or \
+            _sibling_geant4_image(generator_image) or self.default_image
         if cfg.geant4.get("celeritas"):
             # tag variant: ...:main -> ...:main-celeritas
             if ":" in img:

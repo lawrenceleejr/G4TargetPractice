@@ -163,8 +163,12 @@ def _xsec_args(job, workdir, emax_gev=None):
             _ensure_hedis_sf(job, workdir)
         print(f"[run_genie] no spline file found; generating with gmkspl for "
               f"probe {probe} on {target} (tune {tune}, up to {emax} GeV). "
-              f"This is slow the first time; the result is cached in the run "
-              f"directory.", flush=True)
+              f"EXPECT 10-30 MINUTES for a nuclear target -- gmkspl integrates "
+              f"every channel at 100 knots, and it is not hung. The result is "
+              f"cached as {out.name} in the run directory, so reruns and other "
+              f"energies below {emax} GeV are instant. Pre-seed it instead by "
+              f"pointing genie.cross_sections at a prebuilt gxspl XML.",
+              flush=True)
         cmd = ["gmkspl", "-p", f"{probe},{-probe}", "-t", str(target),
                "-n", "100", "-e", str(emax), "--tune", tune]
         if hedis:
@@ -205,7 +209,14 @@ def run(job_path):
     subprocess.run(["gntpc", "-i", ghep, "-f", "gst", "-o", gst], cwd=workdir, check=True)
     print("[run_genie] converting gst -> output.root ...", flush=True)
     from gdmltp.backends import genie_convert
-    genie_convert.convert(gst, str(workdir / out), vtx_units=vtx_units)
+    # gevgen point mode has no source position or axis: it puts every vertex at
+    # the origin and fires along +z. Hand the requested beam.position /
+    # beam.direction to the converter so the events land where the config asked
+    # -- otherwise they sit at (0,0,0), typically outside the detector, and a
+    # transport stage sees nothing.
+    genie_convert.convert(gst, str(workdir / out), vtx_units=vtx_units,
+                          origin=job.get("position"),
+                          direction=job.get("direction"))
     print(f"[run_genie] done -> {workdir / out}", flush=True)
     return 0
 

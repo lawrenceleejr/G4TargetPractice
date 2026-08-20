@@ -153,6 +153,9 @@ def convert(hepmc_path, out_path, out_tree="tree", beam=None, process_label="Ach
         z0 = a0 = -1
     tZ = np.full(n, z0, np.int64); tA = np.full(n, a0, np.int64)
     counts = np.zeros(n, np.int64)
+    # Generator event weight (NuHepMC weights; first entry = nominal). Absent
+    # weights mean unweighted generation, i.e. 1.0.
+    wgt = np.ones(n)
     fs_pdg, fs_kin, fs_p = [], [], []
 
     for i, ev in enumerate(events):
@@ -168,6 +171,8 @@ def convert(hepmc_path, out_path, out_tree="tree", beam=None, process_label="Ach
         if ev["vertex"] is not None:
             vx[i], vy[i], vz[i] = (c * ls for c in ev["vertex"][:3])
             vt[i] = ev["vertex"][3]        # HepMC time unit ~ mm/c; keep raw
+        if ev["weight"] is not None:
+            wgt[i] = float(ev["weight"])
         lep, cc, nc = _out_lepton(int(neu[i]), fs)
         is_cc[i], is_nc[i] = cc, nc
         if lep is not None:
@@ -265,6 +270,10 @@ def convert(hepmc_path, out_path, out_tree="tree", beam=None, process_label="Ach
         "nu_outLeptonE": Elep,
         "nu_outLeptonPx": plep[:, 0], "nu_outLeptonPy": plep[:, 1], "nu_outLeptonPz": plep[:, 2],
         "nu_Q2": Q2, "nu_W": W, "nu_x": xbj, "nu_y": ybj, "nu_q0": q0,
+        # The generator's per-event weight, from the NuHepMC event weights (the
+        # first entry is the nominal one). Events without a weight count as 1.
+        # It must survive into the final ntuple -- rates depend on it.
+        "eventWeight": wgt,
     }
 
     with uproot.recreate(out_path) as f:

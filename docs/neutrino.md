@@ -95,6 +95,27 @@ The result carries generator-quality interaction physics **and** the full
 `step_*`/`totalEdep` transport record — `analyze`, `validate`, `compare`, and
 the event display all just work.
 
+**The generator's event weight rides along.** GENIE's per-event `wght` (and
+Achilles'/Pythia's NuHepMC weight) becomes the `eventWeight` branch, travels to
+Geant4 as the HepMC event weight, and is written back by the merge — so every
+rate or spectrum you compute from the transported file can be weighted
+correctly. Weight 1.0 means unweighted generation, never "the weight was lost".
+
+**Which engine image stage 2 uses.** The generator and engine images are
+siblings built from the same commit (`…-genie:TAG` next to `…:TAG`), so
+`--image …-genie:<branch>` makes the transport stage use `…:<branch>` too.
+Without that, stage 2 would fall back to the default engine tag — which can be
+older than the `/gun/hepmcFile` hand-off itself, and then the run dies on
+`/gun/hepmcFile` being an unknown command. Pin it explicitly with
+`geant4: {image: …}` when the two are not siblings.
+
+**Where the events start.** `gevgen`'s point mode has no notion of a source
+position or axis: it puts every vertex at the origin and fires along +z. The
+converter therefore applies `beam.position` and `beam.direction` itself,
+translating the vertex and rotating the whole final state onto the requested
+axis (kinematics unchanged). Without that, every event would sit at (0,0,0) —
+outside most detectors, so the transport stage would have nothing to do.
+
 ## 5. Look at events
 
 ```bash
@@ -359,7 +380,8 @@ One TTree `tree`, one entry per event; units mm / MeV / ns / MeV/c. Neutrino
 runs fill the `nu_*` block: `nu_isCC/isNC`, `nu_interactionProcess`
 (QES/RES/DIS/COH/MEC), vertex, struck nucleus (Z, A), outgoing lepton
 (PDG, E, p), Q²/W/x/y/q₀ (Q² in MeV²) and `nu_nOscillations` (Geant4 only;
-external generators write 0). Final-state particles are `trk_*`
+external generators write 0). Generator runs also carry `eventWeight` — the
+generator's per-event weight, preserved through the transport hand-off. Final-state particles are `trk_*`
 rows (kinetic `trk_startE`, production momenta `trk_px/py/pz`);
 transported files add `step_*` and `totalEdep`. Full branch reference:
 `macros/README.md`.

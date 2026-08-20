@@ -91,7 +91,16 @@ _SCALAR_SPECS = [
     ("Q2", float), ("W", float), ("x", float), ("y", float),
     ("vtxx", float), ("vtxy", float), ("vtxz", float), ("vtxt", float),
     ("Z", np.int64), ("A", np.int64),
+    # GENIE's per-event weight. 1.0 for unweighted generation, but non-trivial
+    # whenever the run uses a flux driver, a cross-section tweak or any of
+    # GENIE's reweighting knobs -- it must reach the output ntuple, or every
+    # downstream rate/spectrum is wrong. _scalar() defaults it to 1.0 when the
+    # gst file has no wght branch.
+    ("wght", float),
 ]
+
+# Per-event scalars whose absence means something other than zero.
+_SCALAR_DEFAULTS = {"wght": 1.0}   # no wght branch == unweighted generation
 
 
 def _flat_fs(t, keys, name, size):
@@ -111,7 +120,9 @@ def _read_gst(path, gst_tree=None):
         n = int(t.num_entries)
         keys = {k.split(";")[0] for k in t.keys()}
 
-        d = {name: _scalar(t, keys, name, n, dtype=dt) for name, dt in _SCALAR_SPECS}
+        d = {name: _scalar(t, keys, name, n,
+                           default=_SCALAR_DEFAULTS.get(name, 0.0), dtype=dt)
+             for name, dt in _SCALAR_SPECS}
         d["n"] = n
         d["eid"] = _scalar(t, keys, "iev", n, dtype=np.int64) if "iev" in keys \
             else np.arange(n, dtype=np.int64)
@@ -150,13 +161,76 @@ def _concat_gst(dicts):
     return out
 
 
-def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", beam=None):
+def _rays(beam, origin, direction, n, Ev_gev):
+    """Resolve the per-event (position mm, momentum MeV/c) rays to place the
+    events on, or None to leave gst's own vertex and axis alone.
+
+    Two sources, in priority order:
+      * `beam` -- one sampled ray per event (host-sampled distributions/Twiss).
+      * `origin`/`direction` -- one fixed ray shared by all events, carrying
+        each event's own GENIE flux energy. This is what beam.position and
+        beam.direction mean for an aggregate-flux run: gevgen's point mode has
+        no notion of either.
+    """
+    from .. import beam as beammod
+
+    if beam is not None:
+        entries = beammod.read_beam_file(beam) if isinstance(beam, str) else list(beam)
+        if len(entries) < n:
+            raise ValueError(f"beam file has {len(entries)} entries but gst has {n} events")
+        return (np.array([e[1] for e in entries[:n]], float),
+                np.array([e[2] for e in entries[:n]], float))
+
+    if origin is None and direction is None:
+        return None
+
+    pos = _vec_mm(origin) if origin is not None else np.zeros(3)
+    axis = _unit_vec(direction) if direction is not None else np.array([0.0, 0.0, 1.0])
+    # gevgen point mode fires along +z, so a +z direction is the identity and
+    # this stays a pure vertex translation.
+    bpos = np.tile(pos, (n, 1))
+    bmom = np.outer(np.asarray(Ev_gev, float) * GEV_TO_MEV, axis)
+    return bpos, bmom
+
+
+def _vec_mm(v):
+    """'0 0 -60 cm' or an (x,y,z) sequence already in mm -> (3,) mm."""
+    if isinstance(v, str):
+        from ..beam import _len_mm, _vec3
+        return _vec3(v, _len_mm)
+    return np.asarray(v, float).reshape(3)
+
+
+def _unit_vec(v):
+    """'0 0 1' or an (x,y,z) sequence -> unit (3,). A zero vector means "no
+    preferred axis", i.e. leave the event along gevgen's +z."""
+    if isinstance(v, str):
+        parts = str(v).split()
+        if len(parts) < 3:
+            raise ValueError(f"direction needs 3 components, got {v!r}")
+        v = [float(c) for c in parts[:3]]
+    a = np.asarray(v, float).reshape(3)
+    norm = float(np.linalg.norm(a))
+    return a / norm if norm > 0 else np.array([0.0, 0.0, 1.0])
+
+
+def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree",
+            beam=None, origin=None, direction=None):
     """Read GENIE `gst` (one path or a list of paths, concatenated in order) and
     write schema `output.root` at `out_path`.
 
     `beam` (a beam-file path or a list of (name, pos_mm, mom_mev) entries) replays
     a host-sampled beam: it overrides each event's vertex and orients the event
     along the sampled ray (see the per-event beam-replay block below).
+
+    `origin` ("0 0 -60 cm" or an (x,y,z) mm triple) and `direction` ("0 0 1")
+    place and orient a SINGLE fixed ray shared by every event -- what
+    `beam.position` / `beam.direction` mean for a plain aggregate-flux run.
+    gevgen in point mode always puts the vertex at the origin and fires along
+    +z, so without this the requested source point is silently ignored and every
+    event lands at (0,0,0): outside the detector for most geometries, which
+    makes a subsequent Geant4 transport stage produce nothing. Ignored when
+    `beam` is given (the per-ray path already positions each event).
     """
     paths = [gst_path] if isinstance(gst_path, (str, bytes)) or hasattr(gst_path, "__fspath__") \
         else list(gst_path)
@@ -181,13 +255,10 @@ def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", 
     # orient the (point-mode, +z) GENIE event along the ray direction. The
     # incoming neutrino momentum IS the sampled beam momentum; the outgoing
     # lepton is rotated from +z onto the ray. trk_* positions follow the vertex.
-    if beam is not None:
+    rays = _rays(beam, origin, direction, n, Ev)
+    if rays is not None:
         from .. import beam as beammod
-        entries = beammod.read_beam_file(beam) if isinstance(beam, str) else list(beam)
-        if len(entries) < n:
-            raise ValueError(f"beam file has {len(entries)} entries but gst has {n} events")
-        bpos = np.array([e[1] for e in entries[:n]], float)   # (n,3) mm
-        bmom = np.array([e[2] for e in entries[:n]], float)   # (n,3) MeV/c
+        bpos, bmom = rays
         vx, vy, vz = bpos[:, 0].copy(), bpos[:, 1].copy(), bpos[:, 2].copy()
         primary_p = bmom
         primaryE = np.linalg.norm(bmom, axis=1)
@@ -275,6 +346,11 @@ def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", 
         "nu_W": W * GEV_TO_MEV,
         "nu_x": xbj, "nu_y": ybj,
         "nu_q0": q0,
+        # GENIE's per-event weight, carried verbatim. Every rate, spectrum and
+        # comparison downstream has to be weighted by it, and the transport
+        # hand-off passes it through to the final ntuple (HepMC weight ->
+        # g4sim's eventWeight branch).
+        "eventWeight": g["wght"],
     }
 
     with uproot.recreate(out_path) as f:

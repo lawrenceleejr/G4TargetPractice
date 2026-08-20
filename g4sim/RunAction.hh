@@ -31,6 +31,10 @@ public:
     void SetNeutrinoMode(NuMode mode) { fNuMode = mode; }
     void SetGenerator(PrimaryGenerator* gen) { fGenerator = gen; }
     bool NeutrinoBranchesEnabled() const { return fNeutrinoBranches; }
+    /// The eventWeight branch exists only when the primaries come from a
+    /// generator hand-off file that can carry weights, so an ordinary gun run
+    /// is not padded with a column of 1.0.
+    bool WeightBranchEnabled() const { return fWeightBranch; }
 
     // ============================================================
     // Branch variables (written by EventAction at end of event)
@@ -48,6 +52,7 @@ public:
     double primaryEndX = 0, primaryEndY = 0, primaryEndZ = 0;
     double primaryEndPx = 0, primaryEndPy = 0, primaryEndPz = 0;
     double totalEdep = 0;
+    double eventWeight = 1.0;   ///< generator event weight (hand-off runs only)
 
     // --- Per-track vectors (one entry per track) ---
     std::vector<int> trk_id, trk_parentID, trk_pdg;
@@ -78,6 +83,7 @@ private:
 
     NuMode fNuMode = NuMode::kAuto;
     bool fNeutrinoBranches = false;   // resolved in BeginOfRunAction
+    bool fWeightBranch = false;      // ditto
     PrimaryGenerator* fGenerator = nullptr;
     RunActionMessenger* fMessenger = nullptr;
 };

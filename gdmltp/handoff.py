@@ -33,6 +33,18 @@ VERTEX_FILE = "vertex_level.root"
 
 C_MM_PER_NS = 299.792458
 
+# Generator-internal pseudo-particles that Geant4 has no definition for: GENIE
+# writes a hadronic blob / bindino / nucleon-cluster in the 2000000xxx range.
+# They are bookkeeping entries, not transportable particles, so they are left
+# out of the hand-off file (g4sim would otherwise have to skip them, and older
+# builds aborted the whole run on the first one).
+_PSEUDO_PDG_MIN = 2000000000
+
+
+def _is_transportable(pdg):
+    return abs(int(pdg)) < _PSEUDO_PDG_MIN and int(pdg) != 0
+
+
 # Branches replaced on the transported file by the generator's values: the
 # interaction record, the primary identity (probe/parent -- matching what a
 # native Geant4 run would record), and the vertex-level end point (interaction
@@ -81,6 +93,7 @@ def write_event_file(vertex_root, path, tree="tree"):
         wgt = t["eventWeight"].array(library="np") if "eventWeight" in names else None
 
     n_events = len(vx)
+    skipped = {}
     with pyhepmc.open(path, "w") as writer:
         for i in range(n_events):
             ev = pyhepmc.GenEvent(pyhepmc.Units.MEV, pyhepmc.Units.MM)
@@ -95,6 +108,9 @@ def write_event_file(vertex_root, path, tree="tree"):
             vtx.add_particle_in(beam)
             for k in range(len(pdg[i])):
                 pid = int(pdg[i][k])
+                if not _is_transportable(pid):
+                    skipped[pid] = skipped.get(pid, 0) + 1
+                    continue
                 m = masses.mass_mev(pid)
                 etot = float(kin[i][k]) + m
                 fs = pyhepmc.GenParticle(
@@ -105,6 +121,11 @@ def write_event_file(vertex_root, path, tree="tree"):
             if wgt is not None:
                 ev.weights = [float(wgt[i])]
             writer.write(ev)
+    if skipped:
+        detail = ", ".join(f"{p} x{c}" for p, c in sorted(skipped.items()))
+        print(f"[gdmltp] hand-off: left out {sum(skipped.values())} "
+              f"generator-internal pseudo-particle(s) Geant4 cannot transport "
+              f"({detail})")
     return n_events
 
 

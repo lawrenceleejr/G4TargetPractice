@@ -47,6 +47,13 @@ public:
     /// @param energy  Representative energy of this bin.
     /// @param weight  Relative probability weight (need not be normalised).
     void AddEnergyBin(G4double energy, G4double weight);
+
+    /// True once a HepMC3 hand-off file has been loaded -- i.e. the primaries
+    /// come from a generator that may carry per-event weights.
+    G4bool HasHandoffEvents() const { return !fEvents.empty(); }
+
+    /// The generator weight of the event currently being generated.
+    G4double GetEventWeight() const { return fEventWeight; }
     void ClearEnergyBins() { fEnergyBins.clear(); }
 
     /// Load a host-sampled beam file: one primary per line,
@@ -110,9 +117,15 @@ private:
     struct HandoffEvent {
         G4ThreeVector vertex;                                        ///< mm
         G4double      time = 0.0;                                    ///< ns (optional)
+        G4double      weight = 1.0;   ///< generator event weight (HepMC weight)
         std::vector<std::pair<G4ParticleDefinition*, G4ThreeVector>> particles;  ///< MeV/c
     };
     std::vector<HandoffEvent> fEvents;   ///< non-empty => event-file replay mode
+
+    /// Weight of the hand-off event replayed most recently (1.0 when not in
+    /// hand-off mode). Read by EventAction so a generator's event weight
+    /// survives the transport stage into the output ntuple.
+    G4double fEventWeight = 1.0;
 
     RunAction* fRunAction;
 };

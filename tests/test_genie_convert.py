@@ -242,3 +242,80 @@ def test_flux_gauss_is_approximate():
     a, approx = genie.flux_gevgen_args({"mode": "gauss", "value": "3 GeV", "sigma": "500 MeV"})
     assert approx is True
     assert a == ["-e", "3"]
+
+
+def test_event_weight_is_carried_from_gst(tmp_path):
+    """GENIE's per-event weight must reach the ntuple: with a flux driver or any
+    reweighting knob it is not 1, and every rate computed downstream is wrong if
+    it is dropped."""
+    import uproot
+    from tests.conftest import write_synthetic_gst
+
+    gst = write_synthetic_gst(tmp_path / "w.gst.root", n_events=12, seed=3)
+    with uproot.open(gst) as f:
+        want = f["gst"]["wght"].array(library="np")
+    out = tmp_path / "out.root"
+    genie_convert.convert(gst, out)
+    with uproot.open(out) as f:
+        got = f["tree"]["eventWeight"].array(library="np")
+    assert got.shape == want.shape
+    np.testing.assert_allclose(got, want)
+    assert not np.allclose(got, 1.0), "fixture should have non-trivial weights"
+
+
+def test_event_weight_defaults_to_one_without_a_wght_branch(tmp_path):
+    """An unweighted gst has no wght branch; that means weight 1, not 0 -- a
+    zero would silently annihilate every event downstream."""
+    import uproot
+    from tests.conftest import write_synthetic_gst
+
+    gst = write_synthetic_gst(tmp_path / "nw.gst.root", n_events=5, seed=4,
+                              weights=False)
+    out = tmp_path / "out.root"
+    genie_convert.convert(gst, out)
+    with uproot.open(out) as f:
+        got = f["tree"]["eventWeight"].array(library="np")
+    np.testing.assert_allclose(got, 1.0)
+
+
+def test_fixed_ray_places_and_orients_the_events(tmp_path):
+    """beam.position / beam.direction for an aggregate-flux run: gevgen's point
+    mode always vertexes at (0,0,0) along +z, so the converter has to move and
+    rotate the event. The interaction KINEMATICS must be untouched."""
+    import uproot
+    from tests.conftest import write_synthetic_gst
+
+    gst = write_synthetic_gst(tmp_path / "r.gst.root", n_events=8, seed=11)
+    plain, moved, turned = (tmp_path / f"{n}.root" for n in ("plain", "moved", "turned"))
+    genie_convert.convert(gst, plain)
+    genie_convert.convert(gst, moved, origin="0 0 -60 cm")
+    genie_convert.convert(gst, turned, origin="10 0 -60 cm", direction="1 0 0")
+
+    def read(f, *names):
+        with uproot.open(f) as h:
+            return h["tree"].arrays(list(names), library="np")
+
+    kin = ["nu_Q2", "nu_W", "nu_x", "nu_y", "nu_q0", "primaryE"]
+    a, b, c = (read(f, *(kin + ["nu_vertexX", "nu_vertexY", "nu_vertexZ",
+                                "primaryStartPx", "primaryStartPy", "primaryStartPz"]))
+               for f in (plain, moved, turned))
+
+    # the vertex moves to the requested point (mm), every event
+    np.testing.assert_allclose(b["nu_vertexX"], 0.0)
+    np.testing.assert_allclose(b["nu_vertexZ"], -600.0)
+    np.testing.assert_allclose(c["nu_vertexX"], 100.0)
+    np.testing.assert_allclose(c["nu_vertexZ"], -600.0)
+    # ... and the untouched run keeps gst's own vertex
+    assert not np.allclose(a["nu_vertexZ"], -600.0)
+
+    # direction: the probe momentum turns onto +x, magnitude preserved
+    np.testing.assert_allclose(c["primaryStartPy"], 0.0, atol=1e-9)
+    np.testing.assert_allclose(c["primaryStartPz"], 0.0, atol=1e-6)
+    np.testing.assert_allclose(c["primaryStartPx"], b["primaryStartPz"], rtol=1e-9)
+    # a +z request is the identity -- placement only
+    np.testing.assert_allclose(b["primaryStartPz"], a["primaryStartPz"], rtol=1e-9)
+
+    # kinematics are invariant under placement AND rotation
+    for k in kin:
+        np.testing.assert_allclose(b[k], a[k], rtol=1e-9)
+        np.testing.assert_allclose(c[k], a[k], rtol=1e-9)

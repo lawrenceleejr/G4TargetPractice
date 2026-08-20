@@ -34,6 +34,10 @@ void RunAction::BeginOfRunAction([[maybe_unused]] const G4Run* run) {
     if (fNuMode == NuMode::kAuto && fGenerator) {
         fNeutrinoBranches = IsNeutrino(fGenerator->GetParticlePDG());
     }
+    // A generator hand-off file may carry a per-event weight; an ordinary
+    // particle-gun run has nothing to record, so the branch is conditional.
+    fWeightBranch = (fGenerator && fGenerator->HasHandoffEvents());
+
     G4cout << "Output ntuple: neutrino-interaction branches "
            << (fNeutrinoBranches ? "ENABLED" : "disabled")
            << " (/analysis/neutrinoMode)." << G4endl;
@@ -59,6 +63,11 @@ void RunAction::BeginOfRunAction([[maybe_unused]] const G4Run* run) {
     fTree->Branch("primaryEndPy", &primaryEndPy, "primaryEndPy/D");
     fTree->Branch("primaryEndPz", &primaryEndPz, "primaryEndPz/D");
     fTree->Branch("totalEdep", &totalEdep, "totalEdep/D");
+    if (fWeightBranch) {
+        fTree->Branch("eventWeight", &eventWeight, "eventWeight/D");
+        G4cout << "Output ntuple: eventWeight branch ENABLED "
+               << "(generator weights from the hand-off file)." << G4endl;
+    }
     fTree->Branch("nSteps", &nSteps, "nSteps/I");
     fTree->Branch("nTracks", &nTracks, "nTracks/I");
 
@@ -117,6 +126,11 @@ void RunAction::BeginOfRunAction([[maybe_unused]] const G4Run* run) {
 
 void RunAction::FillEvent(EventAction* evt)
 {
+    // The generator's per-event weight, carried through the hand-off file. Read
+    // here rather than threaded through EventAction: the gun holds the weight of
+    // the event just generated, and this runs at end of event.
+    eventWeight = (fWeightBranch && fGenerator) ? fGenerator->GetEventWeight() : 1.0;
+
     // --- Per-track table (map iterates ascending by track id) ---
     trk_id.clear(); trk_parentID.clear(); trk_pdg.clear();
     trk_startX.clear(); trk_startY.clear(); trk_startZ.clear(); trk_startE.clear();

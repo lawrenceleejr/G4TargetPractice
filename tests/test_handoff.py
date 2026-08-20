@@ -130,3 +130,72 @@ def test_run_config_transport_dry_run(repo_root, tmp_path, capsys):
     run.run_config(cfg, outdir=str(tmp_path), dry_run=True)
     out = capsys.readouterr().out
     assert "dry-run" in out and "transport" in out
+
+
+# --- event weight ------------------------------------------------------------
+def test_event_weight_survives_the_handoff_roundtrip(vertex_root, tmp_path):
+    """The generator's per-event weight must reach the final ntuple: it rides the
+    HepMC event weight into g4sim and is grafted back by the merge. Anything that
+    drops it silently rescales every rate the transported file is used for."""
+    import uproot
+    with uproot.open(vertex_root) as f:
+        want = f["tree"]["eventWeight"].array(library="np")
+    assert not np.allclose(want, 1.0), "fixture should have non-trivial weights"
+
+    # 1. host -> HepMC: the weight becomes the HepMC event weight
+    path = tmp_path / "events.hepmc"
+    handoff.write_event_file(vertex_root, path)
+    import pyhepmc
+    got = []
+    with pyhepmc.open(str(path)) as reader:
+        for ev in reader:
+            got.append(ev.weights[0])
+    np.testing.assert_allclose(got, want, rtol=1e-6)
+
+    # 2. merge: the transported file (whose own weights are irrelevant) takes the
+    #    generator's values
+    sys.path.insert(0, str(tmp_path.parent))
+    from conftest import write_synthetic
+    transported = write_synthetic(tmp_path / "transported.root", n_events=25, seed=9)
+    merged = str(tmp_path / "merged.root")
+    handoff.merge_nu_block(transported, vertex_root, merged)
+    with uproot.open(merged) as f:
+        np.testing.assert_allclose(f["tree"]["eventWeight"].array(library="np"), want)
+
+
+def test_pseudo_particles_are_left_out_of_the_handoff(vertex_root, tmp_path, capsys):
+    """GENIE final-state lists carry internal pseudo-particles (hadronic blob /
+    bindino at 2000000xxx) that Geant4 has no definition for. They must not reach
+    the hand-off file: g4sim cannot transport them, and the run must not hinge on
+    the engine tolerating them."""
+    import uproot
+    import awkward as ak
+
+    with uproot.open(vertex_root) as f:
+        t = f["tree"]
+        data = {k.split(";")[0]: t[k].array() for k in t.keys()}
+    n_real = len(ak.to_list(data["trk_pdg"])[0])
+
+    # splice a hadronic blob and a zero PDG onto event 0's final state, padding
+    # every per-track branch so the jagged lengths stay consistent
+    for name, arr in list(data.items()):
+        if not name.startswith("trk_"):
+            continue
+        vals = ak.to_list(arr)
+        pad = [2000000001, 0] if name == "trk_pdg" else (
+            ["x", "x"] if isinstance(vals[0][0], str) else [1.0, 1.0])
+        vals[0] = vals[0] + pad
+        data[name] = ak.Array(vals)
+    doctored = tmp_path / "with_pseudo.root"
+    with uproot.recreate(doctored) as f:
+        f["tree"] = data
+
+    path = tmp_path / "events.hepmc"
+    handoff.write_event_file(doctored, path)
+    out = capsys.readouterr().out
+    assert "pseudo-particle" in out and "2000000001" in out
+
+    events = handoff.read_event_file(path)
+    written = [p[0] for p in events[0][1]]
+    assert 2000000001 not in written and 0 not in written
+    assert len(written) == n_real          # the real particles all survive

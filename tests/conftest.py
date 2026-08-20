@@ -127,7 +127,7 @@ def write_synthetic(path, n_events=30, e0_mev=50000.0, x0_cm=3.0,
     return str(path)
 
 
-def write_synthetic_gst(path, n_events=25, seed=0):
+def write_synthetic_gst(path, n_events=25, seed=0, weights=True):
     """A synthetic GENIE 'gst' summary tree, faithful to the branches the
     converter reads. Energies/momenta in GeV, Q2 in GeV^2, vertex in cm (the
     geometry length units), matching real gst output -- so genie_convert exercises
@@ -189,6 +189,10 @@ def write_synthetic_gst(path, n_events=25, seed=0):
         "pdgf": ak.Array(pdgf), "Ef": ak.Array(Ef),
         "pxf": ak.Array(pxf), "pyf": ak.Array(pyf), "pzf": ak.Array(pzf),
     }
+    # Real gst carries a per-event weight. `weights=False` drops the branch, as
+    # unweighted GENIE builds can, so the converter's 1.0 default is exercised.
+    if weights:
+        data["wght"] = rng.uniform(0.5, 2.0, n_events)
     with uproot.recreate(path) as f:
         f["gst"] = data
     return str(path)

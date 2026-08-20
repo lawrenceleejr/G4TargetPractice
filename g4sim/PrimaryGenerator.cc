@@ -248,6 +248,8 @@ void PrimaryGenerator::LoadEventFile(const G4String& path)
         return;
     }
     fEvents.clear();
+    G4int nUnresolved = 0, nEmpty = 0;
+    G4int unresolvedExample = 0;
     while (true) {
         HepMC3::GenEvent evt(HepMC3::Units::MEV, HepMC3::Units::MM);
         reader.read_event(evt);
@@ -262,23 +264,48 @@ void PrimaryGenerator::LoadEventFile(const G4String& path)
             // HepMC stores the position time as a length (c*t); recover ns.
             h.time = (pos.t() * mm) / CLHEP::c_light;
         }
+        // HepMC carries the generator's event weight; keep the first one (the
+        // nominal weight -- extra entries are systematic variations). GENIE and
+        // Achilles both write it, and it must reach the output ntuple.
+        if (!evt.weights().empty()) h.weight = evt.weights().front();
         for (const auto& p : evt.particles()) {
             if (p->status() != 1) continue;      // final state only
             auto* def = ResolveByPDG(p->pid());
             if (!def) {
-                G4Exception("PrimaryGenerator::LoadEventFile", "NoParticle",
-                            FatalException,
-                            ("HepMC particle PDG not found: "
-                             + std::to_string(p->pid())).c_str());
+                // Generators emit internal pseudo-particles (GENIE's hadronic
+                // blob / bindino at 2000000xxx, cluster codes) that Geant4 has
+                // no definition for. Skip them: they carry no transportable
+                // particle, and aborting would throw away the whole run over
+                // one bookkeeping entry.
+                ++nUnresolved;
+                if (unresolvedExample == 0) unresolvedExample = p->pid();
+                continue;
             }
             const auto m = p->momentum();
             h.particles.emplace_back(
                 def, G4ThreeVector(m.px() * MeV, m.py() * MeV, m.pz() * MeV));
         }
+        if (h.particles.empty()) ++nEmpty;
         fEvents.push_back(std::move(h));
     }
     G4cout << "PrimaryGenerator: loaded " << fEvents.size()
            << " HepMC3 hand-off event(s) from " << path << G4endl;
+    if (nUnresolved > 0) {
+        G4cout << "PrimaryGenerator: skipped " << nUnresolved
+               << " final-state particle(s) with no Geant4 definition (e.g. PDG "
+               << unresolvedExample << ") -- generator-internal pseudo-particles."
+               << G4endl;
+    }
+    if (nEmpty > 0) {
+        G4cout << "*** WARNING: " << nEmpty << " of " << fEvents.size()
+               << " hand-off event(s) have NO transportable final-state particle;"
+               << " those events will be empty in the output." << G4endl;
+    }
+    if (fEvents.empty()) {
+        G4Exception("PrimaryGenerator::LoadEventFile", "NoEvents", FatalException,
+                    ("No events could be read from " + path +
+                     " -- is it HepMC3 ASCII written by the hand-off stage?").c_str());
+    }
 }
 
 G4double PrimaryGenerator::SampleEnergy() const
@@ -316,6 +343,7 @@ void PrimaryGenerator::GeneratePrimaries(G4Event* event)
                         "More events requested than event-file entries; reusing the last.");
         }
         const HandoffEvent& evt = fEvents[std::min(i, fEvents.size() - 1)];
+        fEventWeight = evt.weight;
         fParticleGun->SetParticlePosition(evt.vertex);
         fParticleGun->SetParticleTime(evt.time);   // decay/interaction time (ns)
         for (const auto& [def, mom] : evt.particles) {
