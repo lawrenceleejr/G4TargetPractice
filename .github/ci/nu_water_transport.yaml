@@ -1,6 +1,6 @@
-# CI-scale GENIE -> Geant4 run: the two-stage hand-off the README/neutrino guide
-# describe (generator makes the vertex, Geant4 transports the final state, the
-# nu_* block is grafted back on), sized to run inside a GitHub runner.
+# CI-scale GENIE -> Geant4 run: the default two-stage pipeline (generator makes
+# the vertex, its final state goes to Geant4 as HepMC3, the nu_* block is
+# grafted back on), sized to run inside a GitHub runner.
 #
 # Two deliberate CI-only choices, both physics-honest:
 #   * target: the free PROTON in the water (H-1) rather than a nucleus -- gmkspl
@@ -34,4 +34,5 @@ genie:
   event_generator_list: Default
   length_units: cm
   target: 1000010010          # free proton (the H in H2O)
-  transport: true             # GENIE vertex -> Geant4 transport -> merged ntuple
+  # NO transport key on purpose: the Geant4 stage is the default, and this job
+  # exists to prove that a plain generator config still ends in Geant4.

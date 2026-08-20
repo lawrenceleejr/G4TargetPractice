@@ -260,15 +260,21 @@ def _transport_stage(cfg, prep, outdir, local, dry_run, stage="full"):
 
     image = Geant4Backend().image_for(cfg)
     if dry_run:
-        print(f"[gdmltp] (dry-run:transport) would export the generator events "
-              f"to {handoff.EVENT_FILE} and replay them through {image} via "
-              f"/gun/hepmcFile, merging the nu_* block into {cfg.run.output}")
+        print(f"[gdmltp] (dry-run:handoff) would export the generator events to "
+              f"{handoff.EVENT_FILE} (HepMC3)")
+        if stage == "generator":
+            print(f"[gdmltp] (dry-run) would stop there; `gdmltp transport -o "
+                  f"{outdir.name}` finishes the run in {image}")
+        else:
+            print(f"[gdmltp] (dry-run:transport) would replay them through "
+                  f"{image} via /gun/hepmcFile, merging the nu_* block into "
+                  f"{cfg.run.output}")
         return
 
     spec = handoff.stage_inputs(
         outdir, Path(cfg.gdml).name, output=cfg.run.output, seed=cfg.run.seed,
         field=cfg.geant4.get("field"), generator=cfg.generator,
-        produced=prep.output)
+        produced=prep.output, image=image)
     print(f"[gdmltp] hand-off: {spec['events']} event(s) -> {handoff.EVENT_FILE} "
           f"(HepMC3, the generator -> Geant4 interchange)")
 
@@ -309,19 +315,21 @@ def transport(outdir=".", image=None, local=False, dry_run=False):
     """
     outdir = Path(outdir).resolve()
     spec = handoff.read_spec(outdir)
+    from .backends.base import image_override
+    image = image or image_override("geant4") or spec.get("image") or DEFAULT_IMAGE
     if not local and os.path.exists("/app/entrypoint.sh"):
         local = True                      # inside an image: run the engine here
     if local and not _geant4_engine_here():
         raise RuntimeError(
             f"no Geant4 engine here (no g4sim on PATH): `transport` must run in "
             f"a Geant4 image or on a host with g4sim built. From a host with "
-            f"Docker, drop --local and it launches {image or DEFAULT_IMAGE}.")
+            f"Docker, drop --local and it launches {image}.")
     if dry_run:
         print(f"[gdmltp] (dry-run:transport) would replay {spec['events']} "
-              f"event(s) from {spec['event_file']} through "
-              f"{image or DEFAULT_IMAGE} into {spec['output']}")
+              f"event(s) from {spec['event_file']} through {image} into "
+              f"{spec['output']}")
         return 0
-    _run_transport_spec(spec, outdir, image or DEFAULT_IMAGE, local)
+    _run_transport_spec(spec, outdir, image, local)
     return 0
 
 
@@ -375,10 +383,15 @@ def run_config(cfg, image=None, outdir=".", local=False, dry_run=False,
         _transport_stage(cfg, prep, outdir, local, dry_run, stage=stage)
         return 0
     if stage == "generator":
+        if cfg.generator in config.VERTEX_LEVEL_GENERATORS:
+            raise config.ConfigError(
+                f"--stage generator splits a two-stage run, but this "
+                f"{cfg.generator} run set transport: false, so there is no "
+                f"Geant4 stage to split off")
         raise config.ConfigError(
-            f"--stage generator splits a two-stage run, but this "
-            f"{cfg.generator} run has transport disabled, so there is no Geant4 "
-            f"stage to split off")
+            f"--stage generator splits a generator run into its two engines, "
+            f"but the {cfg.generator} backend is a single Geant4 stage "
+            f"(it transports what it makes)")
 
     if executed:
         _finalize_output(cfg, prep, outdir)

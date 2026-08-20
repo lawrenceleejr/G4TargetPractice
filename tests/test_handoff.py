@@ -235,3 +235,40 @@ def test_generator_image_without_geant4_says_what_to_run(repo_root, synth_gst,
     for name in (handoff.VERTEX_FILE, handoff.EVENT_FILE, handoff.STAGE_SPEC):
         assert (tmp_path / name).exists(), name
     assert not (tmp_path / "output.root").exists()
+
+
+def test_spec_records_the_engine_image_for_a_later_transport(vertex_root, tmp_path,
+                                                            monkeypatch):
+    """A celeritas (or pinned) Geant4 image chosen at generation time must be
+    the one a standalone `gdmltp transport` uses later."""
+    import shutil
+    shutil.copy(vertex_root, tmp_path / "output.root")
+    (tmp_path / "lar.gdml").write_text("<gdml/>")
+    handoff.stage_inputs(tmp_path, "lar.gdml", image="g4:celeritas")
+
+    calls = []
+    monkeypatch.setattr(run, "_exec_stage",
+                        lambda argv, image, *a, **k: calls.append(image))
+    monkeypatch.setattr(run.handoff, "merge_nu_block", lambda *a, **k: None)
+    run.transport(outdir=str(tmp_path))
+    assert calls == ["g4:celeritas"]
+
+    calls.clear()
+    monkeypatch.setenv("GDMLTP_IMAGE_GEANT4", "g4:pinned")   # env still wins
+    run.transport(outdir=str(tmp_path))
+    assert calls == ["g4:pinned"]
+
+
+def test_stage_generator_on_a_single_stage_backend_explains_itself(repo_root, tmp_path):
+    """--stage generator only makes sense for a two-engine run."""
+    cfg = config.RunConfig(
+        gdml=str(repo_root / "gdml" / "bpe_slab.gdml"),
+        beam=config.Beam(particle="proton",
+                         energy=config.Energy(mode="mono", value="1 GeV")),
+        run=config.RunSettings(events=1))
+    with pytest.raises(config.ConfigError, match="single Geant4 stage"):
+        run.run_config(cfg, outdir=str(tmp_path), dry_run=True, stage="generator")
+
+    nu = _genie_cfg(repo_root, transport=False)
+    with pytest.raises(config.ConfigError, match="transport: false"):
+        run.run_config(nu, outdir=str(tmp_path), dry_run=True, stage="generator")

@@ -15,11 +15,15 @@ just Docker.
 
 - **Target** — any geometry in a GDML file (`geometry.gdml`).
 - **Projectile / beam** — a particle, an energy spectrum, a position and direction.
+- **Propagation** — **always Geant4**. The generators below produce the
+  interaction; their final state is handed to Geant4 as **HepMC3** and
+  transported through the same GDML geometry, so every run's `output.root`
+  carries a Geant4 transport record (`transport: false` opts out per backend).
 - **Generator (backend)** — pick one:
   - `geant4` — full particle transport (the `g4sim` engine). *Default.*
-  - `genie` — neutrino event generation on the GDML target. *Vertex-level (v1).*
-  - `achilles` — theory-driven lepton-nucleus generation ([Achilles](https://github.com/AchillesGen/Achilles)); neutrino **and** `e∓` beams. *Vertex-level (v1).*
-  - `pythia` — [Pythia 8](https://pythia.org) collisions off a **free nucleon**: TeV-scale DIS with **no cross-section splines to precompute**, plus min-bias/hard-QCD. Shower + hadronization, then Geant4 transport via `transport: true`. *No nuclear medium/cascade — use genie/achilles for those.*
+  - `genie` — neutrino event generation on the GDML target, then Geant4 transport.
+  - `achilles` — theory-driven lepton-nucleus generation ([Achilles](https://github.com/AchillesGen/Achilles)); neutrino **and** `e∓` beams, then Geant4 transport.
+  - `pythia` — [Pythia 8](https://pythia.org) collisions off a **free nucleon**: TeV-scale DIS with **no cross-section splines to precompute**, plus min-bias/hard-QCD. Shower + hadronization, then Geant4 transport. *No nuclear medium/cascade — use genie/achilles for those.*
   - `decay` — long-lived **BSM projectiles** (HNLs, dark photons, ALPs), decayed **by Geant4** (`G4DecayTable`/`G4Decay`) with lifetime-importance reweighting: displaced vertex + full detector response in one stage. See [docs/bsm.md](docs/bsm.md).
   - `external` — bring **HepMC3 events from a real generator** (Pythia8, MadGraph) into the same schema/transport pipeline. See [docs/bsm.md](docs/bsm.md).
   - `fluka` (via flugg) — *planned, not yet available.*
@@ -32,11 +36,11 @@ Every backend writes the **same** `output.root` schema, so `analyze`, `display`,
 Achilles, and Geant4 — generate, validate, compare kinematics, transport, and
 display in a handful of commands.
 
-## Run it in one line with Docker — no install, no compiling
+## Run it with Docker — no install, no compiling
 
 You describe a run in a **YAML file** (a target + a beam + a backend) and run it
-with a single `docker run`. No macros, no local build. Clone the repo (so you
-have the example YAMLs and geometries) and run from its root.
+with `docker run`. No macros, no local build. Clone the repo (so you have the
+example YAMLs and geometries) and run from its root.
 
 ```bash
 git clone https://github.com/lawrenceleejr/GDMLTargetPractice && cd GDMLTargetPractice
@@ -53,26 +57,41 @@ gtp() { docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
                    -v "$PWD:/run" -w /run "$@"; }
 ```
 
-**Simulate — one command per generator, always from a YAML:**
+**Simulate — always from a YAML:**
 
 ```bash
-# Geant4 — 150 MeV protons into a water phantom (particle transport)
+# Geant4 — 150 MeV protons into a water phantom (one engine, one command)
 gtp $GEANT4   run --config examples/water_proton.yaml -o out
 
-# GENIE — 2 GeV muon-neutrinos on liquid argon (neutrino event generator)
-gtp $GENIE    run --config examples/nu_argon.yaml -o out
-
-# Achilles — 2 GeV muon-neutrinos on argon (theory-driven lepton-nucleus)
-gtp $ACHILLES run --config examples/nu_argon_achilles.yaml -o out
-
-# BSM decay — an HNL decaying in flight inside a detector (Geant4 does the decay)
+# BSM decay — an HNL decaying in flight inside a detector (Geant4 decays AND transports)
 gtp $GEANT4   run --config examples/maia/hnl_decay.yaml -o out
 ```
 
-Each writes `out/output.root` in one common schema, **owned by you**. The
-container renders the engine inputs from the YAML and runs the engine itself —
-one self-contained command, no nested Docker. Override any field on the command
-line, e.g. `gtp $GENIE run --config examples/nu_argon.yaml --energy "5 GeV" -n 2000 -o out`.
+**Generator runs take two commands from bare Docker**, because they use two
+engines and a container cannot start a sibling container: the generator image
+writes the interaction as **HepMC3**, then the Geant4 image propagates it.
+
+```bash
+# GENIE — 2 GeV muon-neutrinos on liquid argon, then Geant4 through the detector
+gtp $GENIE    run --config examples/nu_argon.yaml -o out --stage generator
+gtp $GEANT4   transport -o out
+
+# Achilles — same two steps (theory-driven lepton-nucleus + Geant4)
+gtp $ACHILLES run --config examples/nu_argon_achilles.yaml -o out --stage generator
+gtp $GEANT4   transport -o out
+```
+
+Each writes `out/output.root` in one common schema, **owned by you**, always with
+a Geant4 transport record — stage 2 replays `out/events.hepmc` through the GDML
+geometry and merges the generator's interaction record back in. Override any
+field on the command line, e.g. `gtp $GENIE run --config examples/nu_argon.yaml
+--energy "5 GeV" -n 2000 -o out --stage generator`.
+
+> Prefer **one** command for generator runs? Install the front-end
+> (`pip install "gdmltp @ git+https://github.com/lawrenceleejr/GDMLTargetPractice"`)
+> and `gdmltp run --config examples/nu_argon.yaml -o out` launches both
+> containers itself. And a generator-only (vertex-level) run is a deliberate
+> choice, not the default: put `transport: false` in the backend block.
 
 **Then analyze / validate / display / compare the output — same pattern, any
 image (the `gdmltp` tools ship in all of them):**
@@ -132,6 +151,33 @@ installs the thin front-end (pure Python, **no ROOT**). Then `gdmltp run
 --config …` launches the right container for you and handles multi-stage runs
 (e.g. generator→Geant4 transport); `gdmltp display …` builds the Blender scene
 directly. Add `[geometry]` for the accurate pyg4ometry GDML reader.
+
+## The pipeline: generator → HepMC3 → Geant4 → one ntuple
+
+Whatever produces the interaction, **Geant4 does the final propagation**:
+
+```
+GENIE ┐
+Achilles ┤                                    g4sim              output.root
+Pythia   ├─►  events.hepmc  ─────────────►  transport   ─────►  generator record
+HepMC3 file ┘  (HepMC3 ASCII, the one     through the GDML      + step_*/totalEdep
+Geant4/decay ──────────────────────────────► interchange)        in one schema
+```
+
+The generator stage writes `vertex_level.root` (its own record in the common
+schema) plus **`events.hepmc`** — every final-state particle, one production
+vertex per event with its position and time, written with the official HepMC3
+library. `g4sim` reads it back with `HepMC3::ReaderAscii` (`/gun/hepmcFile`),
+transports each event, and the generator's `nu_*` block and primary identity are
+grafted onto the transported file. The `geant4` and `decay` backends are
+single-stage — Geant4 is already doing everything.
+
+This is the default for every generator; `<backend>: {transport: false}` opts a
+run out and leaves it vertex-level (for generator-only cross-section/kinematics
+studies). A generator run that cannot reach Geant4 fails loudly rather than
+leaving an untransported file behind. The run directory keeps the whole chain —
+`events.hepmc`, `gdmltp_transport.mac`, `gdmltp_transport.json`,
+`vertex_level.root` — so stage 2 is re-runnable and inspectable.
 
 ## The YAML front-end
 
@@ -245,11 +291,11 @@ gdmltp run --generator genie --gdml gdml/liquid_argon_1m3.gdml --particle nu_mu 
 | Backend | Image | Status |
 |---|---|---|
 | `geant4` | `ghcr.io/lawrenceleejr/gdmltargetpractice` | full transport |
-| `genie` | `ghcr.io/lawrenceleejr/gdmltargetpractice-genie` | neutrino vertices (v1) |
-| `achilles` | `ghcr.io/lawrenceleejr/gdmltargetpractice-achilles` | ν / e∓ vertices (v1) |
-| `pythia` | `ghcr.io/lawrenceleejr/gdmltargetpractice-pythia` | Pythia 8 free-nucleon collisions; TeV DIS with no splines |
+| `genie` | `…-genie` **+ the geant4 image** | neutrino vertices, then Geant4 transport |
+| `achilles` | `…-achilles` **+ the geant4 image** | ν / e∓ vertices, then Geant4 transport |
+| `pythia` | `…-pythia` **+ the geant4 image** | Pythia 8 free-nucleon collisions (TeV DIS, no splines), then Geant4 transport |
 | `decay` | the geant4 image | BSM decay-in-flight **by Geant4** (G4DecayTable + G4Decay), one stage incl. transport |
-| `external` | *(none — host conversion)* | HepMC3 events from Pythia8/MadGraph etc.; `transport: true` uses the geant4 image |
+| `external` | host conversion **+ the geant4 image** | HepMC3 events from Pythia8/MadGraph etc., then Geant4 transport |
 
 `gdmltp run` picks the image automatically from the `generator`; override with
 `--image`. (Image repositories follow the GitHub repository name, so they moved
@@ -269,12 +315,14 @@ from `g4targetpractice*` to `gdmltargetpractice*` with the rename.)
 ## The GENIE backend (neutrino generator)
 
 GENIE replaces Geant4's built-in (and physically thin) neutrino handling with a
-proper neutrino event generator. **v1 is vertex-level**: GENIE generates the
-interaction on the nucleus the GDML geometry selects (or `genie.target`), and the
-output ntuple carries the full `nu_*` interaction block plus one `trk_*` row per
-final-state particle. Because GENIE does not transport particles, `step_*` and
-`totalEdep` are empty. The pipeline inside the GENIE image is
-`gevgen → gntpc -f gst → genie2root`.
+proper neutrino event generator. GENIE generates the interaction on the nucleus
+the GDML geometry selects (or `genie.target`), and the output ntuple carries the
+full `nu_*` interaction block plus one `trk_*` row per final-state particle. The
+pipeline inside the GENIE image is `gevgen → gntpc -f gst → genie2root`; the
+final state then goes to **Geant4** through the hand-off below, which is what
+fills `step_*`/`totalEdep` (GENIE itself transports nothing). With
+`genie: {transport: false}` the run stops at the vertex level and those branches
+stay empty.
 
 Roadmap: geometry-aware vertex sampling in the full GDML volume, and a
 single-pass flux driver for large per-event beam replays.
@@ -288,25 +336,43 @@ the detector. Geant4's own neutrino interaction code is, by contrast, physically
 thin (it needs ~10¹² bias factors to interact at all). The right division of
 labor is both: **the generator makes the vertex, Geant4 transports it**.
 
-Set `transport: true` in the backend block:
+This happens **by default** — nothing in the YAML asks for it:
 
 ```yaml
-generator: genie          # or achilles
+generator: genie          # or achilles, pythia, external
 geometry: { gdml: gdml/liquid_argon_1m3.gdml }
 beam: { particle: nu_mu, energy: {mode: mono, value: "2 GeV"} }
 run: { events: 1000, seed: 1 }
-genie: { tune: G18_10a_00_000, transport: true }
+genie: { tune: G18_10a_00_000 }
 ```
 
-`gdmltp run` then executes two stages: (1) the generator image produces the
-vertex-level events; (2) the host writes each event's final-state particles to a
-**HepMC3 file** (the standard interchange, via the official `pyhepmc` library),
-the Geant4 image reads it with `HepMC3::ReaderAscii` and replays each event via
-`/gun/hepmcFile` (one multi-particle vertex per event, full transport through
-the GDML detector), and the generator's `nu_*` interaction record + neutrino
-primary are grafted onto the transported file. The final `output.root` carries **both** the
-generator-quality interaction physics and the Geant4 `step_*`/`totalEdep`
-transport record — analyze/display/Blender all just work.
+Two stages, always: (1) the generator image produces the interaction and its
+final state is exported to **`events.hepmc`** (HepMC3 ASCII, via the official
+`pyhepmc` library — the one interchange every backend uses); (2) the Geant4
+image reads it with `HepMC3::ReaderAscii` and replays each event via
+`/gun/hepmcFile` (one multi-particle vertex per event, at its vertex position
+and time, full transport through the GDML detector), then the generator's `nu_*`
+interaction record + primary identity are grafted onto the transported file.
+`output.root` carries **both** the generator-quality interaction physics and the
+Geant4 `step_*`/`totalEdep` transport record — analyze/display/Blender all just
+work.
+
+`gdmltp run` chains the two images itself. From bare `docker run` it is two
+commands (a container cannot start a sibling), and the run directory holds the
+whole chain between them:
+
+```bash
+gtp $GENIE  run --config examples/nu_argon.yaml -o out --stage generator
+#   -> out/vertex_level.root, out/events.hepmc, out/gdmltp_transport.{mac,json}
+gtp $GEANT4 transport -o out
+#   -> out/output.root  (Geant4 transport + the GENIE interaction record)
+```
+
+Ask a generator image for the full run and it stops with an error naming that
+second command: a result that never reached Geant4 is a failure, not a quiet
+half-result. `<backend>: {transport: false}` is how you *choose* a vertex-level
+run; `gdmltp transport -o out` can also be re-run on its own (different field,
+different seed) without regenerating the events.
 
 ## Biasing knobs
 
@@ -362,6 +428,7 @@ as you so outputs aren't root-owned) or directly if installed.
 | Command | What it does |
 |---|---|
 | `gdmltp run` | Run a simulation from a YAML config (`--config run.yaml`; or quick flags). `--display` opens an event display after; `--field "0 0 5 tesla"` adds a field (auto-sets `CELER_DISABLE=1`). |
+| `gdmltp transport` | The **Geant4 stage** of a generator run: replays `events.hepmc` through the GDML geometry and merges the generator's interaction record in. `gdmltp run` does it automatically; run it by hand to finish, in the Geant4 image, a run a generator image started. |
 | `gdmltp display` | Event display from `output.root` and/or `--gdml`: a **Blender** scene (default), **PNG stills**, and **WebGL HTML**. Shows the richest event by default; pick with `--event N`, `--events A:B`, or overlay all with `--all`. Toggle outputs with `--no-blend`/`--no-png`/`--no-html`. |
 | `gdmltp analyze` | Summary report + plots: primary spectrum, total Edep, depth-dose, energy leakage, secondary counts; for neutrino files also interacted/CC fractions, ⟨Q²⟩/⟨W⟩, and a Q²/W/x/y kinematics panel. |
 | `gdmltp compare` | Overlay two runs: longitudinal shower profile, containment vs depth (d90/d95/d99), per-event leakage. For neutrino files it also overlays Q²/W/x/y — the cross-generator check (GENIE vs Achilles vs Geant4 on the same target). |
@@ -450,7 +517,7 @@ Docker images are built from the checked-in `docker/geant4.Dockerfile` (and
 
 **Pinning images.** `gdmltp run --image IMG` sets the image of the *first*
 stage. To pin every stage — including the Geant4 transport stage of a two-stage
-`transport: true` run — set `GDMLTP_IMAGE_GEANT4` / `GDMLTP_IMAGE_GENIE` /
+two-stage generator run — set `GDMLTP_IMAGE_GEANT4` / `GDMLTP_IMAGE_GENIE` /
 `GDMLTP_IMAGE_ACHILLES` / `GDMLTP_IMAGE_PYTHIA`:
 
 ```bash

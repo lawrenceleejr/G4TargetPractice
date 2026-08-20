@@ -80,17 +80,18 @@ generator: external
 geometry: {gdml: gdml/MAIA_v0.gdml}
 external:
   file: hnl_events.hepmc       # HepMC3 ASCII (Pythia8, MadGraph, ...)
-  transport: true              # replay final states through the GDML detector
+  # Geant4 replays the final states through the GDML detector by default;
+  # transport: false keeps the run vertex-level
 run: {output: output.root}
 ```
 
 The converter (the same tolerant pure-Python HepMC3 reader the Achilles
 backend uses) takes: primary = the status-4 beam particle, final state =
 status-1 particles, the event vertex (displaced vertices supported), HepMC
-event weights → `eventWeight`, vertex time → `decayT`. Without `transport` you
-get the vertex-level file (validate/analyze/display/compare all work); with it
-the daughters are replayed through the detector in the Geant4 image via the
-standard hand-off, timing included.
+event weights → `eventWeight`, vertex time → `decayT`. The daughters are then
+replayed through the detector in the Geant4 image via the standard hand-off,
+timing included; `transport: false` stops at the vertex-level file
+(validate/analyze/display/compare all work on either).
 
 E.g. for an HNL with correct V−A decay distributions: define the HNL in
 Pythia8 (`id:new`, `id:addChannel` with the appropriate `meMode`), decay your
@@ -104,4 +105,4 @@ flux with it, write HepMC3, and hand the file over.
 | lifetime/vertex | Geant4 in-flight + `ctau_sample` reweighting | from your file |
 | polarization / |M|² | no | yes (generator's) |
 | extra installs | none (standard image) | the generator, run by you |
-| stages | one | one (+ optional transport stage) |
+| stages | one | two (conversion, then the Geant4 transport stage) |

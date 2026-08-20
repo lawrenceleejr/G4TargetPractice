@@ -155,7 +155,7 @@ def build_transport_macro(gdml_name, n_events, event_file=EVENT_FILE, seed=None,
 
 
 def stage_inputs(outdir, gdml_name, output="output.root", seed=None, field=None,
-                 generator="", produced="output.root"):
+                 generator="", produced="output.root", image=None):
     """Package stage 1's result as the stage-2 job, in the run directory.
 
     Renames the generator's ntuple to `vertex_level.root`, exports its final
@@ -173,7 +173,10 @@ def stage_inputs(outdir, gdml_name, output="output.root", seed=None, field=None,
     spec = {"generator": generator, "gdml": gdml_name, "events": int(n),
             "seed": seed, "field": field, "output": output,
             "vertex": VERTEX_FILE, "event_file": EVENT_FILE,
-            "macro": TRANSPORT_MACRO}
+            "macro": TRANSPORT_MACRO,
+            # the Geant4 image this run asked for (a celeritas variant, a pinned
+            # tag), so a later `gdmltp transport` uses the same engine
+            "image": image}
     (outdir / STAGE_SPEC).write_text(json.dumps(spec, indent=2) + "\n")
     return spec
 
