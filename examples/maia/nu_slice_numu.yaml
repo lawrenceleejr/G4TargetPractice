@@ -47,5 +47,5 @@ genie:
   event_generator_list: Default
   length_units: cm
   target: 1000741840          # W-184: the nozzles dominate the interaction rate
-  # Geant4 transport of the final state through MAIA is the default (two-stage
-  # run; see docs/neutrino.md). `transport: false` keeps it vertex-level.
+  transport: true             # hand the final state to Geant4 (the default;
+                              # `false` = vertex-level, no propagation)

@@ -19,6 +19,11 @@ just Docker.
   interaction; their final state is handed to Geant4 as **HepMC3** and
   transported through the same GDML geometry, so every run's `output.root`
   carries a Geant4 transport record (`transport: false` opts out per backend).
+- **Neutrinos** — use a **generator** (`genie`/`achilles`/`pythia`), never the
+  bare `geant4` backend. Firing a neutrino beam at Geant4 asks a transport
+  engine to do interaction physics it barely models, so both the front-end and
+  the engine print a loud banner telling you to switch (`GDMLTP_NO_WARNINGS=1`
+  mutes it).
 - **Generator (backend)** — pick one:
   - `geant4` — full particle transport (the `g4sim` engine). *Default.*
   - `genie` — neutrino event generation on the GDML target, then Geant4 transport.
@@ -380,7 +385,12 @@ different seed) without regenerating the events.
 
 ## Biasing knobs
 
-- **geant4**: `geant4.neutrino_bias` — Geant4's built-in neutrino cross sections
+- **geant4**: a neutrino beam here prints an unmissable warning banner (from
+  `gdmltp run` *and* from g4sim itself, so a raw `docker run <image> my.mac`
+  gets it too) recommending `genie`/`achilles`/`pythia`; mute it with
+  `GDMLTP_NO_WARNINGS=1` when the Geant4-only run is deliberate
+  (`examples/maia/nu_slice_geant4_biased.yaml` is exactly that case).
+  `geant4.neutrino_bias` — Geant4's built-in neutrino cross sections
   are so small that unbiased runs record nothing; when the primary is a neutrino
   the generated macro auto-enables the stock `/physics_lists/em/Nu*` biasing
   (factor 5×10¹², as in the shipped macros). Tune with

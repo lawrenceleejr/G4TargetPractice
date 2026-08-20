@@ -17,7 +17,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from . import config, backends, handoff
+from . import config, backends, handoff, warnings as gwarn
 from .backends.geant4 import DEFAULT_IMAGE, build_macro
 
 # Geant4 prints "--> Event N" (or "Event N starts") per printProgress modulo;
@@ -221,6 +221,20 @@ def _repo_of(image):
     return image.rsplit(":", 1)[0] if ":" in image else image
 
 
+def warn_about(cfg):
+    """Loud banners for configurations that quietly produce the wrong physics.
+
+    Emitted for real runs AND dry-runs (the advice is about the config, not the
+    execution), before anything is launched, so the user sees it up front.
+    """
+    pdg = cfg.beam.pdg_code()
+    if cfg.generator == "geant4" and pdg in gwarn.NEUTRINO_PDGS and not cfg.mac:
+        gwarn.neutrino_on_geant4(cfg.beam.particle if cfg.beam.pdg is None
+                                 else f"PDG {pdg}")
+    if cfg.generator in config.VERTEX_LEVEL_GENERATORS and not _wants_transport(cfg):
+        gwarn.generator_without_transport(cfg.generator)
+
+
 def _wants_transport(cfg):
     """Geant4 transport is the default for every vertex-level generator: the
     common output.root is meant to carry a Geant4 transport record whatever
@@ -364,6 +378,7 @@ def run_config(cfg, image=None, outdir=".", local=False, dry_run=False,
     container itself and `gdmltp transport` finishes the run in the Geant4 image.
     """
     cfg.validate()
+    warn_about(cfg)
     outdir = Path(outdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
 

@@ -108,8 +108,12 @@ jobs:
           python3 - << 'PY'
           import pyhepmc
           C = 299.792458  # mm/ns
+          # event 1 carries a final-state NEUTRINO on purpose: a hand-off replay
+          # must transport it silently -- the "bare Geant4 neutrino" banner is
+          # about a GUN-fired neutrino beam, not a generator's final state.
           specs = [([(13,0,0,900),(2212,50,0,300)], (0,0,-20), 0.0),
-                   ([(13,0,0,700),(211,-30,0,200),(2112,0,20,150)], (1,0,-20), 166.8)]
+                   ([(13,0,0,700),(211,-30,0,200),(2112,0,20,150),(14,0,0,120)],
+                    (1,0,-20), 166.8)]
           with pyhepmc.open("events.hepmc", "w") as w:
               for i,(parts,v,tns) in enumerate(specs):
                   ev = pyhepmc.GenEvent(pyhepmc.Units.MEV, pyhepmc.Units.MM)
@@ -131,8 +135,13 @@ jobs:
           /gun/hepmcFile events.hepmc
           /run/beamOn 2
           EOF
-          ./build/g4sim transport.mac
+          ./build/g4sim transport.mac | tee handoff.log
           test -f output.root
+          # a generator's final-state neutrino is not a neutrino BEAM: no banner
+          if grep -q "ON THE BARE GEANT4 BACKEND" handoff.log; then
+            echo "the hand-off replay wrongly warned about a neutrino beam" >&2
+            exit 1
+          fi
           python3 - << 'PY'
           import uproot, awkward as ak
           t = uproot.open('output.root')['tree']
@@ -142,7 +151,7 @@ jobs:
           print('event 1 earliest step time:', t0)
           assert t0 >= 166.8, "HepMC vertex time was not applied to the primaries"
           PY
-          rm -f output.root events.hepmc transport.mac
+          rm -f output.root events.hepmc transport.mac handoff.log
 
       - name: BSM decay smoke (/bsm/define -> G4Decay)
         # Geant4 does the decay: define a 1 GeV neutral with a short sampled
@@ -196,10 +205,21 @@ jobs:
           /gun/direction 0 0 1
           /run/beamOn 20
           EOF
-          ./build/g4sim nubias.mac
+          ./build/g4sim nubias.mac | tee nubias.log
           test -f output.root
+          # firing a neutrino AT Geant4 is generator-free neutrino physics: the
+          # engine must say so loudly, and point at the generators
+          grep -q "ON THE BARE GEANT4 BACKEND" nubias.log
+          grep -q "USE A NEUTRINO EVENT GENERATOR INSTEAD" nubias.log
+          test "$(grep -c 'ON THE BARE GEANT4 BACKEND' nubias.log)" = "1"   # once per run
+          # ... and it must be mutable for scripted/large runs
+          GDMLTP_NO_WARNINGS=1 ./build/g4sim nubias.mac | tee nubias_quiet.log
+          if grep -q "ON THE BARE GEANT4 BACKEND" nubias_quiet.log; then
+            echo "GDMLTP_NO_WARNINGS did not silence the engine banner" >&2
+            exit 1
+          fi
           python3 -c "import uproot,sys; t=uproot.open('output.root')['tree']; n=t.num_entries; nu='nu_isCC' in [k.split(';')[0] for k in t.keys()]; print('events',n,'nu block',nu); sys.exit(0 if (n==20 and nu) else 1)"
-          rm -f output.root nubias.mac
+          rm -f output.root nubias.mac nubias.log nubias_quiet.log
 
       - name: Particle-by-PDG smoke (/gun/particlePDG)
         run: |

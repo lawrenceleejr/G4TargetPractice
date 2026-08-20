@@ -28,7 +28,7 @@ run:
 
 pythia:
   process: dis               # WeakBosonExchange CC + NC
-  # Geant4 transports the final state through the GDML by default
-  # (`transport: false` opts out and keeps the run vertex-level)
+  transport: true            # hand the final state to Geant4 (the default;
+                             # `false` = vertex-level, no propagation)
   # target: 2212             # force a free proton (else inferred from the GDML)
   # settings: ["PDF:pSet = 8"]

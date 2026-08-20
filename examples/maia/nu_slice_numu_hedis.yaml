@@ -56,3 +56,5 @@ genie:
   cross_sections: auto              # on-demand gmkhedissf + gmkspl, cached in run dir
   length_units: cm
   target: 1000741840                # W-184 (the tungsten nozzles)
+  transport: true             # hand the final state to Geant4 (the default;
+                              # `false` = vertex-level, no propagation)

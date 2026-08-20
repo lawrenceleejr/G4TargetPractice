@@ -30,3 +30,5 @@ genie:
   event_generator_list: Default
   length_units: cm
   target: 1000180400          # optional; else inferred from the GDML material
+  transport: true             # hand the final state to Geant4 (the default;
+                              # `false` = vertex-level, no propagation)

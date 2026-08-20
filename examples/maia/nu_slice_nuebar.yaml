@@ -37,3 +37,5 @@ genie:
   event_generator_list: Default
   length_units: cm
   target: 1000741840
+  transport: true             # hand the final state to Geant4 (the default;
+                              # `false` = vertex-level, no propagation)

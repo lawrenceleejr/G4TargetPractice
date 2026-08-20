@@ -79,6 +79,7 @@ private:
     G4ParticleGun*             fParticleGun;
 
     G4String      fParticleName;
+    bool          fWarnedNeutrinoBeam = false;   // gun-fired neutrino: warn once
     G4double      fEnergy;
     G4ThreeVector fPosition;
     G4ThreeVector fDirection;

@@ -26,7 +26,8 @@ gdmltp run --config examples/nu_argon_achilles.yaml -o achilles_out
 # Pythia 8 (high-energy DIS off a free nucleon; no cross-section splines needed)
 gdmltp run --config examples/nu_argon_pythia.yaml -o pythia_out
 
-# Geant4's built-in neutrino handling (thin; kept for contrast/completeness)
+# Geant4's built-in neutrino handling (thin; kept for contrast/completeness --
+# this one prints the "bare Geant4 neutrino" banner on purpose)
 gdmltp run --gdml gdml/liquid_argon_1m3.gdml --particle nu_mu \
            --energy "2 GeV" -n 1000 -o g4_out
 ```
@@ -49,7 +50,13 @@ physics that decides what actually leaves the nucleus — but stop at the
 nuclear surface. Geant4 transports particles superbly but its built-in
 neutrino interactions are physically thin (they need ~10¹² cross-section bias
 to interact at all; `gdmltp` auto-applies that bias for you). Use a generator
-for the vertex, Geant4 for the detector — or both together (§4).
+for the vertex, Geant4 for the detector — which is exactly what every generator
+run does (§4).
+
+Point a neutrino beam at the bare `geant4` backend and both the front-end and
+g4sim itself print a banner saying so and naming the generator configs to use
+instead. It does not stop the run — `GDMLTP_NO_WARNINGS=1` mutes it for the
+deliberate case (`examples/maia/nu_slice_geant4_biased.yaml`).
 
 ## 2. Validate every file before trusting it
 

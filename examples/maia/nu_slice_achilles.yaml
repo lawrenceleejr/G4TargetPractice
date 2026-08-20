@@ -58,3 +58,5 @@ achilles:
   cascade: true              # intranuclear cascade on final-state hadrons
   # nuclear_model: QESpectral
   # processes: [[13], [14]]  # final-state leptons (default: CC + NC)
+  transport: true             # hand the final state to Geant4 (the default;
+                              # `false` = vertex-level, no propagation)
