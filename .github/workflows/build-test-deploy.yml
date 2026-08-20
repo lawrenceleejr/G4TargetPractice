@@ -102,7 +102,6 @@ jobs:
 
       - name: Hand-off HepMC3 smoke (/gun/hepmcFile)
         run: |
-          set -o pipefail          # `g4sim | tee` must not hide a crash
           # Write the hand-off with the official library (pyhepmc), then g4sim
           # reads it back with HepMC3::ReaderAscii -- the real interchange, both
           # ends. Second event carries a vertex time that must reach step times.
@@ -136,7 +135,8 @@ jobs:
           /gun/hepmcFile events.hepmc
           /run/beamOn 2
           EOF
-          ./build/g4sim transport.mac | tee handoff.log
+          ./build/g4sim transport.mac > handoff.log 2>&1 || { cat handoff.log; exit 1; }
+          cat handoff.log
           test -f output.root
           # a generator's final-state neutrino is not a neutrino BEAM: no banner
           if grep -q "ON THE BARE GEANT4 BACKEND" handoff.log; then
@@ -194,7 +194,6 @@ jobs:
         # sections via the C++ API -- it must NOT abort the batch the way the
         # optional /physics_lists/em/Nu* UI commands do in this Geant4 build.
         run: |
-          set -o pipefail          # `g4sim | tee` must not hide a crash
           cat > nubias.mac << 'EOF'
           /gdmltp/neutrinoBias 1e10 1e10 1e10 DefaultRegionForTheWorld
           /detector/readGDML gdml/liquid_argon_1m3.gdml
@@ -207,7 +206,8 @@ jobs:
           /gun/direction 0 0 1
           /run/beamOn 20
           EOF
-          ./build/g4sim nubias.mac | tee nubias.log
+          ./build/g4sim nubias.mac > nubias.log 2>&1 || { cat nubias.log; exit 1; }
+          cat nubias.log
           test -f output.root
           # firing a neutrino AT Geant4 is generator-free neutrino physics: the
           # engine must say so loudly, and point at the generators
@@ -215,7 +215,8 @@ jobs:
           grep -q "USE A NEUTRINO EVENT GENERATOR INSTEAD" nubias.log
           test "$(grep -c 'ON THE BARE GEANT4 BACKEND' nubias.log)" = "1"   # once per run
           # ... and it must be mutable for scripted/large runs
-          GDMLTP_NO_WARNINGS=1 ./build/g4sim nubias.mac | tee nubias_quiet.log
+          GDMLTP_NO_WARNINGS=1 ./build/g4sim nubias.mac > nubias_quiet.log 2>&1 \
+            || { cat nubias_quiet.log; exit 1; }
           if grep -q "ON THE BARE GEANT4 BACKEND" nubias_quiet.log; then
             echo "GDMLTP_NO_WARNINGS did not silence the engine banner" >&2
             exit 1
