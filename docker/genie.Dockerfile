@@ -22,7 +22,7 @@ COPY gdmltp/ /app/pysrc/gdmltp/
 COPY g4tp/ /app/pysrc/g4tp/
 COPY pyproject.toml README.md /app/pysrc/
 RUN python3 -m pip install --no-cache-dir /app/pysrc && \
-    python3 -c "import gdmltp; from gdmltp.backends import genie_convert, achilles_convert; print('gdmltp', gdmltp.__version__)"
+    python3 -c "import gdmltp, pyhepmc; from gdmltp import handoff; from gdmltp.backends import genie_convert, achilles_convert; print('gdmltp', gdmltp.__version__, 'pyhepmc', pyhepmc.__version__)"
 
 # GENIE driver (reads genie_job.json, runs gevgen -> gntpc -> genie2root).
 COPY genie/ /app/genie/

@@ -8,7 +8,10 @@ Like the GENIE backend, the host writes a small job JSON; the Achilles
 container's driver (achilles/run_achilles.py) renders the actual run card from
 it, runs `achilles`, and converts the NuHepMC output to the common
 `output.root` schema (achilles_convert) -- so analyze/display/compare/Blender
-work on Achilles events exactly as they do on Geant4 or GENIE ones.
+work on Achilles events exactly as they do on Geant4 or GENIE ones. Also like
+GENIE, it transports nothing: this is stage 1, and Geant4 propagates the final
+state through the geometry via the HepMC3 hand-off unless
+`achilles: {transport: false}`.
 """
 import json
 from pathlib import Path

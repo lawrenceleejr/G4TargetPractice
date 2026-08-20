@@ -237,6 +237,14 @@ def _geant4_engine_here():
     return bool(shutil.which("g4sim")) or os.path.exists("/app/build/g4sim")
 
 
+def _here(outdir):
+    """`outdir` as the user would type it now (so a suggested command works)."""
+    try:
+        return os.path.relpath(outdir, Path.cwd())
+    except ValueError:                      # different drive (Windows)
+        return str(outdir)
+
+
 def _no_engine_error(outdir, image):
     return RuntimeError(
         f"the generator stage finished, but this image ships no Geant4 engine, "
@@ -244,10 +252,10 @@ def _no_engine_error(outdir, image):
         f"Its inputs are ready in {outdir} ({handoff.EVENT_FILE}, "
         f"{handoff.STAGE_SPEC}); finish the run with a Geant4 image:\n"
         f"    docker run --rm --user \"$(id -u):$(id -g)\" -e HOME=/tmp \\\n"
-        f"        -v \"$PWD:/run\" -w /run {image} transport -o {outdir.name}\n"
+        f"        -v \"$PWD:/run\" -w /run {image} transport -o {_here(outdir)}\n"
         f"or run the whole thing from the host front-end, which chains the two "
         f"images itself:\n"
-        f"    gdmltp run --config <config> -o {outdir.name}\n"
+        f"    gdmltp run --config <config> -o {_here(outdir)}\n"
         f"(add --stage generator to this command to make stopping here the "
         f"intended outcome rather than an error)")
 
@@ -264,7 +272,7 @@ def _transport_stage(cfg, prep, outdir, local, dry_run, stage="full"):
               f"{handoff.EVENT_FILE} (HepMC3)")
         if stage == "generator":
             print(f"[gdmltp] (dry-run) would stop there; `gdmltp transport -o "
-                  f"{outdir.name}` finishes the run in {image}")
+                  f"{_here(outdir)}` finishes the run in {image}")
         else:
             print(f"[gdmltp] (dry-run:transport) would replay them through "
                   f"{image} via /gun/hepmcFile, merging the nu_* block into "
@@ -281,7 +289,7 @@ def _transport_stage(cfg, prep, outdir, local, dry_run, stage="full"):
     if stage == "generator":
         print(f"[gdmltp] stopping after the generator stage as asked. Finish the "
               f"run in a Geant4 image:\n"
-              f"    gdmltp transport -o {outdir.name}   "
+              f"    gdmltp transport -o {_here(outdir)}   "
               f"(-> {outdir / cfg.run.output})")
         return
     if local and not _geant4_engine_here():

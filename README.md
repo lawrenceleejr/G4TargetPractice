@@ -87,6 +87,10 @@ geometry and merges the generator's interaction record back in. Override any
 field on the command line, e.g. `gtp $GENIE run --config examples/nu_argon.yaml
 --energy "5 GeV" -n 2000 -o out --stage generator`.
 
+> These commands (`--stage generator`, `transport`) need images built from this
+> version of the repo — the `:main` tags are rebuilt on every push to the default
+> branch, so `docker pull` first if yours are old.
+
 > Prefer **one** command for generator runs? Install the front-end
 > (`pip install "gdmltp @ git+https://github.com/lawrenceleejr/GDMLTargetPractice"`)
 > and `gdmltp run --config examples/nu_argon.yaml -o out` launches both
@@ -403,10 +407,11 @@ e.g. liquid argon → `40Ar`), runs `achilles`, and converts its **NuHepMC**
 per final-state particle. Backend knobs: `achilles.{cascade, nuclear_model,
 processes, nucleus, options}`, or a verbatim `achilles.run_card`.
 
-**Same display pipeline for every backend.** Vertex-level generators record no
-transport, so their converters also fill optional per-track momentum branches
-(`trk_px/py/pz`); the event display draws momentum-direction rays (length ∝ √|p|)
-for untransported tracks. `gdmltp display output.root --gdml my.gdml [--blend]`
+**Same display pipeline for every backend.** The generator converters also fill
+optional per-track momentum branches (`trk_px/py/pz`) — that is what the Geant4
+hand-off exports to HepMC3, and what lets the event display draw
+momentum-direction rays (length ∝ √|p|) for a `transport: false` run, whose
+tracks were never propagated. `gdmltp display output.root --gdml my.gdml [--blend]`
 therefore works identically on Geant4, GENIE, and Achilles output — including the
 animated Blender export.
 

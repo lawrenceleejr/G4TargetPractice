@@ -107,6 +107,7 @@ core.*
 # shadow macros/ and gdml/).
 gdmltp_run.mac
 gdmltp_transport.mac
+gdmltp_transport.json
 gdmltp_display/
 beam.dat
 events.hepmc
