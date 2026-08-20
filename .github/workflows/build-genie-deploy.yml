@@ -108,6 +108,8 @@ jobs:
     permissions:
       contents: read
       packages: read
+    env:
+      CONFIG: .github/ci/nu_water_transport.yaml
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -136,13 +138,16 @@ jobs:
           REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           BRANCH_TAG="${GITHUB_REF_NAME//\//-}"
           GEANT4="ghcr.io/$REPO:$BRANCH_TAG"
-          docker pull -q "$GEANT4" || GEANT4="ghcr.io/$REPO:main"
-          docker pull -q "$GEANT4"
+          if ! docker pull -q "$GEANT4"; then
+            GEANT4="ghcr.io/$REPO:main"      # this branch's build is not up yet
+            docker pull -q "$GEANT4"
+          fi
           echo "genie=${{ needs.docker-genie.outputs.image }}" >> "$GITHUB_OUTPUT"
           echo "geant4=$GEANT4" >> "$GITHUB_OUTPUT"
 
       - name: Restore the cross-section splines
-        uses: actions/cache@v4
+        id: xsec
+        uses: actions/cache/restore@v4
         with:
           path: xsec_cache
           key: genie-xsec-${{ hashFiles('.github/ci/nu_water_transport.yaml') }}
@@ -162,17 +167,25 @@ jobs:
           # gmkspl caches its splines in the run directory: seed it from the
           # GitHub cache so only the first run on a probe/target pays for them
           cp xsec_cache/gxspl_*.xml nu_out/ 2>/dev/null || true
-          gdmltp run --config .github/ci/nu_water_transport.yaml -o nu_out
+          gdmltp run --config "$CONFIG" -o nu_out
           test -f nu_out/output.root
 
-      - name: Keep the computed splines for the next run
-        # even when the run above failed after gmkspl -- they cost the most and
-        # are independent of whatever broke downstream
+      - name: Collect the computed splines
         if: always()
         run: |
           mkdir -p xsec_cache
           cp nu_out/gxspl_*.xml xsec_cache/ 2>/dev/null || true
           ls -la xsec_cache/ || true
+
+      - name: Save the splines for the next run
+        # restore/save rather than actions/cache: its save step is success-only,
+        # and a gmkspl result is worth keeping even when the run failed after it
+        # (that is the expensive part, and it is independent of what broke)
+        if: always() && steps.xsec.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: xsec_cache
+          key: genie-xsec-${{ hashFiles('.github/ci/nu_water_transport.yaml') }}
 
       - name: Validate and analyze the merged ntuple (README commands)
         env:
@@ -192,11 +205,14 @@ jobs:
           set -euxo pipefail
           # --require-nu AND --require-steps together are the hand-off itself:
           # the generator's interaction record on top of Geant4's transport
+          # the event count comes from the config, so editing it there cannot
+          # leave a stale expectation here
+          EVENTS=$(python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG'))['run']['events'])")
           docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
             -v "$PWD:/run" -w /run --entrypoint python3 "$GEANT4" \
             .github/scripts/ci_ntuple_plots.py nu_out/output.root \
             -o nu_out/plots --label "2 GeV numu -> water" \
-            --min-events 40 --require-steps --require-nu
+            --min-events "$EVENTS" --require-steps --require-nu
 
       - name: Upload the plots and reports
         if: always()

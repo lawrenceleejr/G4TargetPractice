@@ -310,6 +310,7 @@ jobs:
       packages: read
     env:
       GEANT4: ${{ needs.docker.outputs.image }}
+      EVENTS: 200                 # CI-scale; the example YAML asks for 500
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -328,7 +329,7 @@ jobs:
           # outputs are not root-owned
           gtp() { docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
                              -v "$PWD:/run" -w /run "$@"; }
-          gtp "$GEANT4" run --config examples/water_proton.yaml -n 200 -o g4_out
+          gtp "$GEANT4" run --config examples/water_proton.yaml -n "$EVENTS" -o g4_out
           test -f g4_out/output.root
           gtp "$GEANT4" validate g4_out/output.root
           gtp "$GEANT4" analyze g4_out/output.root -o g4_out/analysis
@@ -337,11 +338,13 @@ jobs:
       - name: Plot the output ntuple (independent uproot read, inside the image)
         run: |
           set -euxo pipefail
+          # every requested event must be in the file, and each must carry a
+          # transport record -- an image that runs but writes nothing is red here
           docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
             -v "$PWD:/run" -w /run --entrypoint python3 "$GEANT4" \
             .github/scripts/ci_ntuple_plots.py g4_out/output.root \
             -o g4_out/plots --label "150 MeV p -> water" \
-            --min-events 200 --require-steps
+            --min-events "$EVENTS" --require-steps
 
       - name: Upload the plots and reports
         if: always()

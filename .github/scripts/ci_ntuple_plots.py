@@ -56,7 +56,7 @@ def save(fig, ax, path):
     print(f"[ci-plots] wrote {path}")
 
 
-def hist(values, xlabel, title, path, bins=40, logy=False):
+def hist(values, xlabel, title, path, bins=40):
     v = np.asarray(values, float)
     v = v[np.isfinite(v)]
     if v.size == 0:
@@ -73,8 +73,6 @@ def hist(values, xlabel, title, path, bins=40, logy=False):
     ax.set_xlabel(xlabel)
     ax.set_ylabel("events")
     ax.set_title(title)
-    if logy:
-        ax.set_yscale("log")
     save(fig, ax, path)
     return True
 
