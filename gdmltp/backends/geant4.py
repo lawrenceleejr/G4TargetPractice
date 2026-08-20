@@ -8,7 +8,7 @@ old flag-only path produced. Every command here is one g4sim already understands
 import shutil
 from pathlib import Path
 
-from .base import Backend, Prepared
+from .base import Backend, Prepared, image_override
 
 DEFAULT_IMAGE = "ghcr.io/lawrenceleejr/gdmltargetpractice:main"
 GENERATED_MACRO = "gdmltp_run.mac"
@@ -135,7 +135,7 @@ class Geant4Backend(Backend):
     default_image = DEFAULT_IMAGE
 
     def image_for(self, cfg) -> str:
-        img = self.default_image
+        img = image_override(self.name) or self.default_image
         if cfg.geant4.get("celeritas"):
             # tag variant: ...:main -> ...:main-celeritas
             if ":" in img:

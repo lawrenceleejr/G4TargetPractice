@@ -6,8 +6,21 @@ the engine (and, for GENIE, a converter). Every backend must ultimately produce
 `output.root` in the schema `gdmltp/io.py` declares -- that shared ntuple is the
 contract that lets analyze/compare/display/info work regardless of generator.
 """
+import os
 from dataclasses import dataclass, field
 from typing import Optional
+
+
+def image_override(name: str):
+    """`GDMLTP_IMAGE_<BACKEND>` -- pin the image a backend runs, for every stage.
+
+    `run --image` only sets the FIRST stage's image, so a two-stage run (a
+    generator vertex plus the Geant4 transport of `transport: true`) has no other
+    way to name the Geant4 image; CI uses this to test a freshly built pair of
+    images against each other instead of the published `:main` defaults.
+    """
+    val = os.environ.get(f"GDMLTP_IMAGE_{name.upper()}", "").strip()
+    return val or None
 
 
 @dataclass
@@ -42,7 +55,7 @@ class Backend:
 
     def image_for(self, cfg) -> str:
         """Image to run for this config (may vary on backend-specific options)."""
-        return self.default_image
+        return image_override(self.name) or self.default_image
 
     def prepare(self, cfg, outdir, image=None) -> Prepared:
         """Render backend inputs into `outdir` and return a Prepared plan.

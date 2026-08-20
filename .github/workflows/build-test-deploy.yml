@@ -249,6 +249,10 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      # the exact tag the docker-run tests below (and the GENIE workflow's
+      # transport stage) must pull -- not a re-derived guess at it
+      image: ${{ steps.image.outputs.ref }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -284,3 +288,71 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Publish the pushed tag for the downstream test jobs
+        id: image
+        run: |
+          echo "ref=$(head -n1 <<< '${{ steps.meta.outputs.tags }}')" >> "$GITHUB_OUTPUT"
+
+  # ---- Docker-based run test: the README one-liner against the image we just
+  #      published, pure Geant4 (no generator) ------------------------------- #
+  #
+  # The jobs above test the freshly BUILT engine (g4sim from this checkout) --
+  # this one tests the shipped IMAGE the way a user meets it in the README:
+  # `docker run <image> run --config <yaml>`, then validate/analyze, then plots
+  # read straight off the ntuple. Plots + reports are kept as artifacts.
+  docker-run-geant4:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    needs: [docker]
+    permissions:
+      contents: read
+      packages: read
+    env:
+      GEANT4: ${{ needs.docker.outputs.image }}
+      EVENTS: 200                 # CI-scale; the example YAML asks for 500
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Simulate, validate and analyze -- exactly the README commands
+        run: |
+          set -euxo pipefail
+          # the README's wrapper: mount the repo, run as this user so the
+          # outputs are not root-owned
+          gtp() { docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+                             -v "$PWD:/run" -w /run "$@"; }
+          gtp "$GEANT4" run --config examples/water_proton.yaml -n "$EVENTS" -o g4_out
+          test -f g4_out/output.root
+          gtp "$GEANT4" validate g4_out/output.root
+          gtp "$GEANT4" analyze g4_out/output.root -o g4_out/analysis
+          test -f g4_out/analysis/summary.txt
+
+      - name: Plot the output ntuple (independent uproot read, inside the image)
+        run: |
+          set -euxo pipefail
+          # every requested event must be in the file, and each must carry a
+          # transport record -- an image that runs but writes nothing is red here
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD:/run" -w /run --entrypoint python3 "$GEANT4" \
+            .github/scripts/ci_ntuple_plots.py g4_out/output.root \
+            -o g4_out/plots --label "150 MeV p -> water" \
+            --min-events "$EVENTS" --require-steps
+
+      - name: Upload the plots and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-run-geant4-plots
+          path: |
+            g4_out/plots/
+            g4_out/analysis/
+          if-no-files-found: warn
+          retention-days: 14

@@ -26,6 +26,20 @@ def test_default_image_and_celeritas_variant():
     assert b.image_for(_cfg(celeritas=True)).endswith("-celeritas")
 
 
+def test_image_env_override(monkeypatch):
+    """GDMLTP_IMAGE_<BACKEND> pins the image for EVERY stage (the transport
+    stage of a two-stage run has no --image of its own) -- what CI uses to test
+    a freshly built image pair."""
+    b = backends.get("geant4")
+    monkeypatch.setenv("GDMLTP_IMAGE_GEANT4", "ghcr.io/x/g4:pr-1")
+    assert b.image_for(_cfg()) == "ghcr.io/x/g4:pr-1"
+    assert b.image_for(_cfg(celeritas=True)) == "ghcr.io/x/g4:pr-1-celeritas"
+    monkeypatch.setenv("GDMLTP_IMAGE_GEANT4", "   ")          # blank = unset
+    assert b.image_for(_cfg()) == geant4.DEFAULT_IMAGE
+    monkeypatch.setenv("GDMLTP_IMAGE_GENIE", "ghcr.io/x/genie:pr-1")
+    assert backends.get("genie").image_for(_cfg()) == "ghcr.io/x/genie:pr-1"
+
+
 # --- macro rendering ------------------------------------------------------- #
 def test_macro_mono_basics():
     mac = geant4.build_macro(config.RunConfig(
