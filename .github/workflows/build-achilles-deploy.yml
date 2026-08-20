@@ -10,13 +10,13 @@ on:
       achilles_base:
         description: "Achilles base image"
         required: false
-        default: "ghcr.io/lawrenceleejr/g4targetpractice-achilles-base:latest"
+        default: "ghcr.io/lawrenceleejr/gdmltargetpractice-achilles-base:latest"
 
 env:
   # Base-image resolution: workflow_dispatch input > repo variable > our own
   # from-source base (built by build-generator-bases.yml so nobody downstream
   # compiles Achilles themselves). Red until that base workflow has published once.
-  ACHILLES_BASE: ${{ github.event.inputs.achilles_base || vars.ACHILLES_BASE_IMAGE || 'ghcr.io/lawrenceleejr/g4targetpractice-achilles-base:latest' }}
+  ACHILLES_BASE: ${{ github.event.inputs.achilles_base || vars.ACHILLES_BASE_IMAGE || 'ghcr.io/lawrenceleejr/gdmltargetpractice-achilles-base:latest' }}
 
 jobs:
   docker-achilles:

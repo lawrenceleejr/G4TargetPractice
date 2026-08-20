@@ -4,7 +4,7 @@
 # (HepMC3, fmt, spdlog, yaml-cpp, ...) at configure time.
 #
 # Built by .github/workflows/build-generator-bases.yml and published as
-# ghcr.io/<owner>/g4targetpractice-achilles-base; the fast per-push achilles
+# ghcr.io/<owner>/gdmltargetpractice-achilles-base; the fast per-push achilles
 # app image (docker/achilles.Dockerfile) layers gdmltp + the driver on top.
 ARG UBUNTU=ubuntu:22.04
 FROM ${UBUNTU}

@@ -114,8 +114,8 @@ jobs:
           # rebuild every layer from scratch (so the patched GENIE is actually
           # compiled in); it then repopulates buildcache2 and later edits are
           # incremental again.
-          cache-from: type=registry,ref=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:buildcache2
-          cache-to: type=registry,ref=ghcr.io/lawrenceleejr/g4targetpractice-genie-base:buildcache2,mode=max
+          cache-from: type=registry,ref=ghcr.io/lawrenceleejr/gdmltargetpractice-genie-base:buildcache2
+          cache-to: type=registry,ref=ghcr.io/lawrenceleejr/gdmltargetpractice-genie-base:buildcache2,mode=max
 
   achilles-base:
     runs-on: ubuntu-latest
