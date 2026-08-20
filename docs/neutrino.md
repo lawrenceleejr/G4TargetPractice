@@ -119,22 +119,31 @@ run: { events: 1000, seed: 1 }
 genie: { tune: G18_10a_00_000 }
 ```
 
-**Two engines, so two containers.** `gdmltp run` (the pip front-end) chains them
-for you — one command. From bare `docker run` it is two commands, because a
-container cannot start a sibling container: the generator image writes the
-hand-off, the Geant4 image replays it.
+**Two engines — but for GENIE, one container.** The GENIE image is built ON TOP
+of the project's Geant4 image, so it carries both engines and a bare
+`docker run` completes the whole pipeline:
 
 ```bash
-# stage 1: the interaction, in the generator image (writes events.hepmc)
-gtp $GENIE  run --config examples/nu_argon.yaml -o out --stage generator
+gtp $GENIE run --config examples/nu_argon.yaml -o out    # -> out/output.root
+```
 
-# stage 2: the propagation, in the Geant4 image (writes out/output.root)
+Inside that one container, GENIE runs under its own environment (its own ROOT,
+built with Pythia6) and g4sim under the base image's — the two stacks never mix.
+The split flow remains available for inspecting or re-running the hand-off, and
+it is the required recipe for **Achilles and Pythia**, whose images carry only
+their generator:
+
+```bash
+# stage 1: the interaction (writes events.hepmc + vertex_level.root)
+gtp $ACHILLES run --config examples/nu_argon_achilles.yaml -o out --stage generator
+
+# stage 2: the propagation, in any Geant4-carrying image (writes out/output.root)
 gtp $GEANT4 transport -o out
 ```
 
-Run stage 1 without `--stage generator` and it stops with an error naming that
-exact second command — a run that never reached Geant4 is a failed run, not a
-quiet half-result.
+A full run asked of an image with no Geant4 engine stops with an error naming
+that exact second command — a run that never reached Geant4 is a failed run,
+not a quiet half-result.
 
 **Vertex-level on purpose?** For a generator-only study (cross sections,
 kinematics, no detector), opt out explicitly:

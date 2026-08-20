@@ -249,11 +249,37 @@ def _run_beam(job, workdir):
     return 0
 
 
+GENIE_ENV_SCRIPT = "/opt/genie-env.sh"
+
+
+def _enter_genie_env():
+    """Merge the GENIE stack's environment into this process (merged image).
+
+    In the combined GENIE+Geant4 image the GENIE environment (its own ROOT,
+    Pythia6, LHAPDF, the HEDIS markers) is deliberately NOT global -- g4sim in
+    the same image must keep the base ROOT, and ROOT sonames are unversioned.
+    The driver owns every GENIE subprocess, so it enters that environment here:
+    gevgen/gmkspl/gntpc/gmkhedissf children inherit it, and the driver's own
+    GDMLTP_HEDIS / HEDIS_*_PATH lookups see it. A no-op where the script is
+    absent (a standalone GENIE image bakes the env in globally instead).
+    """
+    if not os.path.exists(GENIE_ENV_SCRIPT):
+        return
+    dump = subprocess.run(
+        ["bash", "-c", f"source {GENIE_ENV_SCRIPT} && env -0"],
+        capture_output=True, check=True)
+    for pair in dump.stdout.split(b"\0"):
+        if b"=" in pair:
+            key, _, val = pair.partition(b"=")
+            os.environ[key.decode()] = val.decode(errors="replace")
+
+
 def main(argv=None):
     argv = argv if argv is not None else sys.argv[1:]
     if not argv:
         print("usage: run_genie.py <genie_job.json>", file=sys.stderr)
         return 2
+    _enter_genie_env()
     return run(argv[0])
 
 
