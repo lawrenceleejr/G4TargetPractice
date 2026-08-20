@@ -236,12 +236,16 @@ def test_convert_without_target_pdg_leaves_target_unknown(tmp_path):
     assert t["nu_targetZ"].array(library="np")[0] == -1
 
 
-def test_transport_flag_recognized(repo_root, tmp_path):
-    """`pythia: {transport: true}` must route through the generic Geant4
-    hand-off, exactly as genie/achilles do."""
+def test_transport_is_the_default(repo_root, tmp_path):
+    """Pythia routes through the generic Geant4 hand-off like genie/achilles --
+    and, like them, does so by DEFAULT: the common output.root is meant to carry
+    a Geant4 transport record whatever generated the interaction."""
     from gdmltp import run as runmod
-    cfg = config.RunConfig(generator="pythia", gdml="x.gdml",
-                           pythia={"transport": True})
+    cfg = config.RunConfig(generator="pythia", gdml="x.gdml", pythia={})
     assert runmod._wants_transport(cfg) is True
-    cfg2 = config.RunConfig(generator="pythia", gdml="x.gdml", pythia={})
-    assert not runmod._wants_transport(cfg2)
+    cfg2 = config.RunConfig(generator="pythia", gdml="x.gdml",
+                            pythia={"transport": True})
+    assert runmod._wants_transport(cfg2) is True
+    cfg3 = config.RunConfig(generator="pythia", gdml="x.gdml",
+                            pythia={"transport": False})
+    assert runmod._wants_transport(cfg3) is False

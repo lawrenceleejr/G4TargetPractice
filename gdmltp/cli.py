@@ -14,6 +14,18 @@ examples:
   gdmltp run --config run.yaml                            # YAML frontend (any backend)
   gdmltp run --config run.yaml --energy "200 MeV"         # flag overrides one YAML field
   gdmltp run --config examples/maia/hnl_decay.yaml        # BSM decay-in-flight (Geant4)""",
+    "transport": """\
+examples:
+  gdmltp transport -o out                                # finish a generator run in Geant4
+  gdmltp transport -o out --image ghcr.io/.../gdmltargetpractice:main
+  gdmltp transport -o out --local                        # g4sim here (inside the Geant4 image)
+
+`gdmltp run` does this automatically when it can reach both images. Run it by
+hand to finish a run a generator IMAGE started -- a bare `docker run` cannot
+launch a second container, so the generator image writes events.hepmc and the
+Geant4 image replays it:
+  docker run --rm -v "$PWD:/run" -w /run $GENIE  run --config nu.yaml -o out
+  docker run --rm -v "$PWD:/run" -w /run $GEANT4 transport -o out""",
     "display": """\
 examples:
   gdmltp display output.root --gdml my_detector.gdml     # WebGL html + PNG stills
@@ -98,8 +110,23 @@ def _build_parser():
     r.add_argument("--image", default=None, help="container image (default: backend's own)")
     r.add_argument("--local", action="store_true", help="use a g4sim on PATH instead of Docker")
     r.add_argument("-o", "--outdir", default=".")
+    r.add_argument("--stage", default="full", choices=["full", "generator"],
+                   help="'generator' stops a two-stage generator run after the "
+                        "generator, leaving events.hepmc for `gdmltp transport` "
+                        "to replay in a Geant4 image (default: full)")
     r.add_argument("--display", action="store_true", help="open an event display after the run")
     r.add_argument("--dry-run", action="store_true")
+
+    # transport
+    t = _sub("transport", "Geant4 stage of a generator run (replay events.hepmc)")
+    t.add_argument("-o", "--outdir", default=".",
+                   help="run directory holding the generator stage's output "
+                        f"(events.hepmc + the stage spec)")
+    t.add_argument("--image", default=None,
+                   help="Geant4 container image (default: the backend's own)")
+    t.add_argument("--local", action="store_true",
+                   help="use a g4sim on PATH instead of Docker")
+    t.add_argument("--dry-run", action="store_true")
 
     # display
     d = _sub("display", "event display: WebGL HTML, PNG stills, and/or Blender")
@@ -243,6 +270,10 @@ def _display_in_docker(image, display_argv):
 def _dispatch(args):
     if args.cmd == "run":
         return _run(args)
+    if args.cmd == "transport":
+        from . import run as runmod
+        return runmod.transport(outdir=args.outdir, image=args.image,
+                                local=args.local, dry_run=args.dry_run)
     if args.cmd == "display":
         if args.root and not Path(args.root).exists():
             if args.gdml:
@@ -294,7 +325,7 @@ def _run(args):
     _require_files(cfg.gdml, cfg.mac)
 
     runmod.run_config(cfg, image=args.image, outdir=args.outdir,
-                      local=args.local, dry_run=args.dry_run)
+                      local=args.local, dry_run=args.dry_run, stage=args.stage)
 
     if args.display and not args.dry_run:
         # Real display-parser defaults (not a hand-copied Namespace), with the

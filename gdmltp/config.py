@@ -20,6 +20,12 @@ from typing import Optional
 
 
 GENERATORS = ("geant4", "genie", "achilles", "pythia", "decay", "external")
+
+# Generators that produce an interaction but transport nothing: their final
+# state is handed to Geant4 as HepMC3 unless `<backend>: {transport: false}`.
+# decay is not one of them -- it is a single Geant4 stage that decays AND
+# transports.
+VERTEX_LEVEL_GENERATORS = ("genie", "achilles", "pythia", "external")
 # mudecay_*: the neutrino energy spectrum from in-flight muon decay (the
 # neutrino-factory / muon-collider "neutrino slice" flux, angle-integrated over
 # the ~1/gamma cone; unpolarized). energy.value is the PARENT MUON energy E_mu:
@@ -207,6 +213,7 @@ class RunConfig:
             raise ConfigError(
                 f"geant4.neutrino_mode must be auto/on/off, got {nm!r}")
         self._validate_beam_distributions()
+        self._validate_transport()
         if self.generator == "decay":
             self._validate_decay()
         if self.generator == "external":
@@ -218,6 +225,20 @@ class RunConfig:
         except (TypeError, ValueError):
             raise ConfigError(f"run.events must be an integer, got {self.run.events!r}")
         return self
+
+    def _validate_transport(self):
+        """Geant4 transport of a generator's final state is ON by default (the
+        common output.root is meant to carry a transport record whatever made
+        the interaction); `transport: false` is the explicit opt-out, so the
+        value has to be a real boolean rather than, say, the string "no"."""
+        if self.generator not in VERTEX_LEVEL_GENERATORS:
+            return
+        block = getattr(self, self.generator)
+        if "transport" in block and not isinstance(block["transport"], bool):
+            raise ConfigError(
+                f"{self.generator}.transport must be true or false, got "
+                f"{block['transport']!r}. Geant4 transport is the default; set "
+                f"it to false for a vertex-level (generator-only) run.")
 
     def _validate_decay(self):
         """Structural checks for the decay backend. The decay itself is done

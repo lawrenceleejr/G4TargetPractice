@@ -17,14 +17,14 @@ import subprocess
 import time
 from pathlib import Path
 
-from . import config, backends
+from . import config, backends, handoff
 from .backends.geant4 import DEFAULT_IMAGE, build_macro
 
 # Geant4 prints "--> Event N" (or "Event N starts") per printProgress modulo;
 # we parse N to drive a host-side progress bar over the requested event count.
 _EVENT_RE = re.compile(r"[Ee]vent[:\s]+(\d+)")
 
-__all__ = ["DEFAULT_IMAGE", "generate_macro", "run", "run_config"]
+__all__ = ["DEFAULT_IMAGE", "generate_macro", "run", "run_config", "transport"]
 
 
 # --------------------------------------------------------------------------- #
@@ -222,54 +222,122 @@ def _repo_of(image):
 
 
 def _wants_transport(cfg):
-    # decay is NOT here: it is a single-stage Geant4 run (Geant4 both decays
-    # and transports); external files opt in like the vertex-level generators.
-    return cfg.generator in ("genie", "achilles", "pythia", "external") and \
-        bool(getattr(cfg, cfg.generator).get("transport"))
+    """Geant4 transport is the default for every vertex-level generator: the
+    common output.root is meant to carry a Geant4 transport record whatever
+    produced the interaction. `<backend>: {transport: false}` opts out and
+    leaves the run vertex-level."""
+    if cfg.generator not in config.VERTEX_LEVEL_GENERATORS:
+        return False
+    return bool(getattr(cfg, cfg.generator).get("transport", True))
 
 
-def _transport_stage(cfg, outdir, local, dry_run):
-    """Stage 2 of the generator->Geant4 hand-off: replay the vertex-level
-    events through g4sim (fills step_*/totalEdep/trk_end*), then graft the
-    generator's nu_* block + primary identity back on."""
-    from . import handoff
+def _geant4_engine_here():
+    """True when g4sim can run in THIS process's environment -- inside the
+    Geant4 image, or on a dev host with g4sim on PATH."""
+    return bool(shutil.which("g4sim")) or os.path.exists("/app/build/g4sim")
+
+
+def _no_engine_error(outdir, image):
+    return RuntimeError(
+        f"the generator stage finished, but this image ships no Geant4 engine, "
+        f"so the transport stage cannot run here.\n"
+        f"Its inputs are ready in {outdir} ({handoff.EVENT_FILE}, "
+        f"{handoff.STAGE_SPEC}); finish the run with a Geant4 image:\n"
+        f"    docker run --rm --user \"$(id -u):$(id -g)\" -e HOME=/tmp \\\n"
+        f"        -v \"$PWD:/run\" -w /run {image} transport -o {outdir.name}\n"
+        f"or run the whole thing from the host front-end, which chains the two "
+        f"images itself:\n"
+        f"    gdmltp run --config <config> -o {outdir.name}\n"
+        f"(add --stage generator to this command to make stopping here the "
+        f"intended outcome rather than an error)")
+
+
+def _transport_stage(cfg, prep, outdir, local, dry_run, stage="full"):
+    """Stage 2 of the generator->Geant4 hand-off: replay the generator's final
+    state through g4sim via HepMC3 (fills step_*/totalEdep/trk_end*), then
+    graft the generator's nu_* block + primary identity back on."""
     from .backends.geant4 import Geant4Backend
 
-    g4 = Geant4Backend()
+    image = Geant4Backend().image_for(cfg)
     if dry_run:
-        print(f"[gdmltp] (dry-run:transport) would replay the generator events "
-              f"through {g4.image_for(cfg)} via /gun/hepmcFile and merge the "
-              f"nu_* block into {cfg.run.output}")
+        print(f"[gdmltp] (dry-run:transport) would export the generator events "
+              f"to {handoff.EVENT_FILE} and replay them through {image} via "
+              f"/gun/hepmcFile, merging the nu_* block into {cfg.run.output}")
         return
 
-    produced = outdir / cfg.run.output
-    vertex = outdir / handoff.VERTEX_FILE
-    produced.replace(vertex)
+    spec = handoff.stage_inputs(
+        outdir, Path(cfg.gdml).name, output=cfg.run.output, seed=cfg.run.seed,
+        field=cfg.geant4.get("field"), generator=cfg.generator,
+        produced=prep.output)
+    print(f"[gdmltp] hand-off: {spec['events']} event(s) -> {handoff.EVENT_FILE} "
+          f"(HepMC3, the generator -> Geant4 interchange)")
 
-    n = handoff.write_event_file(vertex, outdir / handoff.EVENT_FILE)
-    macro = handoff.build_transport_macro(
-        Path(cfg.gdml).name, n, seed=cfg.run.seed, field=cfg.geant4.get("field"))
-    (outdir / handoff.TRANSPORT_MACRO).write_text(macro)
+    if stage == "generator":
+        print(f"[gdmltp] stopping after the generator stage as asked. Finish the "
+              f"run in a Geant4 image:\n"
+              f"    gdmltp transport -o {outdir.name}   "
+              f"(-> {outdir / cfg.run.output})")
+        return
+    if local and not _geant4_engine_here():
+        raise _no_engine_error(outdir, image)
+    _run_transport_spec(spec, outdir, image, local)
+
+
+def _run_transport_spec(spec, outdir, image, local):
+    """Execute a stage-2 spec: g4sim on the HepMC3 file, then the merge."""
+    n = int(spec["events"])
     print(f"[gdmltp] transport: replaying {n} generator event(s) through Geant4 ...")
-
-    env = {"CELER_DISABLE": "1"} if cfg.geant4.get("field") else {}
-    _exec_stage([handoff.TRANSPORT_MACRO], g4.image_for(cfg), env,
-                outdir, local, dry_run=False, label=":transport", events=n)
+    env = {"CELER_DISABLE": "1"} if spec.get("field") else {}
+    _exec_stage([spec["macro"]], image, env, outdir, local, dry_run=False,
+                label=":transport", events=n)
 
     transported = outdir / "output.root"
-    handoff.merge_nu_block(transported, vertex, outdir / cfg.run.output)
-    if (outdir / cfg.run.output) != transported and transported.exists():
+    target = outdir / spec["output"]
+    handoff.merge_nu_block(transported, outdir / spec["vertex"], target)
+    if target != transported and transported.exists():
         transported.unlink()
-    print(f"[gdmltp] transport done -> {outdir / cfg.run.output} "
+    print(f"[gdmltp] transport done -> {target} "
           f"(generator interaction record + Geant4 transport)")
 
 
-def run_config(cfg, image=None, outdir=".", local=False, dry_run=False):
+def transport(outdir=".", image=None, local=False, dry_run=False):
+    """Run stage 2 alone, from the files a generator stage left in `outdir`.
+
+    This is what `gdmltp transport` calls: it lets a Geant4 image finish a run
+    that a generator image started (bare `docker run` cannot chain containers),
+    and lets a transport be re-run without regenerating the events.
+    """
+    outdir = Path(outdir).resolve()
+    spec = handoff.read_spec(outdir)
+    if not local and os.path.exists("/app/entrypoint.sh"):
+        local = True                      # inside an image: run the engine here
+    if local and not _geant4_engine_here():
+        raise RuntimeError(
+            f"no Geant4 engine here (no g4sim on PATH): `transport` must run in "
+            f"a Geant4 image or on a host with g4sim built. From a host with "
+            f"Docker, drop --local and it launches {image or DEFAULT_IMAGE}.")
+    if dry_run:
+        print(f"[gdmltp] (dry-run:transport) would replay {spec['events']} "
+              f"event(s) from {spec['event_file']} through "
+              f"{image or DEFAULT_IMAGE} into {spec['output']}")
+        return 0
+    _run_transport_spec(spec, outdir, image or DEFAULT_IMAGE, local)
+    return 0
+
+
+def run_config(cfg, image=None, outdir=".", local=False, dry_run=False,
+               stage="full"):
     """Execute (or dry-run) a run described by a validated RunConfig.
 
-    With genie.transport / achilles.transport set, this is a two-stage run:
-    the generator produces the vertex-level events, then g4sim transports the
-    final-state particles through the GDML detector and the outputs merge.
+    For every vertex-level generator (genie/achilles/pythia/external) this is a
+    two-stage run, and both stages run by default: the generator produces the
+    interaction, its final state is exported as HepMC3, and g4sim transports it
+    through the GDML detector, the two records merging into one output.root.
+    `<backend>: {transport: false}` keeps a run vertex-level.
+
+    stage="generator" stops after stage 1 with the hand-off written -- for the
+    bare-`docker run` flow, where the generator image cannot start the Geant4
+    container itself and `gdmltp transport` finishes the run in the Geant4 image.
     """
     cfg.validate()
     outdir = Path(outdir).resolve()
@@ -304,8 +372,13 @@ def run_config(cfg, image=None, outdir=".", local=False, dry_run=False):
         prep.post()
 
     if _wants_transport(cfg):
-        _transport_stage(cfg, outdir, local, dry_run)
+        _transport_stage(cfg, prep, outdir, local, dry_run, stage=stage)
         return 0
+    if stage == "generator":
+        raise config.ConfigError(
+            f"--stage generator splits a two-stage run, but this "
+            f"{cfg.generator} run has transport disabled, so there is no Geant4 "
+            f"stage to split off")
 
     if executed:
         _finalize_output(cfg, prep, outdir)
