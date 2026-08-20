@@ -223,6 +223,5 @@ def merge_nu_block(transported_root, vertex_root, out_path, tree="tree"):
             if name in vnames:
                 data[name] = tv[name].array(library="np")
 
-    with uproot.recreate(out_path) as f:
-        f[tree] = data
+    io.write_tree(out_path, data, tree=tree)
     return out_path

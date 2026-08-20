@@ -20,6 +20,7 @@ MeV/c, MeV^2, mm, ns (Geant4 internal units, matching g4sim/EventAction.cc):
 import numpy as np
 import awkward as ak
 import uproot
+from ..io import write_tree
 
 from ..masses import mass_mev
 
@@ -326,8 +327,7 @@ def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", 
         "eventWeight": g["wght"],
     }
 
-    with uproot.recreate(out_path) as f:
-        f[out_tree] = data
+    write_tree(out_path, data, tree=out_tree)
     return out_path
 
 

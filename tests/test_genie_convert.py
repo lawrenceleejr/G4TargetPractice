@@ -347,8 +347,7 @@ def test_convert_event_weight_defaults_to_one(tmp_path):
         data = {k.split(";")[0]: f["gst"][k.split(";")[0]].array()
                 for k in f["gst"].keys() if k.split(";")[0] != "wght"}
     stripped = str(tmp_path / "nowght.root")
-    with uproot.recreate(stripped) as f:
-        f["gst"] = data
+    io.write_tree(stripped, data, tree="gst")
     out = str(tmp_path / "o.root")
     genie_convert.convert(stripped, out)
     w = uproot.open(out)["tree"]["eventWeight"].array(library="np")

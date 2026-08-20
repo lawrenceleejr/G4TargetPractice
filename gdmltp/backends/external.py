@@ -126,8 +126,8 @@ def convert(hepmc_path, out_path, out_tree="tree"):
         "step_time": _empty_jagged(n, np.float64),
         "step_process": _empty_jagged_str(n),
     }
-    with uproot.recreate(out_path) as f:
-        f[out_tree] = data
+    from ..io import write_tree
+    write_tree(out_path, data, tree=out_tree)
     return n
 
 

@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 import yaml
 
-from gdmltp import config, decay
+from gdmltp import io, config, decay
 from gdmltp.config import ConfigError
 
 
@@ -206,8 +206,7 @@ def _fake_decay_output(path, s_mm, decayed, p_mev=5e5, n_extra_tracks=1):
         "trk_parentID": ak.Array(trk_parent),
         "trk_creatorProcess": ak.Array(trk_proc),
     }
-    with uproot.recreate(path) as f:
-        f["tree"] = data
+    io.write_tree(path, data)
     return str(path)
 
 

@@ -57,6 +57,170 @@ import os
 from functools import lru_cache
 
 
+#: Legend for branches whose strings are stored as integer codes (see
+#: `write_tree`): one entry per (branch, code) -> value.
+STRING_LEGEND_TREE = "gdmltp_strings"
+_NO_VALUES = -1                     # legend row meaning "encoded, but no values"
+
+
+def write_tree(path, data, tree="tree", title=""):
+    """Write `data` (name -> array) as a **classic TTree** at `path`.
+
+    Every ntuple this package writes goes through here, because the obvious
+    spelling stopped meaning what the schema promises: as of uproot 5.7 the
+    dict-like assignment `f["tree"] = data` writes an **RNTuple**, and a file
+    holding one greets `root output.root` with
+
+        Error in <TKey::ReadObj>: Unknown class ROOT::RNTuple
+
+    on any ROOT older than that class -- while uproot itself reads it back
+    happily, so nothing in our own tooling notices. `mktree` + `extend` is the
+    explicit TTree path (and behaves the same on older uproot).
+
+    uproot's TTree writer cannot express `std::vector<std::string>`, which is
+    what g4sim writes for the per-track/per-step process names, so those
+    branches are stored as jagged **int32 codes** plus a `gdmltp_strings`
+    legend tree mapping (branch, code) -> value. `read_string_branch` /
+    `load_events` decode them transparently, and a native g4sim file (real
+    strings) reads the same way.
+    """
+    import uproot
+
+    payload, legend = _encode_string_branches(data)
+    n = _num_entries(payload)
+    with uproot.recreate(str(path)) as f:
+        # Declare the branches from the data's TYPES, then fill: handing mktree
+        # the arrays themselves would write them once as a side effect and again
+        # on extend (every event duplicated).
+        f.mktree(tree, {k: _branch_type(v) for k, v in payload.items()},
+                 title=title)
+        if n:
+            f[tree].extend(dict(payload))
+        if legend:
+            f.mktree(STRING_LEGEND_TREE,
+                     {"branch": np.dtype(str), "code": np.dtype(np.int32),
+                      "value": np.dtype(str)},
+                     title="string branches stored as int codes")
+            f[STRING_LEGEND_TREE].extend(legend)
+    return str(path)
+
+
+def _branch_type(v):
+    """The type spec for one branch: a numpy dtype, or the awkward type of a
+    jagged branch. An all-empty jagged branch types as `var * unknown`, which
+    uproot cannot write, so it is pinned to float64 -- the schema's empty
+    step_*/trk_* branches carry no values to lose."""
+    import awkward as ak
+    if isinstance(v, ak.Array):
+        t = ak.type(v)
+        if str(t).endswith("* unknown"):
+            return ak.types.ArrayType(
+                ak.types.ListType(ak.types.NumpyType("float64")), len(v))
+        return t
+    return np.asarray(v).dtype
+
+
+def _num_entries(data):
+    for v in data.values():
+        try:
+            return len(v)
+        except TypeError:                     # a scalar: nothing to count
+            continue
+    return 0
+
+
+def _is_jagged_string(v):
+    """A `var * string` awkward array -- what uproot cannot put in a TTree.
+
+    A FLAT string array (`N * string`) is fine: uproot writes those as a normal
+    char branch, so only the nested case needs encoding. In awkward a string is
+    itself a list of chars, so the two are told apart by depth, not by the
+    innermost type.
+    """
+    import awkward as ak
+    if not isinstance(v, ak.Array):
+        return False
+    tokens = str(ak.type(v)).split(" * ")
+    return len(tokens) > 2 and tokens[-1] == "string"
+
+
+def _encode_string_branches(data):
+    """Replace `var * string` branches with int32 codes; return (data, legend).
+
+    The legend is a flat table (branch, code, value) -- itself TTree-writable.
+    A branch with no values at all still gets one row, so a reader can tell an
+    encoded-but-empty branch from a genuinely numeric one.
+    """
+    import awkward as ak
+
+    out, branches, codes, values = {}, [], [], []
+    for name, v in data.items():
+        if not _is_jagged_string(v):
+            out[name] = v
+            continue
+        flat = ak.to_numpy(ak.flatten(v, axis=1)).astype(str)
+        vocab, encoded = np.unique(flat, return_inverse=True)
+        out[name] = ak.unflatten(encoded.astype(np.int32), ak.to_numpy(ak.num(v)))
+        if len(vocab) == 0:
+            branches.append(name); codes.append(_NO_VALUES); values.append("")
+            continue
+        for code, value in enumerate(vocab):
+            branches.append(name); codes.append(code); values.append(str(value))
+
+    legend = None
+    if branches:
+        legend = {"branch": branches,
+                  "code": np.asarray(codes, np.int32),
+                  "value": values}
+    return out, legend
+
+
+def string_legend(path):
+    """{branch: [value per code]} from a file's `gdmltp_strings` tree ({} if none)."""
+    import uproot
+    with uproot.open(str(path)) as f:
+        if STRING_LEGEND_TREE not in [k.split(";")[0] for k in f.keys()]:
+            return {}
+        t = f[STRING_LEGEND_TREE]
+        branch = [_as_str(x) for x in t["branch"].array(library="np")]
+        code = t["code"].array(library="np")
+        value = [_as_str(x) for x in t["value"].array(library="np")]
+    out = {}
+    for b, c, v in zip(branch, code, value):
+        vals = out.setdefault(b, [])
+        if int(c) == _NO_VALUES:
+            continue
+        if int(c) >= len(vals):
+            vals.extend([""] * (int(c) + 1 - len(vals)))
+        vals[int(c)] = v
+    return out
+
+
+def decode_string_branch(array, legend_values):
+    """Jagged int codes -> jagged strings, using this branch's legend values."""
+    import awkward as ak
+    if legend_values is None:                 # already strings (a g4sim file)
+        return array
+    names = np.asarray(list(legend_values), dtype=object)
+    flat = ak.to_numpy(ak.flatten(array)).astype(np.int64)
+    decoded = names[flat] if len(names) and len(flat) else np.array([], dtype=object)
+    return ak.unflatten(ak.Array(list(decoded)), ak.to_numpy(ak.num(array)))
+
+
+def read_string_branch(path, name, tree="tree"):
+    """Read a process-name branch as strings, whether the file stores them as
+    `std::vector<std::string>` (g4sim) or as codes + legend (written here)."""
+    t = open_tree(str(path), tree)
+    arr = t[name].array()
+    if _is_jagged_string(arr):
+        return arr
+    return decode_string_branch(arr, string_legend(path).get(name))
+
+
+def _as_str(v):
+    return v.decode("utf-8", "replace") if isinstance(v, (bytes, bytearray)) else str(v)
+
+
 def open_tree(path, tree="tree"):
     """Open (and cache) the TTree. One CLI invocation touches the same file from
     several helpers (num_events, read_scalars, iterate_flat, load_events);
@@ -137,12 +301,23 @@ def load_events(path, tree="tree", entry_start=None, entry_stop=None):
     t = open_tree(str(path), tree)
     present = set(branch_names(t))
 
+    # process-name branches are strings in a g4sim file and int codes + legend
+    # in one we wrote; decode the latter so callers always see names
+    legend = string_legend(path)
+
     def read(names):
         # Read each branch separately: a single multi-branch np conversion fails
         # on jagged/string branches (it tries to build one structured array).
         out = {}
         for n in names:
             if n not in present:
+                continue
+            if n in legend:
+                arr = decode_string_branch(
+                    t[n].array(entry_start=entry_start, entry_stop=entry_stop),
+                    legend[n]).to_list()
+                out[n] = np.array([np.asarray(x, dtype=object) for x in arr],
+                                  dtype=object)
                 continue
             arr = t[n].array(library="np", entry_start=entry_start, entry_stop=entry_stop)
             out[n] = arr

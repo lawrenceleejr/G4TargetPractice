@@ -22,7 +22,7 @@ and feed them in through the `external` backend instead.
 """
 import numpy as np
 
-from . import masses
+from . import io, masses
 from .beam import _len_mm
 from .config import ConfigError
 
@@ -133,6 +133,13 @@ def postprocess(root_path, cfg, tree="tree"):
         names = [k.split(";")[0] for k in t.keys()]
         data = {name: t[name].array() for name in names}
 
+    # creator processes are strings in a g4sim file and int codes + legend in
+    # one written here (uproot cannot put vector<string> in a TTree); decode so
+    # the Decay test below reads the same either way, including on a re-run
+    if "trk_creatorProcess" in data:
+        data["trk_creatorProcess"] = io.read_string_branch(
+            root_path, "trk_creatorProcess", tree)
+
     sx = np.asarray(data["primaryStartX"], float)
     sy = np.asarray(data["primaryStartY"], float)
     sz = np.asarray(data["primaryStartZ"], float)
@@ -163,8 +170,7 @@ def postprocess(root_path, cfg, tree="tree"):
     else:
         data["eventWeight"] = np.ones(len(s))
 
-    with uproot.recreate(str(root_path)) as f:
-        f[tree] = data
+    io.write_tree(root_path, data, tree=tree)
     return str(root_path)
 
 

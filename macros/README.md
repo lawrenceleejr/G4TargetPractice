@@ -306,7 +306,7 @@ secondaries; a track's start position is its production vertex, and
 | `trk_id`, `trk_parentID`, `trk_pdg` | track id, parent id, PDG code |
 | `trk_startX/Y/Z`, `trk_startE` | production vertex position and kinetic energy |
 | `trk_endX/Y/Z`, `trk_endE` | end position and final kinetic energy |
-| `trk_creatorProcess` | process that created the track (`Primary` for primaries) |
+| `trk_creatorProcess` | process that created the track (`Primary` for primaries). g4sim writes `std::vector<std::string>`; files written by the Python converters store int32 codes + the `gdmltp_strings` legend tree (uproot cannot put `vector<string>` in a TTree) — `gdmltp.io.read_string_branch` decodes both |
 | `trk_edep`, `trk_length` | summed energy deposit and path length over the track |
 
 The track table replaces fixed per-particle counters — count by PDG, e.g.
@@ -321,7 +321,7 @@ pre-step position is where the step's energy deposit is registered):
 | `step_x/y/z` | pre-step position |
 | `step_kinE` | pre-step kinetic energy |
 | `step_edep`, `step_length`, `step_time` | energy deposit, step length, global time |
-| `step_process` | process limiting the step |
+| `step_process` | process limiting the step (same string/code encoding as `trk_creatorProcess`) |
 
 ## Neutrino mode
 

@@ -1,6 +1,6 @@
 import pytest
 
-from gdmltp import cli
+from gdmltp import io, cli
 
 
 def test_version(capsys):
@@ -96,8 +96,7 @@ def test_display_auto_picks_richest_event(tmp_path, capsys):
     # 4 events; event 2 has by far the most tracks (the "interesting" one)
     pdg = ak.Array([[13], [13], [13, 211, 2212, 111, 22], [13]])
     zero = ak.Array([[0.0]] * 3 + [[0.0]])
-    with uproot.recreate(p) as f:
-        f["tree"] = {
+    io.write_tree(p, {
             "eventID": np.arange(4, dtype=np.int32),
             "nSteps": np.zeros(4, np.int32),
             "nTracks": np.array([1, 1, 5, 1], np.int32),
@@ -112,7 +111,7 @@ def test_display_auto_picks_richest_event(tmp_path, capsys):
             "trk_parentID": ak.Array([[0], [0], [0, 1, 1, 1, 1], [0]]),
             "trk_creatorProcess": ak.Array([["Primary"], ["Primary"],
                                             ["Primary", "x", "x", "x", "x"], ["Primary"]]),
-        }
+    })
     assert cli.main(["display", str(p), "--no-png", "--no-blend",
                      "-o", str(tmp_path / "d")]) == 0
     assert "event 2 (richest)" in capsys.readouterr().out
