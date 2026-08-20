@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .base import Backend, Prepared
 
-DEFAULT_IMAGE = "ghcr.io/lawrenceleejr/g4targetpractice:main"
+DEFAULT_IMAGE = "ghcr.io/lawrenceleejr/gdmltargetpractice:main"
 GENERATED_MACRO = "gdmltp_run.mac"
 BEAM_FILE = "beam.dat"
 

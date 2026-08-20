@@ -76,7 +76,7 @@ def test_backend_prepare_renders_single_stage_macro(tmp_path):
     assert "/gun/particlePDG 9900014" in mac
     assert "/run/beamOn 500" in mac
     assert prep.argv == [DECAY_MACRO]
-    assert "g4targetpractice" in prep.image      # the geant4 image, a real tool
+    assert "gdmltargetpractice" in prep.image      # the geant4 image, a real tool
     assert prep.post is not None
 
 
