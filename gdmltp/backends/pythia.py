@@ -29,7 +29,7 @@ from .base import Backend, Prepared
 from ..config import ConfigError, PYTHIA_PROCESSES
 from .genie import infer_target, _as_pdg, flux_emax_gev
 
-PYTHIA_IMAGE = "ghcr.io/lawrenceleejr/g4targetpractice-pythia:main"
+PYTHIA_IMAGE = "ghcr.io/lawrenceleejr/gdmltargetpractice-pythia:main"
 JOB_FILE = "pythia_job.json"
 BEAM_FILE = "beam.dat"
 CMND_FILE = "pythia_run.cmnd"

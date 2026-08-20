@@ -3,7 +3,7 @@
 # The base image provides Pythia 8 (built against HepMC3) and HepMC3 itself;
 # this layer adds the gdmltp python package, the pythia driver, and compiles the
 # small pythia_gen generator (Pythia8 -> HepMC3 ASCII).
-ARG PYTHIA_BASE=ghcr.io/lawrenceleejr/g4targetpractice-pythia-base:latest
+ARG PYTHIA_BASE=ghcr.io/lawrenceleejr/gdmltargetpractice-pythia-base:latest
 FROM ${PYTHIA_BASE}
 
 WORKDIR /app

@@ -9,7 +9,7 @@
 #   GENIE Generator (pinned release)
 #
 # Built by .github/workflows/build-generator-bases.yml (slow: ~2-3 h) and
-# published as ghcr.io/<owner>/g4targetpractice-genie-base; the fast per-push
+# published as ghcr.io/<owner>/gdmltargetpractice-genie-base; the fast per-push
 # genie app image (docker/genie.Dockerfile) layers gdmltp + the driver on top.
 ARG UBUNTU=ubuntu:22.04
 FROM ${UBUNTU}

@@ -108,8 +108,8 @@ def test_run_config_transport_two_stages(repo_root, synth_gst, tmp_path, monkeyp
     run.run_config(cfg, outdir=str(tmp_path))
 
     assert len(calls) == 2
-    assert any("g4targetpractice-genie" in c for c in calls[0])
-    assert any("g4targetpractice:main" in c for c in calls[1])   # geant4 image
+    assert any("gdmltargetpractice-genie" in c for c in calls[0])
+    assert any("gdmltargetpractice:main" in c for c in calls[1])   # geant4 image
     assert calls[1][-1] == handoff.TRANSPORT_MACRO
     assert (tmp_path / handoff.EVENT_FILE).exists()
 

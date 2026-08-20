@@ -9,12 +9,12 @@
 # (fraction of muons Bragg-peak-stopped inside the D-T, mean stopping depth)
 # to scan_results/summary.csv.
 #
-# Run inside the g4targetpractice Docker image (script is shipped at
+# Run inside the gdmltargetpractice Docker image (script is shipped at
 # /app/scans/mucf_scan.sh, executable at /app/build/g4sim):
 #
 #   docker run --rm -v "$PWD":/work -w /work \
 #     -e ENERGIES="14 18 22 26 30 34" -e DFRACS="0.3 0.5 0.7" \
-#     --entrypoint bash ghcr.io/lawrenceleejr/g4targetpractice:main \
+#     --entrypoint bash ghcr.io/lawrenceleejr/gdmltargetpractice:main \
 #     /app/scans/mucf_scan.sh
 #
 # Or locally: G4SIM=./build/g4sim scans/mucf_scan.sh

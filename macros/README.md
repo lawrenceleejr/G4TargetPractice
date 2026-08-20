@@ -214,7 +214,7 @@ the mean stopping depth. On any machine with Docker:
 ```bash
 docker run --rm -v "$PWD":/work -w /work \
   -e ENERGIES="14 16 18 20 22 24 26 28 30 32 34" -e DFRACS="0.3 0.5 0.7" \
-  --entrypoint bash ghcr.io/lawrenceleejr/g4targetpractice:main \
+  --entrypoint bash ghcr.io/lawrenceleejr/gdmltargetpractice:main \
   /app/scans/mucf_scan.sh
 ```
 

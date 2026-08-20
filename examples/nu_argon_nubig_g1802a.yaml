@@ -1,0 +1,40 @@
+# GENIE backend: 2 GeV nu_mu on liquid argon, using the pre-computed "NUbig"
+# cross-section splines from the Fermilab genie_xsec product instead of
+# computing splines on demand with gmkspl.
+#
+#   genie_xsec-3.06.00-noarch-G1802a00000-k250-e1000.tar.bz2
+#     -> data/gxspl-NUbig.xml.gz
+#     tune G18_02a_00_000, "Default" generator list,
+#     0.01-1000 GeV, 250 log-spaced knots, all 6 nu flavors,
+#     large isotope set (includes Ar-40 = 1000180400).
+#
+# The spline file must sit in the run directory: gdmltp mounts only the output
+# directory into the container (as /run), so that is the path gevgen sees.
+#
+#   gdmltp run --config examples/nu_argon_nubig_g1802a.yaml \
+#              -o runs/nu_lar_g1802a_nubig
+generator: genie
+
+geometry:
+  gdml: gdml/liquid_argon_1m3.gdml
+
+beam:
+  particle: nu_mu
+  energy:
+    mode: mono
+    value: "2.0 GeV"
+  position: "0 0 -50 cm"
+  direction: "0 0 1"
+
+run:
+  events: 200
+  output: output.root
+  seed: 12345
+
+genie:
+  tune: G18_02a_00_000
+  cross_sections: /run/gxspl-NUbig.xml.gz
+  event_generator_list: Default
+  length_units: cm
+  target: 1000180400          # Ar-40
+  transport: true             # GENIE vertex -> Geant4 transport -> merged ntuple
