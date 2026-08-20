@@ -94,6 +94,14 @@ _SCALAR_SPECS = [
 ]
 
 
+def _vec3_plain(s):
+    """A dimensionless 3-vector, e.g. a direction "0 0 1"."""
+    parts = str(s).split()
+    if len(parts) < 3:
+        raise ValueError(f"expected 3 components, got {s!r}")
+    return np.array([float(parts[i]) for i in range(3)], float)
+
+
 def _flat_fs(t, keys, name, size):
     if name in keys and size:
         return np.asarray(ak.flatten(t[name].array()), dtype=float)
@@ -116,6 +124,10 @@ def _read_gst(path, gst_tree=None):
         d["eid"] = _scalar(t, keys, "iev", n, dtype=np.int64) if "iev" in keys \
             else np.arange(n, dtype=np.int64)
         d["lep_pdg"] = _out_lepton_pdg(t, keys, d["neu"], d["cc"])
+        # GENIE's per-event weight (1.0 for unweighted gevgen runs). Carried
+        # through as the schema's optional `eventWeight` so a flux-weighted or
+        # reweighted sample does not silently lose its normalisation.
+        d["wght"] = _scalar(t, keys, "wght", n, default=1.0, dtype=float)
         d["procs"] = list(_process_names(t, keys, n))
 
         if "pdgf" in keys:
@@ -142,7 +154,7 @@ def _concat_gst(dicts):
     for name, _dt in _SCALAR_SPECS:
         out[name] = np.concatenate([d[name] for d in dicts])
     for name in ("counts", "flat_pdg", "flat_Ef_mev", "flat_pxf", "flat_pyf", "flat_pzf",
-                 "lep_pdg"):
+                 "lep_pdg", "wght"):
         out[name] = np.concatenate([d[name] for d in dicts])
     out["procs"] = [p for d in dicts for p in d["procs"]]
     out["n"] = int(sum(d["n"] for d in dicts))
@@ -150,13 +162,19 @@ def _concat_gst(dicts):
     return out
 
 
-def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", beam=None):
+def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", beam=None,
+            position=None, direction=None):
     """Read GENIE `gst` (one path or a list of paths, concatenated in order) and
     write schema `output.root` at `out_path`.
 
     `beam` (a beam-file path or a list of (name, pos_mm, mom_mev) entries) replays
     a host-sampled beam: it overrides each event's vertex and orients the event
     along the sampled ray (see the per-event beam-replay block below).
+
+    `position` ("0 0 -50 cm") and `direction` ("0 0 1") place and orient a
+    point-mode gevgen run, which always generates at the origin along +z. They
+    are ignored when `beam` is given, because the replay already carries a
+    per-event vertex and direction.
     """
     paths = [gst_path] if isinstance(gst_path, (str, bytes)) or hasattr(gst_path, "__fspath__") \
         else list(gst_path)
@@ -203,6 +221,37 @@ def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", 
         primaryE = Ev * GEV_TO_MEV
         outlep_p = np.column_stack([pxl, pyl, pzl]) * GEV_TO_MEV
         q0 = (Ev - El) * GEV_TO_MEV
+        # gevgen point mode always generates at the origin along +z, so the run's
+        # configured beam position/direction have to be applied here -- otherwise
+        # they are silently dropped (they were only honoured on the replay path).
+        if direction is not None and n:
+            from .. import beam as beammod
+            dv = _vec3_plain(direction)
+            if np.linalg.norm(dv) > 0 and not np.allclose(
+                    dv / np.linalg.norm(dv), [0.0, 0.0, 1.0]):
+                primary_p = beammod.rotate_uz_rows(primary_p, np.tile(dv, (n, 1)))
+                outlep_p = beammod.rotate_uz_rows(outlep_p, np.tile(dv, (n, 1)))
+                if flat_pf.size:
+                    flat_pf = beammod.rotate_uz_rows(
+                        flat_pf, np.tile(dv, (flat_pf.shape[0], 1)))
+        if position is not None:
+            from .. import beam as beammod
+            off = beammod._vec3(position, beammod._len_mm)
+            vx = vx + off[0]; vy = vy + off[1]; vz = vz + off[2]
+
+    # GENIE's gst `pdgf` list holds the final-state HADRONS only; the primary
+    # lepton is kept separately in El/pxl/pyl/pzl. Prepend it so trk_* is the
+    # COMPLETE final state -- without this the Geant4 hand-off never transports
+    # the CC muon (which carries most of the event energy), and the achilles
+    # converter, whose final-state list already includes the lepton, disagrees.
+    if n:
+        starts = np.zeros(n, np.int64)
+        if n > 1:
+            starts[1:] = np.cumsum(counts)[:-1]
+        flat_pdg = np.insert(flat_pdg, starts, lep_pdg.astype(flat_pdg.dtype))
+        flat_Ef_mev = np.insert(flat_Ef_mev, starts, El * GEV_TO_MEV)
+        flat_pf = np.insert(flat_pf, starts, outlep_p, axis=0)
+        counts = counts + 1
 
     flat_mass = np.array([mass_mev(p) for p in flat_pdg], dtype=float)
     flat_kin = np.maximum(0.0, flat_Ef_mev - flat_mass)
@@ -273,6 +322,8 @@ def convert(gst_path, out_path, vtx_units="cm", gst_tree=None, out_tree="tree", 
         "nu_W": W * GEV_TO_MEV,
         "nu_x": xbj, "nu_y": ybj,
         "nu_q0": q0,
+        # optional schema branch (io.SCALAR_OPTIONAL_BRANCHES)
+        "eventWeight": g["wght"],
     }
 
     with uproot.recreate(out_path) as f:

@@ -79,9 +79,12 @@ def test_convert_trk_start_energy_is_kinetic(synth_gst, tmp_path):
     startE = conv["trk_startE"].array()
     gst = uproot.open(synth_gst)["gst"]
     Ef = gst["Ef"].array()
-    # first particle of first event: kinetic = Ef*1000 - mass
-    p0 = int(pdg[0][0]); e0_tot = float(Ef[0][0]) * 1000.0
-    assert float(startE[0][0]) == pytest.approx(max(0.0, e0_tot - mass_mev(p0)), abs=1e-3)
+    # track 0 is the prepended outgoing lepton: kinetic = El*1000 - mass
+    p0 = int(pdg[0][0]); lep_tot = float(gst["El"].array()[0]) * 1000.0
+    assert float(startE[0][0]) == pytest.approx(max(0.0, lep_tot - mass_mev(p0)), abs=1e-3)
+    # track 1 is the first hadron from gst: kinetic = Ef*1000 - mass
+    p1 = int(pdg[0][1]); e1_tot = float(Ef[0][0]) * 1000.0
+    assert float(startE[0][1]) == pytest.approx(max(0.0, e1_tot - mass_mev(p1)), abs=1e-3)
 
 
 def test_convert_vtx_units_scale(synth_gst, tmp_path):
@@ -195,7 +198,10 @@ def test_convert_fills_track_momenta(synth_gst, tmp_path):
     gst = uproot.open(synth_gst)["gst"]
     pz_conv = t["trk_pz"].array()
     pz_gst = gst["pzf"].array()
-    assert float(pz_conv[0][0]) == pytest.approx(float(pz_gst[0][0]) * 1000.0, rel=1e-9)
+    # track 0 is the outgoing lepton (prepended); the hadrons follow in gst order
+    assert float(pz_conv[0][0]) == pytest.approx(
+        float(gst["pzl"].array()[0]) * 1000.0, rel=1e-9)
+    assert float(pz_conv[0][1]) == pytest.approx(float(pz_gst[0][0]) * 1000.0, rel=1e-9)
 
 
 def test_converted_events_display_with_momentum_rays(synth_gst, tmp_path):
@@ -242,3 +248,108 @@ def test_flux_gauss_is_approximate():
     a, approx = genie.flux_gevgen_args({"mode": "gauss", "value": "3 GeV", "sigma": "500 MeV"})
     assert approx is True
     assert a == ["-e", "3"]
+
+
+# --- regressions: the complete final state, beam placement, event weight ----- #
+def test_convert_prepends_outgoing_lepton(synth_gst, tmp_path):
+    """Real gst keeps the primary lepton out of pdgf; the converter must add it
+    back, or the Geant4 hand-off never transports the CC muon."""
+    import uproot
+    out = str(tmp_path / "o.root")
+    genie_convert.convert(synth_gst, out)
+    t = uproot.open(out)["tree"]
+    gst = uproot.open(synth_gst)["gst"]
+    pdg = t["trk_pdg"].array()
+    nf = gst["nf"].array(library="np")
+    fspl = gst["fspl"].array(library="np")
+    ntracks = t["nTracks"].array(library="np")
+    # exactly one extra track per event, and it is the outgoing lepton, first
+    assert list(ntracks) == list(nf + 1)
+    assert [int(row[0]) for row in pdg] == list(fspl)
+    # every CC event carries its charged lepton
+    cc = gst["cc"].array(library="np").astype(bool)
+    assert cc.sum() > 0
+    for i in np.nonzero(cc)[0]:
+        assert 13 in [int(v) for v in pdg[i]]
+
+
+def test_convert_applies_position_offset(synth_gst, tmp_path):
+    """beam.position must move the vertex; gevgen point mode always sits at 0."""
+    import uproot, awkward as ak
+    a = str(tmp_path / "a.root"); b = str(tmp_path / "b.root")
+    genie_convert.convert(synth_gst, a)
+    genie_convert.convert(synth_gst, b, position="0 0 -50 cm")
+    ta, tb = uproot.open(a)["tree"], uproot.open(b)["tree"]
+    za = ta["nu_vertexZ"].array(library="np")
+    zb = tb["nu_vertexZ"].array(library="np")
+    assert np.allclose(zb - za, -500.0)                      # -50 cm = -500 mm
+    # the offset has to follow through to the track/primary start points
+    assert np.allclose(tb["primaryStartZ"].array(library="np") - za, -500.0)
+    sa = ak.to_numpy(ak.flatten(ta["trk_startZ"].array()))
+    sb = ak.to_numpy(ak.flatten(tb["trk_startZ"].array()))
+    assert np.allclose(sb - sa, -500.0)
+
+
+def test_convert_applies_direction_rotation(synth_gst, tmp_path):
+    """beam.direction must orient the event; gevgen point mode shoots along +z."""
+    import uproot
+    out = str(tmp_path / "o.root")
+    genie_convert.convert(synth_gst, out, direction="1 0 0")
+    t = uproot.open(out)["tree"]
+    px = t["primaryStartPx"].array(library="np")
+    pz = t["primaryStartPz"].array(library="np")
+    E = t["primaryE"].array(library="np")
+    assert np.allclose(px, E, rtol=1e-9)      # all momentum now along +x
+    assert np.allclose(pz, 0.0, atol=1e-6)
+
+
+def test_convert_direction_plus_z_is_a_noop(synth_gst, tmp_path):
+    import uproot
+    a = str(tmp_path / "a.root"); b = str(tmp_path / "b.root")
+    genie_convert.convert(synth_gst, a)
+    genie_convert.convert(synth_gst, b, direction="0 0 1")
+    for k in ("primaryStartPx", "primaryStartPz", "nu_outLeptonPz"):
+        assert np.allclose(uproot.open(a)["tree"][k].array(library="np"),
+                           uproot.open(b)["tree"][k].array(library="np"))
+
+
+def test_convert_beam_replay_ignores_position(synth_gst, tmp_path):
+    """The replay path carries its own per-event vertex; position must not
+    double-apply on top of it."""
+    import uproot
+    gst = uproot.open(synth_gst)["gst"]
+    n = int(gst.num_entries)
+    entries = [("nu_mu", (1.0, 2.0, 3.0), (0.0, 0.0, 1000.0))] * n
+    out = str(tmp_path / "o.root")
+    genie_convert.convert(synth_gst, out, beam=entries, position="0 0 -50 cm")
+    z = uproot.open(out)["tree"]["nu_vertexZ"].array(library="np")
+    assert np.allclose(z, 3.0)
+
+
+def test_convert_writes_event_weight(synth_gst, tmp_path):
+    import uproot
+    out = str(tmp_path / "o.root")
+    genie_convert.convert(synth_gst, out)
+    t = uproot.open(out)["tree"]
+    assert "eventWeight" in [k.split(";")[0] for k in t.keys()]
+    w_out = t["eventWeight"].array(library="np")
+    w_gst = uproot.open(synth_gst)["gst"]["wght"].array(library="np")
+    assert np.allclose(w_out, w_gst)
+    assert w_out.min() != w_out.max()        # the fixture varies it
+
+
+def test_convert_event_weight_defaults_to_one(tmp_path):
+    """A gst without a wght column still gets a usable weight."""
+    import uproot
+    from conftest import write_synthetic_gst
+    src = write_synthetic_gst(tmp_path / "g.root", n_events=5, seed=3)
+    with uproot.open(src) as f:
+        data = {k.split(";")[0]: f["gst"][k.split(";")[0]].array()
+                for k in f["gst"].keys() if k.split(";")[0] != "wght"}
+    stripped = str(tmp_path / "nowght.root")
+    with uproot.recreate(stripped) as f:
+        f["gst"] = data
+    out = str(tmp_path / "o.root")
+    genie_convert.convert(stripped, out)
+    w = uproot.open(out)["tree"]["eventWeight"].array(library="np")
+    assert np.allclose(w, 1.0)
