@@ -305,11 +305,11 @@ def _solid_parts(g, name, depth=0):
 def _clip_to_world(prims, world_half):
     """Trim primitives to the world box, dropping those wholly outside it.
 
-    Geant4 tracks nothing beyond the world, so this loses no physics -- but it
-    does keep one oversized solid from setting the scale of everything. A
-    FLUKA-converted model carries its outermost "blackhole" regions as bodies
-    kilometres across inside a world a few metres wide; unclipped, they blow up
-    the scene bounds and the display renders a dot.
+    Geant4 tracks nothing beyond the world, so nothing trackable is lost -- a
+    solid that straddles the boundary keeps its axis-aligned footprint inside.
+    What this buys is scale: a FLUKA-converted model carries its outermost
+    "blackhole" regions as bodies kilometres across inside a world a few metres
+    wide, and unclipped they blow up the scene bounds until the display is a dot.
     """
     out = []
     for p in prims:

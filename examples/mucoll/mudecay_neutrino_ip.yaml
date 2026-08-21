@@ -44,8 +44,8 @@ geant4:
   neutrino_mode: on             # write the nu_* interaction block
   neutrino_bias:
     # One factor on every neutrino channel (CC, NC, nucleus). At 1.75 TeV the
-    # interaction length in the nozzle alloy is ~1e8 m, so ~0.5 m of tungsten
-    # gives ~6e-9 per crossing: 1e10 turns a crossing into an interaction.
+    # interaction length in the nozzle alloy is ~1e8 m, so half a metre of it
+    # gives ~4e-9 per crossing: 1e10 turns a crossing into an interaction.
     factor: 1.0e10
 
 run:

@@ -11,7 +11,8 @@
 
   Beam axis: z. Interaction point: (0, 0, 0). Regenerate with
       python3 gdml/mucoll_ip_extract.py
---><define />
+-->
+	<define />
 	<materials>
 		<element name="HYDROGEN_element" formula="H" Z="1">
 			<atom value="1" />

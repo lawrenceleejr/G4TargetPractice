@@ -27,8 +27,9 @@ point tested. This script extracts THAT and nothing else, mechanically:
      of kB and Geant4 stops building 700+ unused boolean solids at load).
 
 Materials are kept verbatim: they are small and cross-reference each other.
-Nothing else about the kept volumes changes, so the output can be diffed
-against the source.
+Nothing else about the kept volumes changes -- no solid, material or placement
+is edited beyond the shift above -- though the writer normalizes the file's
+indentation, so compare it element by element rather than with a plain diff.
 """
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -87,7 +88,7 @@ def _solid_refs(el, solids, seen):
     return seen
 
 
-def main():
+def main(output=OUTPUT):
     tree = ET.parse(SOURCE)
     root = tree.getroot()
     solids_el = root.find("solids")
@@ -110,7 +111,10 @@ def main():
             pos.set("name", f"{pv.get('name')}_pos")
             old = (0.0, 0.0, 0.0)
         else:
-            assert pos.get("unit", "mm") == "mm", pos.get("unit")
+            if pos.get("unit", "mm") != "mm":
+                raise SystemExit(
+                    f"{SOURCE.name}: {pv.get('name')} places in "
+                    f"{pos.get('unit')!r}; this script only shifts mm")
             old = tuple(float(pos.get(a, 0.0)) for a in "xyz")
         pos.set("unit", "mm")
         for axis, was, ip in zip("xyz", old, IP_MM):
@@ -139,14 +143,15 @@ def main():
         if s.get("name") not in live:
             solids_el.remove(s)
 
-    ET.indent(tree, space="\t")
     root.insert(0, ET.Comment(PROVENANCE))
-    tree.write(OUTPUT, encoding="unicode", xml_declaration=True)
-    with open(OUTPUT, "a") as f:
+    ET.indent(tree, space="\t")
+    output = Path(output)
+    tree.write(output, encoding="unicode", xml_declaration=True)
+    with open(output, "a") as f:
         f.write("\n")
-    print(f"{OUTPUT.relative_to(Path.cwd()) if OUTPUT.is_relative_to(Path.cwd()) else OUTPUT}: "
-          f"{len(kept_lvs)} volume(s), {len(live)} solid(s), "
-          f"{OUTPUT.stat().st_size / 1024:.0f} kB")
+    print(f"{output}: {len(kept_lvs)} volume(s), {len(live)} solid(s), "
+          f"{output.stat().st_size / 1024:.0f} kB")
+    return output
 
 
 if __name__ == "__main__":

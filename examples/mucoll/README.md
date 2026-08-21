@@ -8,7 +8,7 @@ its borated liner, the beryllium chamber at the IP.
 
 | Config | What it follows |
 |---|---|
-| `mudecay_electron_ip.yaml` | the **Michel electron**, ⟨E⟩ = 1.75 TeV, full EM/hadronic transport |
+| `mudecay_electron_ip.yaml` | the **Michel electron**, ⟨E⟩ = 1.75 TeV, transported through `FTFP_BERT` |
 | `mudecay_neutrino_ip.yaml` | the **νμ** of the same decay, same spectrum, with 10¹⁰ cross-section biasing so the ones that reach the nozzle interact |
 
 ```bash
@@ -39,10 +39,10 @@ Three findings, all reproducible from the file itself:
 1. **The interaction point is outside the world volume.** `<setup>` names a
    world that is a 10 m cube at the origin, but the MDI it describes is built
    around **(0, −30 m, +85 m)** — that is where the beryllium chamber
-   `DET_CHAM_pv` is placed and where the two nozzle tips point. Geant4 refuses
-   to shoot a primary at a point outside the world, so nothing can be fired at
-   this IP. Most of the rest of the model (tunnel sections out to z ≈ −250 m,
-   rock at y = +142 m) is outside the world too.
+   `DET_CHAM_pv` is placed and where the two nozzle tips point. A primary that
+   starts outside the world cannot be tracked, so nothing can be fired at this
+   IP. Most of the rest of the model (tunnel sections out to z ≈ −250 m, rock
+   at y = +142 m) is outside the world too.
 2. **The sub-assembly that *is* near the world origin overlaps itself.** On the
    beam axis there, six vacuum cylinders occupy the same space
    (`BEAM_V3U/V3D/V4U/V4D/V5U/V5D`, radii 30/46/62 mm, all rmin = 0, all
@@ -85,13 +85,13 @@ z = −950 mm, then opens into the beryllium chamber:
 
 | z [mm] | −5900 | −5000 | −4000 | −3000 | −2000 | −1000 | −500 | 0 |
 |---|---|---|---|---|---|---|---|---|
-| bore radius [mm] | 17.7 | 15.0 | 12.0 | 9.0 | 6.0 | 2.9 | 4.8 | 23.0 |
+| bore radius [mm] | 17.7 | 15.0 | 12.0 | 9.0 | 6.0 | 3.0 | 4.8 | 23.0 |
 
 ## The physics in the beam block
 
 **The decay vertex.** Uniform along the beam axis over the 5.7 m of incoming
 pipe this geometry holds (z = −5.9 m to −0.2 m). Uniform is exact, not a
-convenience: a 5 TeV muon has γcτ = 47 323 × 658.6 m = **31 166 km**, so it
+convenience: a 5 TeV muon has γcτ = 47 322 × 658.6 m = **31 168 km**, so it
 covers 1.8 × 10⁻⁷ of a decay length crossing this whole region and the decay
 rate per metre is flat to seven digits. That number is also the normalisation —
 per muon, the probability of decaying inside this geometry at all. With

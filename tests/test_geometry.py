@@ -132,6 +132,22 @@ def test_mucoll_ip_region(repo_root):
     assert np.all(hi <= [8000.0, 8000.0, 7000.0])
 
 
+def test_mucoll_ip_extract_is_up_to_date(repo_root, tmp_path):
+    """The committed IP file must be what the script makes from the committed
+    lattice export -- otherwise the two drift and the derivation stops being
+    checkable."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "mucoll_ip_extract", repo_root / "gdml" / "mucoll_ip_extract.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    regenerated = mod.main(tmp_path / "regenerated.gdml")
+    assert regenerated.read_bytes() == \
+        (repo_root / "gdml" / "mucoll_mdi_v0p8_ip.gdml").read_bytes(), (
+            "gdml/mucoll_mdi_v0p8_ip.gdml is stale; "
+            "re-run python3 gdml/mucoll_ip_extract.py")
+
+
 def test_all_repo_gdmls_parse(repo_root):
     """Every shipped geometry parses without raising."""
     import warnings
