@@ -73,6 +73,7 @@ public:
     int primaryTrackID = 0;
 
     double E = 0, x = 0, y = 0, z = 0;       // primary initial KE / position
+    double primaryMass = 0;                  // primary rest mass [MeV]
     double px = 0, py = 0, pz = 0;           // primary initial momentum
     double finalE = 0, finalX = 0, finalY = 0, finalZ = 0;  // primary stop point
     double finalPx = 0, finalPy = 0, finalPz = 0;           // primary final momentum

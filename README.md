@@ -62,45 +62,47 @@ gtp() { docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
                    -v "$PWD:/run" -w /run "$@"; }
 ```
 
-**Simulate — always from a YAML:**
+**Simulate — always from a YAML, one command per run:**
 
 ```bash
-# Geant4 — 150 MeV protons into a water phantom (one engine, one command)
+# Geant4 — 150 MeV protons into a water phantom
 gtp $GEANT4   run --config examples/water_proton.yaml -o out
 
 # BSM decay — an HNL decaying in flight inside a detector (Geant4 decays AND transports)
 gtp $GEANT4   run --config examples/maia/hnl_decay.yaml -o out
+
+# GENIE — 2 GeV muon-neutrinos on liquid argon, then Geant4 through the detector.
+# The GENIE image CONTAINS the Geant4 engine, so one container runs both stages.
+gtp $GENIE    run --config examples/nu_argon.yaml -o out
 ```
 
-**Generator runs take two commands from bare Docker**, because they use two
-engines and a container cannot start a sibling container: the generator image
-writes the interaction as **HepMC3**, then the Geant4 image propagates it.
+Each writes `out/output.root` in one common schema, **owned by you**, always
+with a Geant4 transport record. Override any field on the command line, e.g.
+`gtp $GENIE run --config examples/nu_argon.yaml --energy "5 GeV" -n 2000 -o out`.
+
+**Achilles and Pythia runs take two commands from bare Docker** — those images
+carry only their generator, and a container cannot start a sibling container:
+stage 1 writes the interaction as **HepMC3**, then a Geant4-carrying image
+(`$GEANT4` or `$GENIE`) propagates it.
 
 ```bash
-# GENIE — 2 GeV muon-neutrinos on liquid argon, then Geant4 through the detector
-gtp $GENIE    run --config examples/nu_argon.yaml -o out --stage generator
-gtp $GEANT4   transport -o out
-
-# Achilles — same two steps (theory-driven lepton-nucleus + Geant4)
 gtp $ACHILLES run --config examples/nu_argon_achilles.yaml -o out --stage generator
 gtp $GEANT4   transport -o out
 ```
 
-Each writes `out/output.root` in one common schema, **owned by you**, always with
-a Geant4 transport record — stage 2 replays `out/events.hepmc` through the GDML
-geometry and merges the generator's interaction record back in. Override any
-field on the command line, e.g. `gtp $GENIE run --config examples/nu_argon.yaml
---energy "5 GeV" -n 2000 -o out --stage generator`.
+The same split works for GENIE (`--stage generator`, then `transport`) when you
+want to inspect or re-transport the hand-off (`out/events.hepmc`,
+`out/vertex_level.root`) between the stages.
 
 > These commands (`--stage generator`, `transport`) need images built from this
 > version of the repo — the `:main` tags are rebuilt on every push to the default
 > branch, so `docker pull` first if yours are old.
 
-> Prefer **one** command for generator runs? Install the front-end
+> Prefer one command for the two-image backends too? Install the front-end
 > (`pip install "gdmltp @ git+https://github.com/lawrenceleejr/GDMLTargetPractice"`)
-> and `gdmltp run --config examples/nu_argon.yaml -o out` launches both
-> containers itself. And a generator-only (vertex-level) run is a deliberate
-> choice, not the default: put `transport: false` in the backend block.
+> and `gdmltp run --config <config> -o out` launches the containers itself.
+> And a generator-only (vertex-level) run is a deliberate choice, not the
+> default: put `transport: false` in the backend block.
 
 **Then analyze / validate / display / compare the output — same pattern, any
 image (the `gdmltp` tools ship in all of them):**
@@ -187,6 +189,36 @@ studies). A generator run that cannot reach Geant4 fails loudly rather than
 leaving an untransported file behind. The run directory keeps the whole chain —
 `events.hepmc`, `gdmltp_transport.mac`, `gdmltp_transport.json`,
 `vertex_level.root` — so stage 2 is re-runnable and inspectable.
+
+### Exporting what leaves: HepMC3 out of Geant4
+
+The interchange runs both ways. `g4sim` reads HepMC3 (`/gun/hepmcFile`) and can
+also **write** the particles *leaving* a volume — a scoring-plane / phase-space
+file — so one run can feed the next stage, or any downstream tool that speaks
+HepMC3:
+
+```yaml
+geant4:
+  exit_hepmc: exit.hepmc        # enables the export
+  exit_volume: WaterPhantom_vol # default World = everything that escapes
+  exit_min_ke: "1 MeV"          # skip soft crossings (a shower exit is mostly them)
+  exit_kill: true               # stop tracks at the surface (staged runs)
+```
+
+Then replay it as the primaries of the next run — different geometry, different
+physics list, whatever the stage needs:
+
+```bash
+gtp $GEANT4 run --config stage1.yaml -o stage1     # writes stage1/exit.hepmc
+# stage 2: a macro with /gun/hepmcFile stage1/exit.hepmc, or external backend
+```
+
+One `GenEvent` per event, one vertex **per crossing** at the point and time that
+particle crossed (they are not all the same place, and the reader honours each
+particle's own vertex), the primary as an incoming status-4 leg for provenance,
+and the source volume as an event attribute. `exit_kill` matters for staging: it
+stops the track at the surface so the next stage, which continues from there,
+does not double count.
 
 ## The YAML front-end
 
@@ -300,7 +332,7 @@ gdmltp run --generator genie --gdml gdml/liquid_argon_1m3.gdml --particle nu_mu 
 | Backend | Image | Status |
 |---|---|---|
 | `geant4` | `ghcr.io/lawrenceleejr/gdmltargetpractice` | full transport |
-| `genie` | `…-genie` **+ the geant4 image** | neutrino vertices, then Geant4 transport |
+| `genie` | `…-genie` (built **on top of** the geant4 image — both engines aboard) | neutrino vertices + Geant4 transport, one container |
 | `achilles` | `…-achilles` **+ the geant4 image** | ν / e∓ vertices, then Geant4 transport |
 | `pythia` | `…-pythia` **+ the geant4 image** | Pythia 8 free-nucleon collisions (TeV DIS, no splines), then Geant4 transport |
 | `decay` | the geant4 image | BSM decay-in-flight **by Geant4** (G4DecayTable + G4Decay), one stage incl. transport |
@@ -366,22 +398,23 @@ interaction record + primary identity are grafted onto the transported file.
 Geant4 `step_*`/`totalEdep` transport record — analyze/display/Blender all just
 work.
 
-`gdmltp run` chains the two images itself. From bare `docker run` it is two
-commands (a container cannot start a sibling), and the run directory holds the
-whole chain between them:
+For **GENIE** both stages run in its one image (it is built on top of the
+Geant4 image), so a bare `docker run $GENIE run --config … -o out` finishes the
+whole pipeline. For **Achilles/Pythia** — generator-only images — it is two
+commands, and the run directory holds the whole chain between them:
 
 ```bash
-gtp $GENIE  run --config examples/nu_argon.yaml -o out --stage generator
+gtp $ACHILLES run --config examples/nu_argon_achilles.yaml -o out --stage generator
 #   -> out/vertex_level.root, out/events.hepmc, out/gdmltp_transport.{mac,json}
-gtp $GEANT4 transport -o out
-#   -> out/output.root  (Geant4 transport + the GENIE interaction record)
+gtp $GEANT4   transport -o out
+#   -> out/output.root  (Geant4 transport + the interaction record)
 ```
 
-Ask a generator image for the full run and it stops with an error naming that
-second command: a result that never reached Geant4 is a failure, not a quiet
-half-result. `<backend>: {transport: false}` is how you *choose* a vertex-level
-run; `gdmltp transport -o out` can also be re-run on its own (different field,
-different seed) without regenerating the events.
+Ask an image with no Geant4 engine for the full run and it stops with an error
+naming that second command: a result that never reached Geant4 is a failure,
+not a quiet half-result. `<backend>: {transport: false}` is how you *choose* a
+vertex-level run; `gdmltp transport -o out` can also be re-run on its own
+(different field, different seed) without regenerating the events.
 
 ## Biasing knobs
 

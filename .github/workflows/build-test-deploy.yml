@@ -114,6 +114,12 @@ jobs:
           specs = [([(13,0,0,900),(2212,50,0,300)], (0,0,-20), 0.0),
                    ([(13,0,0,700),(211,-30,0,200),(2112,0,20,150),(14,0,0,120)],
                     (1,0,-20), 166.8)]
+          # A THIRD event with TWO vertices far apart: an exit/scoring-plane file
+          # has one crossing point per particle, so the reader must fire each
+          # primary from ITS OWN vertex. With the old one-vertex-per-event
+          # reading, both of these would start at -300 mm.
+          split = [((13, 0, 0, 900), (0, 0, -300), 0.0),
+                   ((13, 0, 0, 900), (0, 0,  300), 0.0)]
           with pyhepmc.open("events.hepmc", "w") as w:
               for i,(parts,v,tns) in enumerate(specs):
                   ev = pyhepmc.GenEvent(pyhepmc.Units.MEV, pyhepmc.Units.MM)
@@ -126,6 +132,17 @@ jobs:
                           (px,py,pz, math.sqrt(px*px+py*py+pz*pz)+140.0), pid, 1))
                   ev.add_vertex(vtx)
                   w.write(ev)
+
+              ev = pyhepmc.GenEvent(pyhepmc.Units.MEV, pyhepmc.Units.MM)
+              ev.event_number = len(specs)
+              for (pid, px, py, pz), v, tns in split:
+                  import math
+                  vtx = pyhepmc.GenVertex((v[0], v[1], v[2], tns * C))
+                  vtx.add_particle_in(pyhepmc.GenParticle((0,0,1000,1000), 14, 4))
+                  vtx.add_particle_out(pyhepmc.GenParticle(
+                      (px, py, pz, math.sqrt(px*px+py*py+pz*pz) + 140.0), pid, 1))
+                  ev.add_vertex(vtx)
+              w.write(ev)
           print("wrote events.hepmc")
           PY
           cat > transport.mac << 'EOF'
@@ -133,7 +150,7 @@ jobs:
           /run/initialize
           /analysis/neutrinoMode off
           /gun/hepmcFile events.hepmc
-          /run/beamOn 2
+          /run/beamOn 3
           EOF
           ./build/g4sim transport.mac > handoff.log 2>&1 || { cat handoff.log; exit 1; }
           cat handoff.log
@@ -146,11 +163,19 @@ jobs:
           python3 - << 'PY'
           import uproot, awkward as ak
           t = uproot.open('output.root')['tree']
-          assert t.num_entries == 2, f"events {t.num_entries}"
+          assert t.num_entries == 3, f"events {t.num_entries}"
           st = t['step_time'].array()
           t0 = ak.min(st[1]) if len(st[1]) else 0.0
           print('event 1 earliest step time:', t0)
           assert t0 >= 166.8, "HepMC vertex time was not applied to the primaries"
+          # event 2: two primaries, each from its OWN production vertex
+          parent = t['trk_parentID'].array()[2]
+          startZ = t['trk_startZ'].array()[2]
+          zs = sorted({round(float(z)) for z, p in zip(startZ, parent) if p == 0})
+          print('event 2 primary start z:', zs)
+          assert zs == [-300, 300], (
+              f"per-particle vertices lost: primaries started at {zs}, "
+              f"expected [-300, 300]")
           PY
           rm -f output.root events.hepmc transport.mac handoff.log
 
@@ -239,6 +264,109 @@ jobs:
           test -f output.root
           python3 -c "import uproot,sys; t=uproot.open('output.root')['tree']; import numpy as np; pdg=t['primaryPDG'].array(library='np'); print('primaries',pdg.tolist()); sys.exit(0 if (t.num_entries==2 and (pdg==2212).all()) else 1)"
           rm -f output.root pdg.mac
+
+      - name: Exit HepMC3 export + replay (the staged-simulation round trip)
+        # g4sim reads HepMC3 already; this proves it now WRITES it too, and that
+        # what it writes is replayable -- stage 1 records what leaves, stage 2
+        # fires those particles as its primaries.
+        #
+        # Geometry chosen so the answer cannot be zero by luck: a 500 MeV
+        # electron crosses OUT of a 1 mm silicon slab and then out of the world,
+        # so both surfaces are guaranteed to be hit. (A proton stopping inside a
+        # thick phantom escapes almost nothing -- a fine physics result, a
+        # useless test.)
+        run: |
+          write_mac() {   # $1 = macro, $2 = exit file, $3 = volume, $4 = min KE
+          cat > "$1" << EOF
+          /detector/readGDML gdml/silicon_slab_1mm.gdml
+          /run/initialize
+          /analysis/neutrinoMode off
+          /analysis/exitHepMC $2
+          /analysis/exitVolume $3
+          /analysis/exitMinKE $4
+          /random/setSeeds 21 22
+          /gun/particle e-
+          /gun/energy 500 MeV
+          /gun/position 0 0 -49 mm
+          /gun/direction 0 0 1
+          /run/beamOn 3
+          EOF
+          }
+          # (a) the world surface: everything escaping the simulation, KE cut on
+          write_mac world.mac world.hepmc World "1 MeV"
+          ./build/g4sim world.mac > world.log 2>&1 || { cat world.log; exit 1; }
+          grep "Exit HepMC3" world.log
+          # (b) the slab surface, by its GDML (logical) name, no cut
+          write_mac slab.mac slab.hepmc SiSlab_vol "0 MeV"
+          ./build/g4sim slab.mac > slab.log 2>&1 || { cat slab.log; exit 1; }
+          grep "Exit HepMC3" slab.log
+
+          python3 - << 'PY'
+          import pyhepmc
+
+          def read(path):
+              events, parts = 0, []
+              with pyhepmc.open(path) as f:
+                  for ev in f:
+                      events += 1
+                      assert "SiSlab_vol" in str(ev.attributes["gdmltp_exit_volume"]) \
+                          or "World" in str(ev.attributes["gdmltp_exit_volume"])
+                      assert "gdmltp_primary_pdg" in ev.attributes
+                      for p in ev.particles:
+                          if p.status == 4:
+                              continue            # the incoming primary leg
+                          assert p.status == 1, f"status {p.status}"
+                          v = p.production_vertex
+                          assert v is not None, "no crossing vertex"
+                          parts.append((p.pid, p.momentum.e - p.generated_mass,
+                                        v.position.z, v.position.t))
+              return events, parts
+
+          w_events, w = read("world.hepmc")
+          s_events, sl = read("slab.hepmc")
+          print(f"world surface: {w_events} events, {len(w)} crossings")
+          print(f"slab surface : {s_events} events, {len(sl)} crossings")
+          assert w_events == 3 and s_events == 3
+          assert w and sl, "a 500 MeV electron must cross both surfaces"
+
+          # the KE cut is applied (world run asked for >= 1 MeV)
+          assert all(ke >= 1.0 - 1e-6 for _, ke, _, _ in w), min(k for _, k, _, _ in w)
+
+          # the two surfaces are genuinely different places: the slab spans
+          # |z| <= 0.5 mm, the world face sits at |z| = 50 mm
+          assert any(abs(z) <= 0.6 for _, _, z, _ in sl), \
+              f"slab crossings not on the slab: {sorted({round(z,3) for _,_,z,_ in sl})}"
+          assert all(abs(z) < 49.0 for _, _, z, _ in sl), \
+              "slab export picked up world-boundary crossings"
+          assert any(abs(z) >= 49.0 for _, _, z, _ in w), \
+              "world export missed the world boundary"
+
+          # (that the recorded point is the REAL crossing, not something fixed
+          # like the primary's start, is what the two surfaces above show; the
+          # reader side is pinned deterministically in the hand-off smoke.)
+          print("exit export OK: both surfaces, KE cut honoured")
+          PY
+
+          # ... and stage 2 replays the file as its primaries
+          cat > replay.mac << 'EOF'
+          /detector/readGDML gdml/liquid_argon_1m3.gdml
+          /run/initialize
+          /analysis/neutrinoMode off
+          /gun/hepmcFile world.hepmc
+          /run/beamOn 3
+          EOF
+          ./build/g4sim replay.mac > replay.log 2>&1 || { cat replay.log; exit 1; }
+          grep -q "loaded 3 HepMC3 hand-off event(s)" replay.log
+          python3 - << 'PY'
+          import uproot
+          t = uproot.open("output.root")["tree"]
+          assert t.num_entries == 3, t.num_entries
+          n = t["nTracks"].array(library="np")
+          print("stage 2 tracks per event:", n.tolist())
+          assert n.sum() > 0, "stage 2 transported nothing"
+          PY
+          rm -f world.hepmc slab.hepmc output.root world.mac slab.mac replay.mac \
+                world.log slab.log replay.log
 
       - name: Python-written ntuples must open in REAL ROOT as a TTree
         # The regression this guards: uproot 5.7 writes an RNTuple for

@@ -213,6 +213,7 @@ class RunConfig:
             raise ConfigError(
                 f"geant4.neutrino_mode must be auto/on/off, got {nm!r}")
         self._validate_beam_distributions()
+        self._validate_exit_hepmc()
         self._validate_transport()
         if self.generator == "decay":
             self._validate_decay()
@@ -225,6 +226,35 @@ class RunConfig:
         except (TypeError, ValueError):
             raise ConfigError(f"run.events must be an integer, got {self.run.events!r}")
         return self
+
+    def _validate_exit_hepmc(self):
+        """`geant4.exit_hepmc` and friends: the HepMC3 export of what leaves a
+        volume. Catch the typos here rather than in a Geant4 macro error."""
+        g = self.geant4
+        path = g.get("exit_hepmc")
+        if path is None:
+            for key in ("exit_volume", "exit_min_ke", "exit_kill"):
+                if key in g:
+                    raise ConfigError(
+                        f"geant4.{key} only means something with "
+                        f"geant4.exit_hepmc set (the file to write)")
+            return
+        if not isinstance(path, str) or not path.strip():
+            raise ConfigError("geant4.exit_hepmc must be a file name, e.g. exit.hepmc")
+        if "exit_kill" in g and not isinstance(g["exit_kill"], bool):
+            raise ConfigError(
+                f"geant4.exit_kill must be true or false, got {g['exit_kill']!r}")
+        ke = g.get("exit_min_ke")
+        if ke is not None:
+            # reuse the beam parser so the accepted spellings are identical to
+            # every other energy in a config
+            from .beam import _ene_mev
+            try:
+                _ene_mev(ke)
+            except (ValueError, TypeError, IndexError):
+                raise ConfigError(
+                    f"geant4.exit_min_ke must be an energy with a unit "
+                    f'(e.g. "1 MeV"), got {ke!r}')
 
     def _validate_transport(self):
         """Geant4 transport of a generator's final state is ON by default (the
