@@ -161,14 +161,19 @@ void SteppingAction::RecordExitCrossing(const G4Step* step)
     auto* writer = fRunAction->GetExitWriter();
     if (!writer->Enabled()) return;
 
+    // Geant4 reports the two boundaries with DIFFERENT statuses: an inner
+    // volume boundary is fGeomBoundary, but leaving the world is fWorldBoundary
+    // -- checking only the former would silently record nothing for the default
+    // World surface.
     const auto* post = step->GetPostStepPoint();
-    if (post->GetStepStatus() != fGeomBoundary) return;
+    const G4StepStatus status = post->GetStepStatus();
+    if (status != fGeomBoundary && status != fWorldBoundary) return;
     if (post->GetKineticEnergy() < writer->MinKineticEnergy()) return;
 
     auto* track = step->GetTrack();
 
     // Which volume are we leaving? Past the world edge there is no post-step
-    // volume at all, which IS the world-exit signal.
+    // volume at all, which (with fWorldBoundary above) is the world-exit signal.
     const auto* preVol = step->GetPreStepPoint()->GetPhysicalVolume();
     const auto* postVol = post->GetPhysicalVolume();
     const G4String& watched = writer->Volume();
