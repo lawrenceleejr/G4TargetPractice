@@ -1,0 +1,52 @@
+# A muon-decay ELECTRON flying into the interaction region of the muon
+# collider v0.8 lattice.
+#
+# A mu- of the incoming 5 TeV beam decays in the last few metres of beam pipe
+# before the IP -- mu- -> e- nu_mu_bar nu_e -- and Geant4 transports the Michel
+# electron on from the decay point: down the shrinking bore, past the tungsten
+# nozzle tip, through the beryllium chamber at the IP. Roughly one daughter in
+# five is outside the bore's angular acceptance and dumps its ~TeV into the
+# nozzle instead; those are the events that make the beam-induced background.
+#
+#   gdmltp run     --config examples/mucoll/mudecay_electron_ip.yaml -o e_ip
+#   gdmltp analyze e_ip/output.root -o e_ip/analysis
+#   gdmltp display e_ip/output.root --gdml gdml/mucoll_mdi_v0p8_ip.gdml --all
+#
+# See examples/mucoll/README.md for the geometry, the numbers behind the beam
+# block, and what this model does and does not include (no machine field).
+generator: geant4
+
+geometry:
+  # The extracted, recentred interaction region -- NOT the raw lattice export,
+  # whose IP sits outside its own world volume. README.md explains why.
+  gdml: gdml/mucoll_mdi_v0p8_ip.gdml
+
+beam:
+  particle: e-                  # from the mu- beam; use e+ for the mu+ beam
+  # The exact angle-integrated lab spectrum of the charged daughter of an
+  # in-flight unpolarized muon decay: dN/dy = 5/3 - 3y^2 + 4/3 y^3, y = E/E_mu.
+  # value is the PARENT MUON energy -> <E_e> = 0.35 * 5 TeV = 1.75 TeV.
+  energy: {mode: mudecay_e, value: "5 TeV"}
+  position:
+    # On the beam axis, uniformly along the incoming pipe this geometry holds
+    # (z = -5.95 m is where the bore begins, the Be chamber starts at -158 mm).
+    # Decay is uniform per unit length here: over 5.7 m the muon covers
+    # 1.8e-7 of a decay length, so nothing about the rate varies across it.
+    x: "0 mm"
+    y: "0 mm"
+    z: {dist: uniform, min: "-5900 mm", max: "-200 mm"}
+  direction:
+    central: "0 0 1"            # downstream, toward the IP at the origin
+    # The daughter inherits the parent's direction. At the IP the beam
+    # divergence is sqrt(eps_N/(gamma beta*)) = 0.59 mrad (eps_N = 25 um,
+    # beta* = 1.5 mm), which swamps the 1/gamma = 21 urad decay cone.
+    xprime: {dist: gauss, sigma: "0.6 mrad"}
+    yprime: {dist: gauss, sigma: "0.6 mrad"}
+
+run:
+  # A 1.75 TeV electron that reaches the tungsten makes a shower with ~1e6
+  # steps, and g4sim records every one -- raise this deliberately, and see the
+  # README on geant4.celeritas for the EM offload.
+  events: 50
+  output: output.root
+  seed: 20250821

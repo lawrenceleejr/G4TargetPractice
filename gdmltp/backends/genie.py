@@ -82,15 +82,18 @@ def flux_gevgen_args(flux: dict):
         e0 = parse_energy_gev(flux["value"])
         emin = parse_energy_gev(flux["min"]); emax = parse_energy_gev(flux["max"])
         return ["-e", f"{emin:g},{emax:g}", "-f", f"exp(-x/{e0:g})"], False
-    if mode in ("mudecay_numu", "mudecay_nue"):
-        # Angle-integrated lab spectrum of neutrinos from in-flight muon decay
+    if mode in ("mudecay_numu", "mudecay_nue", "mudecay_e"):
+        # Angle-integrated lab spectrum of the daughters of in-flight muon decay
         # (value = parent muon energy). Exact TF1 expressions in y = x/E_mu.
+        # mudecay_e shares the nu_mu shape (same rest-frame Michel spectrum);
+        # GENIE itself only takes a neutrino probe, but the mapping stays exact
+        # for any caller that reaches here.
         emu = parse_energy_gev(flux["value"])
         y = f"(x/{emu:g})"
-        if mode == "mudecay_numu":
-            expr = f"5./3.-3.*pow({y},2)+4./3.*pow({y},3)"
-        else:
+        if mode == "mudecay_nue":
             expr = f"2.-6.*pow({y},2)+4.*pow({y},3)"
+        else:
+            expr = f"5./3.-3.*pow({y},2)+4./3.*pow({y},3)"
         emin = max(0.1, 1e-3 * emu)      # gevgen needs a nonzero lower edge
         return ["-e", f"{emin:g},{emu:g}", "-f", expr], False
     return ["-e", f"{parse_energy_gev(flux['value']):g}"], True

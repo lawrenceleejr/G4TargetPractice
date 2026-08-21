@@ -1,0 +1,54 @@
+# A muon-decay NEUTRINO flying into the interaction region of the muon
+# collider v0.8 lattice -- the companion to mudecay_electron_ip.yaml, same
+# decay, same geometry, the other daughter.
+#
+# The same mu- decay in the last few metres before the IP also makes a nu_mu
+# (and a nu_e_bar). It leaves the decay point along the beam axis, and on the
+# axis there is nothing to interact with: the bore is vacuum and the beryllium
+# chamber's 1 mm wall is off to the side at r = 23 mm. So this run turns
+# Geant4's neutrino processes on with a 1e10 bias, and the ~1 neutrino in 5
+# whose emission angle takes it out of the bore and into the tungsten nozzle
+# interacts there -- the interaction this geometry can actually show.
+#
+#   gdmltp run     --config examples/mucoll/mudecay_neutrino_ip.yaml -o nu_ip
+#   gdmltp analyze nu_ip/output.root -o nu_ip/analysis     # nu kinematics panel
+#   gdmltp display nu_ip/output.root --gdml gdml/mucoll_mdi_v0p8_ip.gdml --all
+#
+# Geant4 doing the neutrino interaction is deliberate here and the front-end
+# will say so loudly (GDMLTP_NO_WARNINGS=1 mutes it): its neutrino model is
+# thin, so read the energy deposition and the shower, not the interaction
+# kinematics. examples/mucoll/README.md has the GENIE route for those.
+generator: geant4
+
+geometry:
+  gdml: gdml/mucoll_mdi_v0p8_ip.gdml
+
+beam:
+  particle: nu_mu               # from the mu- beam; nu_mu_bar for the mu+ beam
+  # Exact angle-integrated lab spectrum of the nu_mu from in-flight unpolarized
+  # muon decay: dN/dy = 5/3 - 3y^2 + 4/3 y^3 -> <E> = 0.35 * 5 TeV = 1.75 TeV.
+  # (For the nu_e_bar of the same decay: mode mudecay_nue, <E> = 0.30 E_mu.)
+  energy: {mode: mudecay_numu, value: "5 TeV"}
+  position:
+    # Identical decay-vertex model to the electron config: on the beam axis,
+    # uniform along the 5.7 m of incoming beam pipe this geometry holds.
+    x: "0 mm"
+    y: "0 mm"
+    z: {dist: uniform, min: "-5900 mm", max: "-200 mm"}
+  direction:
+    central: "0 0 1"
+    xprime: {dist: gauss, sigma: "0.6 mrad"}   # the parent beam's divergence
+    yprime: {dist: gauss, sigma: "0.6 mrad"}
+
+geant4:
+  neutrino_mode: on             # write the nu_* interaction block
+  neutrino_bias:
+    # One factor on every neutrino channel (CC, NC, nucleus). At 1.75 TeV the
+    # interaction length in the nozzle alloy is ~1e8 m, so half a metre of it
+    # gives ~4e-9 per crossing: 1e10 turns a crossing into an interaction.
+    factor: 1.0e10
+
+run:
+  events: 100
+  output: output.root
+  seed: 20250822

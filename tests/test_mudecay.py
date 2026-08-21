@@ -1,9 +1,12 @@
-"""Muon-decay neutrino spectrum energy modes (mudecay_numu / mudecay_nue) --
-the neutrino-factory / muon-collider "neutrino slice" flux (arXiv:2412.14115).
+"""Muon-decay daughter spectrum energy modes (mudecay_numu / mudecay_nue /
+mudecay_e) -- the neutrino-factory / muon-collider "neutrino slice" flux
+(arXiv:2412.14115) and the Michel electron that comes with it.
 
 The exact angle-integrated lab spectra in y = E/E_mu (unpolarized):
   nu_mu / anti-nu_mu: 5/3 - 3y^2 + 4/3 y^3   -> <y> = 0.35
   nu_e  / anti-nu_e : 2 - 6y^2 + 4y^3        -> <y> = 0.30
+  e- / e+           : 5/3 - 3y^2 + 4/3 y^3   -> <y> = 0.35  (same as nu_mu)
+The three <y> sum to 1: the daughters share the muon energy exactly.
 """
 import numpy as np
 import pytest
@@ -31,6 +34,19 @@ beam:
 """, tmp_path)
     assert cfg.beam.energy.mode == "mudecay_numu"
     assert cfg.beam.energy.value == "5 TeV"
+
+
+def test_mudecay_e_mode_is_valid(tmp_path):
+    """The Michel-electron mode: an e- beam, energy.value the parent muon."""
+    cfg = _cfg("""
+generator: geant4
+geometry: {gdml: g.gdml}
+beam:
+  particle: e-
+  energy: {mode: mudecay_e, value: "5 TeV"}
+""", tmp_path)
+    assert cfg.beam.energy.mode == "mudecay_e"
+    assert cfg.beam.needs_sampling()                  # no native g4sim command
 
 
 def test_unknown_mode_still_rejected(tmp_path):
@@ -77,6 +93,22 @@ def test_nue_spectrum_moments():
     assert y.mean() == pytest.approx(0.30, rel=0.02)
 
 
+def test_electron_spectrum_matches_numu():
+    """Unpolarized muon decay: the charged lepton and the nu_mu share the
+    rest-frame Michel spectrum, so the boosted spectra are identical."""
+    assert np.array_equal(_energies("mudecay_e", seed=9),
+                          _energies("mudecay_numu", seed=9))
+    y = _energies("mudecay_e") / 5e6
+    assert y.mean() == pytest.approx(0.35, rel=0.02)
+
+
+def test_daughter_energies_sum_to_the_muon():
+    """<y_e> + <y_numu> + <y_nue> = 1 -- the three daughters carry all of it."""
+    total = sum(_energies(m, seed=13).mean()
+                for m in ("mudecay_e", "mudecay_numu", "mudecay_nue"))
+    assert total / 5e6 == pytest.approx(1.0, abs=0.01)
+
+
 def test_spectra_differ_and_are_deterministic():
     a = _energies("mudecay_numu", seed=3)
     b = _energies("mudecay_numu", seed=3)
@@ -101,6 +133,23 @@ run: {events: 500, seed: 11}
     assert pmag.mean() == pytest.approx(0.35 * 3e6, rel=0.05)
 
 
+def test_sample_electron_beam(tmp_path):
+    """End to end for an e- beam: |p| = sqrt((T+m)^2 - m^2) ~ T at TeV scale."""
+    cfg = _cfg("""
+generator: geant4
+geometry: {gdml: g.gdml}
+beam:
+  particle: e-
+  energy: {mode: mudecay_e, value: "5 TeV"}
+run: {events: 400, seed: 21}
+""", tmp_path)
+    s = beammod.sample(cfg, 400, seed=21)
+    assert s.name == "e-"
+    pmag = np.linalg.norm(s.mom, axis=1)
+    assert pmag.max() <= 5e6 + 1.0                     # bounded by E_mu
+    assert pmag.mean() == pytest.approx(0.35 * 5e6, rel=0.06)
+
+
 # --- genie flux mapping ------------------------------------------------------ #
 
 def test_genie_flux_args_mudecay():
@@ -117,6 +166,13 @@ def test_genie_flux_args_mudecay():
     args, approx = flux_gevgen_args(flux)
     assert not approx
     assert args[args.index("-f") + 1].startswith("2.-6.")
+
+    # the electron shares the nu_mu functional form, and stays exact
+    flux["mode"] = "mudecay_e"
+    args, approx = flux_gevgen_args(flux)
+    assert not approx
+    assert args[args.index("-f") + 1].startswith("5./3.")
+    assert flux_emax_gev(flux) == 5000.0
 
 
 def test_genie_flux_emax_other_modes():

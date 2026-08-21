@@ -144,23 +144,32 @@ class _GDML:
 
     def _read_physvol(self, pv):
         ref = None
+        for sub in pv:
+            if _strip_ns(sub.tag) == "volumeref":
+                ref = sub.get("ref")
+        pos, rot = self.read_pos_rot(pv)
+        return {"ref": ref, "pos": pos, "rot": rot}
+
+    def read_pos_rot(self, el, prefix=""):
+        """(position mm, rotation rad) from an element's position/rotation
+        children or their *ref forms -- shared by physvol, boolean solids
+        (`prefix="first"` picks up firstposition/firstrotation) and
+        multiUnionNode."""
         pos = (0.0, 0.0, 0.0)
         rot = (0.0, 0.0, 0.0)
-        for sub in pv:
+        for sub in el:
             st = _strip_ns(sub.tag)
-            if st == "volumeref":
-                ref = sub.get("ref")
-            elif st == "position":
+            if st == prefix + "position":
                 s = _len_scale(sub)
                 pos = (_f(sub, "x") * s, _f(sub, "y") * s, _f(sub, "z") * s)
-            elif st == "positionref":
+            elif st == prefix + "positionref":
                 pos = self.defines_pos.get(sub.get("ref"), (0.0, 0.0, 0.0))
-            elif st == "rotation":
+            elif st == prefix + "rotation":
                 a = AUNIT_TO_RAD.get((sub.get("aunit") or sub.get("unit") or "rad").lower(), 1.0)
                 rot = (_f(sub, "x") * a, _f(sub, "y") * a, _f(sub, "z") * a)
-            elif st == "rotationref":
+            elif st == prefix + "rotationref":
                 rot = self.defines_rot.get(sub.get("ref"), (0.0, 0.0, 0.0))
-        return {"ref": ref, "pos": pos, "rot": rot}
+        return pos, rot
 
 
 def _solid_primitive(solidtype, el):
@@ -211,6 +220,116 @@ def _bbox_of_solid(solidtype, el):
     except Exception:
         return None
     return None
+
+
+# --------------------------------------------------------------------------- #
+# Boolean solids
+#
+# The lightweight parser does no CSG, so a boolean is reduced to the positive
+# shapes that BOUND it -- enough for the display's job (context around the
+# tracks) and for `info`'s extent. Without this, geometry that is *entirely*
+# boolean -- a FLUKA-converted accelerator model, say, where every region is an
+# intersection of bodies minus its neighbours -- parses to nothing at all.
+# pyg4ometry, when installed, meshes these properly instead.
+# --------------------------------------------------------------------------- #
+_BOOLEAN_TAGS = ("subtraction", "intersection", "union", "multiUnion")
+
+
+def _params_half_extent(ptype, params):
+    return _half_extent(Primitive(ptype, params, _identity()))
+
+
+def _parts_span(parts):
+    """Diagonal of the AABB around [(ptype, params, offset)], for comparing how
+    tightly two operands bound an intersection. inf when there is nothing."""
+    lo = np.array([np.inf] * 3)
+    hi = np.array([-np.inf] * 3)
+    for ptype, params, off in parts:
+        c = off[:3, 3]
+        h = _params_half_extent(ptype, params)
+        lo = np.minimum(lo, c - h)
+        hi = np.maximum(hi, c + h)
+    if not np.all(np.isfinite(lo)):
+        return np.inf
+    return float(np.linalg.norm(hi - lo))
+
+
+def _solid_parts(g, name, depth=0):
+    """[(ptype, params, offset 4x4)] bounding the named solid.
+
+      primitive        -> itself (exact)
+      subtraction      -> the first operand; what is cut away is not drawn
+      intersection     -> whichever operand bounds the result more tightly
+      union/multiUnion -> every constituent, each at its own offset
+    """
+    if depth > 8 or name not in g.solids:
+        return []
+    stype, el = g.solids[name]
+    ptype, params = _solid_primitive(stype, el)
+    if ptype is not None:
+        return [(ptype, params, _identity())]
+    if stype not in _BOOLEAN_TAGS:
+        bb = _bbox_of_solid(stype, el)
+        if not bb:
+            return []
+        params, off = bb
+        return [("bbox", params, _translation(*off))]
+
+    def placed(parts, pos, rot):
+        m = _translation(*pos) @ _rotation(*rot)
+        return [(t, p, m @ off) for t, p, off in parts]
+
+    if stype == "multiUnion":
+        out = []
+        for node in el:
+            if _strip_ns(node.tag) != "multiUnionNode":
+                continue
+            ref = next((s.get("ref") for s in node
+                        if _strip_ns(s.tag) == "solid"), None)
+            if ref:
+                out += placed(_solid_parts(g, ref, depth + 1),
+                              *g.read_pos_rot(node))
+        return out
+
+    first = next((s.get("ref") for s in el if _strip_ns(s.tag) == "first"), None)
+    second = next((s.get("ref") for s in el if _strip_ns(s.tag) == "second"), None)
+    a = placed(_solid_parts(g, first, depth + 1), *g.read_pos_rot(el, "first"))
+    if stype == "subtraction":
+        return a
+    b = placed(_solid_parts(g, second, depth + 1), *g.read_pos_rot(el))
+    if stype == "union":
+        return a + b
+    return a if _parts_span(a) <= _parts_span(b) else b     # intersection
+
+
+def _clip_to_world(prims, world_half):
+    """Trim primitives to the world box, dropping those wholly outside it.
+
+    Geant4 tracks nothing beyond the world, so nothing trackable is lost -- a
+    solid that straddles the boundary keeps its axis-aligned footprint inside.
+    What this buys is scale: a FLUKA-converted model carries its outermost
+    "blackhole" regions as bodies kilometres across inside a world a few metres
+    wide, and unclipped they blow up the scene bounds until the display is a dot.
+    """
+    out = []
+    for p in prims:
+        if p.is_world or p.transform is None:
+            out.append(p)
+            continue
+        c = p.transform[:3, 3]
+        h = _half_extent(p)
+        lo = np.maximum(c - h, -world_half)
+        hi = np.minimum(c + h, world_half)
+        if np.any(hi <= lo):
+            continue                                   # entirely outside
+        if np.allclose(lo, c - h) and np.allclose(hi, c + h):
+            out.append(p)                              # fits: keep the real shape
+            continue
+        mid = 0.5 * (lo + hi)
+        out.append(Primitive("bbox", {"sx": hi[0] - lo[0], "sy": hi[1] - lo[1],
+                                      "sz": hi[2] - lo[2]},
+                             _translation(*mid), p.material, p.volume_name))
+    return out
 
 
 def _use_pyg4ometry(path):
@@ -396,14 +515,14 @@ def _parse_lightweight(path, include_world=False, max_bytes=DEFAULT_MAX_BYTES):
                                                vol.get("materialref", ""), volname, is_world))
                     else:
                         if stype not in warned:
-                            warnings.warn(f"Unsupported solid '{stype}'; bbox fallback.")
+                            what = ("decomposed into its positive parts"
+                                    if stype in _BOOLEAN_TAGS else "bbox fallback")
+                            warnings.warn(f"Unsupported solid '{stype}'; {what}.")
                             warned.add(stype)
-                        bb = _bbox_of_solid(stype, sel)
-                        if bb:
-                            params, off = bb
-                            prims.append(Primitive("bbox", params,
-                                                   transform @ _translation(*off),
-                                                   vol.get("materialref", ""), volname, is_world))
+                        for ptype, params, off in _solid_parts(g, sref):
+                            prims.append(Primitive(ptype, params, transform @ off,
+                                                   vol.get("materialref", ""),
+                                                   volname, is_world))
         if bbox_only and not is_world:
             return  # don't recurse deeply in huge files
         for pv in vol.get("physvols", []):
@@ -413,6 +532,11 @@ def _parse_lightweight(path, include_world=False, max_bytes=DEFAULT_MAX_BYTES):
 
     if g.world:
         recurse(g.world, _identity(), 0)
+        wsolid = g.solids.get((g.volumes.get(g.world) or {}).get("solidref"))
+        if wsolid and wsolid[0] == "box":
+            s = _len_scale(wsolid[1])
+            prims = _clip_to_world(prims, 0.5 * s * np.array(
+                [_f(wsolid[1], "x"), _f(wsolid[1], "y"), _f(wsolid[1], "z")]))
     return prims
 
 
