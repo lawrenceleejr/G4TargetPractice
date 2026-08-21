@@ -1,0 +1,2795 @@
+<?xml version='1.0' encoding='utf-8'?>
+<gdml xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://cern.ch/service-spi/app/releases/GDML/schema/gdml.xsd">
+	<!--
+  The interaction region of the muon collider v0.8 lattice, ready to track.
+
+  Derived from mucoll_mdi_lattice_v0p8.gdml by gdml/mucoll_ip_extract.py:
+  the MDI assembly (both nozzles with their borated liners, the beryllium
+  beam chamber, the beam-pipe vacuum and the detector cavern) translated by
+  (0, +30 m, -85 m) so the interaction point is at the origin, in a world
+  sized to it. Solids and materials are otherwise untouched.
+
+  Beam axis: z. Interaction point: (0, 0, 0). Regenerate with
+      python3 gdml/mucoll_ip_extract.py
+--><define />
+	<materials>
+		<element name="HYDROGEN_element" formula="H" Z="1">
+			<atom value="1" />
+		</element>
+		<element name="HELIUM_element" formula="He" Z="2">
+			<atom value="4" />
+		</element>
+		<element name="BERYLLIU_element" formula="Be" Z="4">
+			<atom value="9" />
+		</element>
+		<element name="CARBON_element" formula="B" Z="5">
+			<atom value="10" />
+		</element>
+		<element name="NITROGEN_element" formula="N" Z="7">
+			<atom value="14" />
+		</element>
+		<element name="OXYGEN_element" formula="O" Z="8">
+			<atom value="15" />
+		</element>
+		<element name="MAGNESIU_element" formula="Mg" Z="12">
+			<atom value="24" />
+		</element>
+		<element name="ALUMINUM_element" formula="Al" Z="13">
+			<atom value="26" />
+		</element>
+		<element name="IRON_element" formula="Fe" Z="26">
+			<atom value="55" />
+		</element>
+		<element name="COPPER_element" formula="Cu" Z="29">
+			<atom value="63" />
+		</element>
+		<element name="SILVER_element" formula="Ag" Z="47">
+			<atom value="107" />
+		</element>
+		<element name="SILICON_element" formula="Si" Z="14">
+			<atom value="28" />
+		</element>
+		<element name="GOLD_element" formula="Au" Z="79">
+			<atom value="196" />
+		</element>
+		<element name="MERCURY_element" formula="Hg" Z="80">
+			<atom value="200" />
+		</element>
+		<element name="LEAD_element" formula="Pb" Z="82">
+			<atom value="207" />
+		</element>
+		<element name="TANTALUM_element" formula="Ta" Z="73">
+			<atom value="180" />
+		</element>
+		<element name="SODIUM_element" formula="Na" Z="11">
+			<atom value="22" />
+		</element>
+		<element name="ARGON_element" formula="Ar" Z="18">
+			<atom value="39" />
+		</element>
+		<element name="CALCIUM_element" formula="Ca" Z="20">
+			<atom value="40" />
+		</element>
+		<element name="TIN_element" formula="Sn" Z="50">
+			<atom value="118" />
+		</element>
+		<element name="TUNGSTEN_element" formula="W" Z="74">
+			<atom value="183" />
+		</element>
+		<element name="TITANIUM_element" formula="Ti" Z="22">
+			<atom value="47" />
+		</element>
+		<element name="NICKEL_element" formula="Ni" Z="28">
+			<atom value="58" />
+		</element>
+		<element name="H_1.9K_element" formula="H_1.9K_element" Z="1">
+			<atom value="1.007" />
+		</element>
+		<material name="H_1.9K" Z="1">
+			<D value="8.37e-05" />
+			<atom value="1.007" />
+		</material>
+		<element name="H_4.5K_element" formula="H_4.5K_element" Z="1">
+			<atom value="1.007" />
+		</element>
+		<material name="H_4.5K" Z="1">
+			<D value="8.37e-05" />
+			<atom value="1.007" />
+		</material>
+		<element name="LHe_1.9K_element" formula="LHe_1.9K_element" Z="2">
+			<atom value="4.002" />
+		</element>
+		<material name="LHe_1.9K" Z="2">
+			<D value="0.1472" />
+			<atom value="4.002" />
+		</material>
+		<element name="LHe_4K_element" formula="LHe_4K_element" Z="2">
+			<atom value="4.002" />
+		</element>
+		<material name="LHe_4K" Z="2">
+			<D value="0.12206" />
+			<atom value="4.002" />
+		</material>
+		<element name="LHe_4.5K_element" formula="LHe_4.5K_element" Z="2">
+			<atom value="4.002" />
+		</element>
+		<material name="LHe_4.5K" Z="2">
+			<D value="0.12206" />
+			<atom value="4.002" />
+		</material>
+		<element name="vHe_1.9K_element" formula="vHe_1.9K_element" Z="2">
+			<atom value="4.002" />
+		</element>
+		<material name="vHe_1.9K" Z="2">
+			<D value="0.03125" />
+			<atom value="4.002" />
+		</material>
+		<element name="B_1.9K_element" formula="B_1.9K_element" Z="5">
+			<atom value="10.811" />
+		</element>
+		<material name="B_1.9K" Z="5">
+			<D value="2.34" />
+			<atom value="10.811" />
+		</material>
+		<element name="C_1.9K_element" formula="C_1.9K_element" Z="6">
+			<atom value="12.011" />
+		</element>
+		<material name="C_1.9K" Z="6">
+			<D value="2.0" />
+			<atom value="12.011" />
+		</material>
+		<element name="C_4.5K_element" formula="C_4.5K_element" Z="6">
+			<atom value="12.011" />
+		</element>
+		<material name="C_4.5K" Z="6">
+			<D value="2.0" />
+			<atom value="12.011" />
+		</material>
+		<element name="CARBONCO_element" formula="CARBONCO_element" Z="6">
+			<atom value="12.011" />
+		</element>
+		<material name="CARBONCO" Z="6">
+			<D value="1.77" />
+			<atom value="12.011" />
+		</material>
+		<element name="GRAPHITE_element" formula="GRAPHITE_element" Z="6">
+			<atom value="12.011" />
+		</element>
+		<material name="GRAPHITE" Z="6">
+			<D value="1.8" />
+			<atom value="12.011" />
+		</material>
+		<element name="N_1.9K_element" formula="N_1.9K_element" Z="7">
+			<atom value="14.007" />
+		</element>
+		<material name="N_1.9K" Z="7">
+			<D value="0.808" />
+			<atom value="14.007" />
+		</material>
+		<element name="N_4.5K_element" formula="N_4.5K_element" Z="7">
+			<atom value="14.007" />
+		</element>
+		<material name="N_4.5K" Z="7">
+			<D value="0.808" />
+			<atom value="14.007" />
+		</material>
+		<element name="O_1.9K_element" formula="O_1.9K_element" Z="8">
+			<atom value="15.999" />
+		</element>
+		<material name="O_1.9K" Z="8">
+			<D value="0.00133" />
+			<atom value="15.999" />
+		</material>
+		<element name="O_4.5K_element" formula="O_4.5K_element" Z="8">
+			<atom value="15.999" />
+		</element>
+		<material name="O_4.5K" Z="8">
+			<D value="0.00133" />
+			<atom value="15.999" />
+		</material>
+		<element name="FLUORINE_element" formula="FLUORINE_element" Z="9">
+			<atom value="18.998" />
+		</element>
+		<material name="FLUORINE" Z="9">
+			<D value="0.001696" />
+			<atom value="18.998" />
+		</material>
+		<element name="Na_1.9K_element" formula="Na_1.9K_element" Z="11">
+			<atom value="22.99" />
+		</element>
+		<material name="Na_1.9K" Z="11">
+			<D value="0.971" />
+			<atom value="22.99" />
+		</material>
+		<element name="Mg_1.9K_element" formula="Mg_1.9K_element" Z="12">
+			<atom value="24.305" />
+		</element>
+		<material name="Mg_1.9K" Z="12">
+			<D value="1.74" />
+			<atom value="24.305" />
+		</material>
+		<element name="Al_1.9K_element" formula="Al_1.9K_element" Z="13">
+			<atom value="26.982" />
+		</element>
+		<material name="Al_1.9K" Z="13">
+			<D value="2.699" />
+			<atom value="26.982" />
+		</material>
+		<element name="Al_4K_element" formula="Al_4K_element" Z="13">
+			<atom value="26.982" />
+		</element>
+		<material name="Al_4K" Z="13">
+			<D value="2.699" />
+			<atom value="26.982" />
+		</material>
+		<element name="Si_1.9K_element" formula="Si_1.9K_element" Z="14">
+			<atom value="28.086" />
+		</element>
+		<material name="Si_1.9K" Z="14">
+			<D value="2.329" />
+			<atom value="28.086" />
+		</material>
+		<element name="P_1.9K_element" formula="P_1.9K_element" Z="15">
+			<atom value="30.974" />
+		</element>
+		<material name="P_1.9K" Z="15">
+			<D value="1.82" />
+			<atom value="30.974" />
+		</material>
+		<element name="S_1.9K_element" formula="S_1.9K_element" Z="16">
+			<atom value="32.065" />
+		</element>
+		<material name="S_1.9K" Z="16">
+			<D value="2.07" />
+			<atom value="32.065" />
+		</material>
+		<element name="POTASSIU_element" formula="POTASSIU_element" Z="19">
+			<atom value="39.098" />
+		</element>
+		<material name="POTASSIU" Z="19">
+			<D value="0.862" />
+			<atom value="39.098" />
+		</material>
+		<element name="K_1.9K_element" formula="K_1.9K_element" Z="19">
+			<atom value="39.098" />
+		</element>
+		<material name="K_1.9K" Z="19">
+			<D value="0.862" />
+			<atom value="39.098" />
+		</material>
+		<element name="Ca_1.9K_element" formula="Ca_1.9K_element" Z="20">
+			<atom value="40.078" />
+		</element>
+		<material name="Ca_1.9K" Z="20">
+			<D value="1.55" />
+			<atom value="40.078" />
+		</material>
+		<element name="Ti_1.9K_element" formula="Ti_1.9K_element" Z="22">
+			<atom value="47.867" />
+		</element>
+		<material name="Ti_1.9K" Z="22">
+			<D value="4.54" />
+			<atom value="47.867" />
+		</material>
+		<element name="Ti_4.5K_element" formula="Ti_4.5K_element" Z="22">
+			<atom value="47.867" />
+		</element>
+		<material name="Ti_4.5K" Z="22">
+			<D value="4.54" />
+			<atom value="47.867" />
+		</material>
+		<element name="V_1.9K_element" formula="V_1.9K_element" Z="23">
+			<atom value="50.942" />
+		</element>
+		<material name="V_1.9K" Z="23">
+			<D value="6.11" />
+			<atom value="50.942" />
+		</material>
+		<element name="Cr_1.9K_element" formula="Cr_1.9K_element" Z="24">
+			<atom value="51.996" />
+		</element>
+		<material name="Cr_1.9K" Z="24">
+			<D value="7.19" />
+			<atom value="51.996" />
+		</material>
+		<element name="Mn_1.9K_element" formula="Mn_1.9K_element" Z="25">
+			<atom value="54.938" />
+		</element>
+		<material name="Mn_1.9K" Z="25">
+			<D value="7.43" />
+			<atom value="54.938" />
+		</material>
+		<element name="Fe_1.9K_element" formula="Fe_1.9K_element" Z="26">
+			<atom value="55.845" />
+		</element>
+		<material name="Fe_1.9K" Z="26">
+			<D value="7.874" />
+			<atom value="55.845" />
+		</material>
+		<element name="Co_1.9K_element" formula="Co_1.9K_element" Z="27">
+			<atom value="58.933" />
+		</element>
+		<material name="Co_1.9K" Z="27">
+			<D value="8.9" />
+			<atom value="58.933" />
+		</material>
+		<element name="Ni_1.9K_element" formula="Ni_1.9K_element" Z="28">
+			<atom value="58.693" />
+		</element>
+		<material name="Ni_1.9K" Z="28">
+			<D value="8.902" />
+			<atom value="58.693" />
+		</material>
+		<element name="Cu_1.9K_element" formula="Cu_1.9K_element" Z="29">
+			<atom value="63.546" />
+		</element>
+		<material name="Cu_1.9K" Z="29">
+			<D value="8.96" />
+			<atom value="63.546" />
+		</material>
+		<element name="Cu_4K_element" formula="Cu_4K_element" Z="29">
+			<atom value="63.546" />
+		</element>
+		<material name="Cu_4K" Z="29">
+			<D value="8.96" />
+			<atom value="63.546" />
+		</material>
+		<element name="Cu_4.5K_element" formula="Cu_4.5K_element" Z="29">
+			<atom value="63.546" />
+		</element>
+		<material name="Cu_4.5K" Z="29">
+			<D value="8.96" />
+			<atom value="63.546" />
+		</material>
+		<element name="Cu_87K_element" formula="Cu_87K_element" Z="29">
+			<atom value="63.546" />
+		</element>
+		<material name="Cu_87K" Z="29">
+			<D value="8.96" />
+			<atom value="63.546" />
+		</material>
+		<element name="Zn_1.9K_element" formula="Zn_1.9K_element" Z="30">
+			<atom value="65.38" />
+		</element>
+		<material name="Zn_1.9K" Z="30">
+			<D value="7.14" />
+			<atom value="65.38" />
+		</material>
+		<element name="ARSENIC_element" formula="ARSENIC_element" Z="33">
+			<atom value="74.922" />
+		</element>
+		<material name="ARSENIC" Z="33">
+			<D value="5.73" />
+			<atom value="74.922" />
+		</material>
+		<element name="STRONTIU_element" formula="STRONTIU_element" Z="38">
+			<atom value="87.62" />
+		</element>
+		<material name="STRONTIU" Z="38">
+			<D value="2.63" />
+			<atom value="87.62" />
+		</material>
+		<element name="Nb_1.9K_element" formula="Nb_1.9K_element" Z="41">
+			<atom value="92.906" />
+		</element>
+		<material name="Nb_1.9K" Z="41">
+			<D value="8.57" />
+			<atom value="92.906" />
+		</material>
+		<element name="Nb_4.5K_element" formula="Nb_4.5K_element" Z="41">
+			<atom value="92.906" />
+		</element>
+		<material name="Nb_4.5K" Z="41">
+			<D value="8.57" />
+			<atom value="92.906" />
+		</material>
+		<element name="Mo_1.9K_element" formula="Mo_1.9K_element" Z="42">
+			<atom value="95.96" />
+		</element>
+		<material name="Mo_1.9K" Z="42">
+			<D value="10.22" />
+			<atom value="95.96" />
+		</material>
+		<element name="CADMIUM_element" formula="CADMIUM_element" Z="48">
+			<atom value="112.411" />
+		</element>
+		<material name="CADMIUM" Z="48">
+			<D value="8.65" />
+			<atom value="112.411" />
+		</material>
+		<element name="Sn_1.9K_element" formula="Sn_1.9K_element" Z="50">
+			<atom value="118.71" />
+		</element>
+		<material name="Sn_1.9K" Z="50">
+			<D value="7.31" />
+			<atom value="118.71" />
+		</material>
+		<element name="ANTIMONY_element" formula="ANTIMONY_element" Z="51">
+			<atom value="121.76" />
+		</element>
+		<material name="ANTIMONY" Z="51">
+			<D value="6.691" />
+			<atom value="121.76" />
+		</material>
+		<element name="BARIUM_element" formula="BARIUM_element" Z="56">
+			<atom value="137.327" />
+		</element>
+		<material name="BARIUM" Z="56">
+			<D value="3.5" />
+			<atom value="137.327" />
+		</material>
+		<element name="EUROPIUM_element" formula="EUROPIUM_element" Z="63">
+			<atom value="151.964" />
+		</element>
+		<material name="EUROPIUM" Z="63">
+			<D value="5.244" />
+			<atom value="151.964" />
+		</material>
+		<element name="Ta_1.9K_element" formula="Ta_1.9K_element" Z="73">
+			<atom value="180.948" />
+		</element>
+		<material name="Ta_1.9K" Z="73">
+			<D value="16.654" />
+			<atom value="180.948" />
+		</material>
+		<element name="Pb_1.9K_element" formula="Pb_1.9K_element" Z="82">
+			<atom value="207.2" />
+		</element>
+		<material name="Pb_1.9K" Z="82">
+			<D value="11.35" />
+			<atom value="207.2" />
+		</material>
+		<element name="Pb_87K_element" formula="Pb_87K_element" Z="82">
+			<atom value="207.2" />
+		</element>
+		<material name="Pb_87K" Z="82">
+			<D value="11.35" />
+			<atom value="207.2" />
+		</material>
+		<element name="BISMUTH_element" formula="BISMUTH_element" Z="83">
+			<atom value="208.98" />
+		</element>
+		<material name="BISMUTH" Z="83">
+			<D value="9.747" />
+			<atom value="208.98" />
+		</material>
+		<element name="LANTHANU_element" formula="LANTHANU_element" Z="57">
+			<atom value="138.905" />
+		</element>
+		<material name="LANTHANU" Z="57">
+			<D value="6.162" />
+			<atom value="138.905" />
+		</material>
+		<element name="CERIUM_element" formula="CERIUM_element" Z="58">
+			<atom value="140.116" />
+		</element>
+		<material name="CERIUM" Z="58">
+			<D value="6.77" />
+			<atom value="140.116" />
+		</material>
+		<element name="CHLORINE_element" formula="CHLORINE_element" Z="17">
+			<atom value="35.453" />
+		</element>
+		<material name="CHLORINE" Z="17">
+			<D value="3.214" />
+			<atom value="35.453" />
+		</material>
+		<element name="NEODYMIU_element" formula="NEODYMIU_element" Z="60">
+			<atom value="144.242" />
+		</element>
+		<material name="NEODYMIU" Z="60">
+			<D value="7.01" />
+			<atom value="144.242" />
+		</material>
+		<element name="YTTRIUM_element" formula="YTTRIUM_element" Z="39">
+			<atom value="88.906" />
+		</element>
+		<material name="YTTRIUM" Z="39">
+			<D value="4.472" />
+			<atom value="88.906" />
+		</material>
+		<element name="GALLIUM_element" formula="GALLIUM_element" Z="31">
+			<atom value="69.723" />
+		</element>
+		<material name="GALLIUM" Z="31">
+			<D value="5.91" />
+			<atom value="69.723" />
+		</material>
+		<element name="LITHIUM_element" formula="LITHIUM_element" Z="3">
+			<atom value="6.941" />
+		</element>
+		<material name="LITHIUM" Z="3">
+			<D value="0.535" />
+			<atom value="6.941" />
+		</material>
+		<element name="BLM.ALUM_element" formula="BLM.ALUM_element" Z="13">
+			<atom value="26.982" />
+		</element>
+		<material name="BLM.ALUM" Z="13">
+			<D value="2.699" />
+			<atom value="26.982" />
+		</material>
+		<element name="BLM.NITR_element" formula="BLM.NITR_element" Z="7">
+			<atom value="14.007" />
+		</element>
+		<material name="BLM.NITR" Z="7">
+			<D value="0.00126" />
+			<atom value="14.007" />
+		</material>
+		<element name="ARG_87K_element" formula="ARG_87K_element" Z="18">
+			<atom value="39.948" />
+		</element>
+		<material name="ARG_87K" Z="18">
+			<D value="1.396" />
+			<atom value="39.948" />
+		</material>
+		<element name="LITHIU-6_element" formula="LITHIU-6_element" Z="3">
+			<atom value="6.941" />
+		</element>
+		<material name="LITHIU-6" Z="3">
+			<D value="1.0" />
+			<atom value="6.941" />
+		</material>
+		<element name="LITHIU-7_element" formula="LITHIU-7_element" Z="3">
+			<atom value="6.941" />
+		</element>
+		<material name="LITHIU-7" Z="3">
+			<D value="1.0" />
+			<atom value="6.941" />
+		</material>
+		<element name="H_CH2_element" formula="H_CH2_element" Z="1">
+			<atom value="1.007" />
+		</element>
+		<material name="H_CH2" Z="1">
+			<D value="1.0" />
+			<atom value="1.007" />
+		</material>
+		<element name="RHENIUM_element" formula="RHENIUM_element" Z="75">
+			<atom value="186.207" />
+		</element>
+		<material name="RHENIUM" Z="75">
+			<D value="21.02" />
+			<atom value="186.207" />
+		</material>
+		<element name="He4Kp016_element" formula="He4Kp016_element" Z="2">
+			<atom value="4.002" />
+		</element>
+		<material name="He4Kp016" Z="2">
+			<D value="0.00019256" />
+			<atom value="4.002" />
+		</material>
+		<element name="He46K3p6_element" formula="He46K3p6_element" Z="2">
+			<atom value="4.002" />
+		</element>
+		<material name="He46K3p6" Z="2">
+			<D value="0.037677" />
+			<atom value="4.002" />
+		</material>
+		<element name="He20K1p3_element" formula="He20K1p3_element" Z="2">
+			<atom value="4.002" />
+		</element>
+		<material name="He20K1p3" Z="2">
+			<D value="0.0031291" />
+			<atom value="4.002" />
+		</material>
+		<element name="He50K19_element" formula="He50K19_element" Z="2">
+			<atom value="4.002" />
+		</element>
+		<material name="He50K19" Z="2">
+			<D value="0.018293" />
+			<atom value="4.002" />
+		</material>
+		<element name="He75K18_element" formula="He75K18_element" Z="2">
+			<atom value="4.002" />
+		</element>
+		<material name="He75K18" Z="2">
+			<D value="0.011554" />
+			<atom value="4.002" />
+		</material>
+		<element name="Graphite_element" formula="Graphite_element" Z="6">
+			<atom value="12.011" />
+		</element>
+		<material name="Graphite" Z="6">
+			<D value="2.26" />
+			<atom value="12.011" />
+		</material>
+		<element name="IRIDIUM_element" formula="IRIDIUM_element" Z="77">
+			<atom value="192.217" />
+		</element>
+		<material name="IRIDIUM" Z="77">
+			<D value="22.42" />
+			<atom value="192.217" />
+		</material>
+		<element name="BROMINE_element" formula="BROMINE_element" Z="35">
+			<atom value="79.904" />
+		</element>
+		<material name="BROMINE" Z="35">
+			<D value="0.0070722" />
+			<atom value="79.904" />
+		</material>
+		<element name="BORON_element" formula="BORON_element" Z="5">
+			<atom value="10.811" />
+		</element>
+		<material name="BORON" Z="5">
+			<D value="2.37" />
+			<atom value="10.811" />
+		</material>
+		<element name="AC150GPH_element" formula="AC150GPH_element" Z="6">
+			<atom value="12.011" />
+		</element>
+		<material name="AC150GPH" Z="6">
+			<D value="1.67" />
+			<atom value="12.011" />
+		</material>
+		<element name="CC_1_85_element" formula="CC_1_85_element" Z="6">
+			<atom value="12.011" />
+		</element>
+		<material name="CC_1_85" Z="6">
+			<D value="1.85" />
+			<atom value="12.011" />
+		</material>
+		<element name="CC_1_80_element" formula="CC_1_80_element" Z="6">
+			<atom value="12.011" />
+		</element>
+		<material name="CC_1_80" Z="6">
+			<D value="1.8" />
+			<atom value="12.011" />
+		</material>
+		<element name="CC_1_75_element" formula="CC_1_75_element" Z="6">
+			<atom value="12.011" />
+		</element>
+		<material name="CC_1_75" Z="6">
+			<D value="1.75" />
+			<atom value="12.011" />
+		</material>
+		<element name="CC_1_40_element" formula="CC_1_40_element" Z="6">
+			<atom value="12.011" />
+		</element>
+		<material name="CC_1_40" Z="6">
+			<D value="1.4" />
+			<atom value="12.011" />
+		</material>
+		<element name="GRAR4550_element" formula="GRAR4550_element" Z="6">
+			<atom value="12.011" />
+		</element>
+		<material name="GRAR4550" Z="6">
+			<D value="1.83" />
+			<atom value="12.011" />
+		</material>
+		<element name="PHOSPHO_element" formula="PHOSPHO_element" Z="15">
+			<atom value="30.974" />
+		</element>
+		<material name="PHOSPHO" Z="15">
+			<D value="1.82" />
+			<atom value="30.974" />
+		</material>
+		<element name="SULFUR_element" formula="SULFUR_element" Z="16">
+			<atom value="32.065" />
+		</element>
+		<material name="SULFUR" Z="16">
+			<D value="2.07" />
+			<atom value="32.065" />
+		</material>
+		<element name="VANADIUM_element" formula="VANADIUM_element" Z="23">
+			<atom value="50.942" />
+		</element>
+		<material name="VANADIUM" Z="23">
+			<D value="6.11" />
+			<atom value="50.942" />
+		</material>
+		<element name="CHROMIUM_element" formula="CHROMIUM_element" Z="24">
+			<atom value="51.996" />
+		</element>
+		<material name="CHROMIUM" Z="24">
+			<D value="7.18" />
+			<atom value="51.996" />
+		</material>
+		<element name="MANGANES_element" formula="MANGANES_element" Z="25">
+			<atom value="54.938" />
+		</element>
+		<material name="MANGANES" Z="25">
+			<D value="7.43" />
+			<atom value="54.938" />
+		</material>
+		<element name="COBALT_element" formula="COBALT_element" Z="27">
+			<atom value="58.933" />
+		</element>
+		<material name="COBALT" Z="27">
+			<D value="8.9" />
+			<atom value="58.933" />
+		</material>
+		<element name="ZINC_element" formula="ZINC_element" Z="30">
+			<atom value="65.38" />
+		</element>
+		<material name="ZINC" Z="30">
+			<D value="7.14" />
+			<atom value="65.38" />
+		</material>
+		<element name="ZIRCONIU_element" formula="ZIRCONIU_element" Z="40">
+			<atom value="91.224" />
+		</element>
+		<material name="ZIRCONIU" Z="40">
+			<D value="6.51" />
+			<atom value="91.224" />
+		</material>
+		<element name="NIOBIUM_element" formula="NIOBIUM_element" Z="41">
+			<atom value="92.906" />
+		</element>
+		<material name="NIOBIUM" Z="41">
+			<D value="8.57" />
+			<atom value="92.906" />
+		</material>
+		<element name="MOLYBDEN_element" formula="MOLYBDEN_element" Z="42">
+			<atom value="95.96" />
+		</element>
+		<material name="MOLYBDEN" Z="42">
+			<D value="10.22" />
+			<atom value="95.96" />
+		</material>
+		<element name="HAFNIUM_element" formula="HAFNIUM_element" Z="72">
+			<atom value="178.49" />
+		</element>
+		<material name="HAFNIUM" Z="72">
+			<D value="13.31" />
+			<atom value="178.49" />
+		</material>
+		<element name="IRONS_element" formula="IRONS_element" Z="26">
+			<atom value="55.845" />
+		</element>
+		<material name="IRONS" Z="26">
+			<D value="7.874" />
+			<atom value="55.845" />
+		</material>
+		<element name="Fe_87K_element" formula="Fe_87K_element" Z="26">
+			<atom value="55.845" />
+		</element>
+		<material name="Fe_87K" Z="26">
+			<D value="7.874" />
+			<atom value="55.845" />
+		</material>
+		<material name="POLY_87K">
+			<D value="1.06" />
+			<fraction ref="H_1.9K_element" n="0.07735443232447381" />
+			<fraction ref="C_1.9K_element" n="0.9226455676755262" />
+		</material>
+		<material name="KAPTO87K">
+			<D value="1.42" />
+			<fraction ref="H_1.9K" n="0.026362" />
+			<fraction ref="C_1.9K" n="0.691133" />
+			<fraction ref="N_1.9K" n="0.07327" />
+			<fraction ref="O_1.9K" n="0.209235" />
+		</material>
+		<material name="KAPT4.5K">
+			<D value="1.42" />
+			<fraction ref="H_4.5K" n="0.026362" />
+			<fraction ref="C_4.5K" n="0.691133" />
+			<fraction ref="N_4.5K" n="0.07327" />
+			<fraction ref="O_4.5K" n="0.209235" />
+		</material>
+		<material name="EPOXY87K">
+			<D value="1.43" />
+			<fraction ref="H_1.9K" n="0.03435" />
+			<fraction ref="C_1.9K" n="0.37345" />
+			<fraction ref="O_1.9K" n="0.21852" />
+			<fraction ref="Na_1.9K" n="0.12105" />
+			<fraction ref="Si_1.9K" n="0.14737" />
+			<fraction ref="Ca_1.9K" n="0.10526" />
+		</material>
+		<material name="G10">
+			<D value="1.85" />
+			<fraction ref="H_1.9K" n="0.007113515679791605" />
+			<fraction ref="O_1.9K" n="0.5310089169421902" />
+			<fraction ref="Si_1.9K" n="0.2705139765554554" />
+			<fraction ref="Ca_1.9K" n="0.19136359082256288" />
+		</material>
+		<material name="cSS304L">
+			<D value="8.02" />
+			<fraction ref="Fe_1.9K" n="0.6714500000000001" />
+			<fraction ref="Cr_1.9K" n="0.18500000000000003" />
+			<fraction ref="Ni_1.9K" n="0.11250000000000002" />
+			<fraction ref="Mn_1.9K" n="0.020000000000000004" />
+			<fraction ref="Si_1.9K" n="0.010000000000000002" />
+			<fraction ref="P_1.9K" n="0.00045000000000000004" />
+			<fraction ref="S_1.9K" n="0.00030000000000000003" />
+			<fraction ref="C_1.9K" n="0.00030000000000000003" />
+		</material>
+		<material name="KHMN30L">
+			<D value="7.78" />
+			<fraction ref="Fe_1.9K" n="0.63654" />
+			<fraction ref="Cr_1.9K" n="0.067" />
+			<fraction ref="Ni_1.9K" n="0.0082" />
+			<fraction ref="N_1.9K" n="0.001" />
+			<fraction ref="Mn_1.9K" n="0.28" />
+			<fraction ref="Si_1.9K" n="0.006" />
+			<fraction ref="P_1.9K" n="0.00022" />
+			<fraction ref="S_1.9K" n="4e-05" />
+			<fraction ref="C_1.9K" n="0.001" />
+		</material>
+		<material name="cLowCSTL">
+			<D value="7.87" />
+			<fraction ref="Fe_1.9K" n="0.982" />
+			<fraction ref="Ni_1.9K" n="0.01" />
+			<fraction ref="C_1.9K" n="0.001" />
+			<fraction ref="Mn_1.9K" n="0.004" />
+			<fraction ref="Si_1.9K" n="0.001" />
+			<fraction ref="Cu_1.9K" n="0.002" />
+		</material>
+		<material name="cFe360ST">
+			<D value="7.87" />
+			<fraction ref="Fe_1.9K" n="0.9858000000000001" />
+			<fraction ref="Ni_1.9K" n="0.0013000000000000002" />
+			<fraction ref="C_1.9K" n="0.0015000000000000002" />
+			<fraction ref="Mn_1.9K" n="0.005200000000000001" />
+			<fraction ref="Si_1.9K" n="0.0020000000000000005" />
+			<fraction ref="Cu_1.9K" n="0.0025000000000000005" />
+			<fraction ref="Cr_1.9K" n="0.0017000000000000001" />
+		</material>
+		<material name="cAA5086">
+			<D value="2.65" />
+			<fraction ref="Al_1.9K" n="0.9405000000000001" />
+			<fraction ref="Si_1.9K" n="0.004000000000000001" />
+			<fraction ref="Fe_1.9K" n="0.005000000000000001" />
+			<fraction ref="Cu_1.9K" n="0.0010000000000000002" />
+			<fraction ref="Mn_1.9K" n="0.004000000000000001" />
+			<fraction ref="Zn_1.9K" n="0.0025000000000000005" />
+			<fraction ref="Cr_1.9K" n="0.0015000000000000002" />
+			<fraction ref="Ti_1.9K" n="0.0015000000000000002" />
+			<fraction ref="Mg_1.9K" n="0.04000000000000001" />
+		</material>
+		<material name="NbTi">
+			<D value="6.0471" />
+			<fraction ref="Nb_1.9K" n="0.53" />
+			<fraction ref="Ti_1.9K" n="0.47" />
+		</material>
+		<material name="cSS317LN">
+			<D value="7.9" />
+			<fraction ref="Fe_1.9K" n="0.6868" />
+			<fraction ref="C_1.9K" n="0.0002" />
+			<fraction ref="Cr_1.9K" n="0.17" />
+			<fraction ref="Mo_1.9K" n="0.032" />
+			<fraction ref="Ni_1.9K" n="0.11" />
+			<fraction ref="N_1.9K" n="0.001" />
+		</material>
+		<material name="PSSTHOL">
+			<D value="4.0" />
+			<fraction ref="Fe_1.9K" n="0.61395" />
+			<fraction ref="Cr_1.9K" n="0.185" />
+			<fraction ref="Ni_1.9K" n="0.14" />
+			<fraction ref="Mo_1.9K" n="0.03" />
+			<fraction ref="Mn_1.9K" n="0.02" />
+			<fraction ref="Si_1.9K" n="0.01" />
+			<fraction ref="P_1.9K" n="0.00045" />
+			<fraction ref="S_1.9K" n="0.0003" />
+			<fraction ref="C_1.9K" n="0.0003" />
+		</material>
+		<material name="cSS316L">
+			<D value="8.0" />
+			<fraction ref="Fe_1.9K" n="0.61395" />
+			<fraction ref="Cr_1.9K" n="0.185" />
+			<fraction ref="Ni_1.9K" n="0.14" />
+			<fraction ref="Mo_1.9K" n="0.03" />
+			<fraction ref="Mn_1.9K" n="0.02" />
+			<fraction ref="Si_1.9K" n="0.01" />
+			<fraction ref="P_1.9K" n="0.00045" />
+			<fraction ref="S_1.9K" n="0.0003" />
+			<fraction ref="C_1.9K" n="0.0003" />
+		</material>
+		<material name="YUS130S">
+			<D value="7.78" />
+			<fraction ref="Fe_1.9K" n="0.63198" />
+			<fraction ref="Cr_1.9K" n="0.1777" />
+			<fraction ref="Ni_1.9K" n="0.0661" />
+			<fraction ref="Mo_1.9K" n="0.0009" />
+			<fraction ref="Mn_1.9K" n="0.115" />
+			<fraction ref="Si_1.9K" n="0.0042" />
+			<fraction ref="P_1.9K" n="0.00022" />
+			<fraction ref="S_1.9K" n="4e-05" />
+			<fraction ref="C_1.9K" n="0.00086" />
+			<fraction ref="N_1.9K" n="0.003" />
+		</material>
+		<material name="P506">
+			<D value="7.78" />
+			<fraction ref="Fe_1.9K" n="0.564315" />
+			<fraction ref="Cr_1.9K" n="0.1918" />
+			<fraction ref="Ni_1.9K" n="0.109" />
+			<fraction ref="Mo_1.9K" n="0.0086" />
+			<fraction ref="Mn_1.9K" n="0.1205" />
+			<fraction ref="Si_1.9K" n="0.0023" />
+			<fraction ref="P_1.9K" n="5e-05" />
+			<fraction ref="S_1.9K" n="1e-05" />
+			<fraction ref="C_1.9K" n="0.00012" />
+			<fraction ref="B_1.9K" n="5e-06" />
+			<fraction ref="N_1.9K" n="0.0033" />
+		</material>
+		<material name="SSnitr50">
+			<D value="7.874" />
+			<fraction ref="Fe_1.9K" n="0.5328999999999999" />
+			<fraction ref="Cr_1.9K" n="0.23499999999999993" />
+			<fraction ref="Ni_1.9K" n="0.13499999999999998" />
+			<fraction ref="Mn_1.9K" n="0.04599999999999999" />
+			<fraction ref="Mo_1.9K" n="0.029999999999999992" />
+			<fraction ref="Si_1.9K" n="0.009999999999999998" />
+			<fraction ref="N_1.9K" n="0.003999999999999999" />
+			<fraction ref="Nb_1.9K" n="0.002999999999999999" />
+			<fraction ref="V_1.9K" n="0.002999999999999999" />
+			<fraction ref="C_1.9K" n="0.0005999999999999998" />
+			<fraction ref="P_1.9K" n="0.0003999999999999999" />
+			<fraction ref="S_1.9K" n="9.999999999999998e-05" />
+		</material>
+		<material name="PHBRZ">
+			<D value="8.9" />
+			<fraction ref="Cu_1.9K" n="0.6103896103896104" />
+			<fraction ref="Sn_1.9K" n="0.3246753246753247" />
+			<fraction ref="P_1.9K" n="0.06493506493506494" />
+		</material>
+		<material name="ARMCO">
+			<D value="7.874" />
+			<fraction ref="Fe_1.9K" n="0.99877" />
+			<fraction ref="Mn_1.9K" n="0.0006" />
+			<fraction ref="Cu_1.9K" n="0.0003" />
+			<fraction ref="C_1.9K" n="0.0001" />
+			<fraction ref="P_1.9K" n="5e-05" />
+			<fraction ref="N_1.9K" n="5e-05" />
+			<fraction ref="Co_1.9K" n="5e-05" />
+			<fraction ref="Sn_1.9K" n="5e-05" />
+			<fraction ref="S_1.9K" n="3e-05" />
+		</material>
+		<material name="C510">
+			<D value="8.8576" />
+			<fraction ref="Sn_1.9K_element" n="0.08960725527247852" />
+			<fraction ref="P_1.9K_element" n="0.0009352186420048015" />
+			<fraction ref="Cu_1.9K_element" n="0.9094575260855166" />
+		</material>
+		<material name="Nb3Sn">
+			<D value="8.804" />
+			<fraction ref="Cu_1.9K_element" n="0.5872261910879304" />
+			<fraction ref="Nb_1.9K_element" n="0.3076851581705544" />
+			<fraction ref="Sn_1.9K_element" n="0.07609211348499978" />
+			<fraction ref="Ta_1.9K_element" n="0.02899653725651533" />
+		</material>
+		<material name="cSS316LN">
+			<D value="8.03" />
+			<fraction ref="Fe_1.9K" n="0.6509300000000001" />
+			<fraction ref="Cr_1.9K" n="0.17000000000000004" />
+			<fraction ref="Ni_1.9K" n="0.12000000000000002" />
+			<fraction ref="Mo_1.9K" n="0.02500000000000001" />
+			<fraction ref="Mn_1.9K" n="0.020000000000000004" />
+			<fraction ref="Si_1.9K" n="0.0075000000000000015" />
+			<fraction ref="Ti_1.9K" n="0.0015000000000000005" />
+			<fraction ref="N_1.9K" n="0.0014000000000000002" />
+			<fraction ref="Nb_1.9K" n="0.0010000000000000002" />
+			<fraction ref="Cu_1.9K" n="0.0010000000000000002" />
+			<fraction ref="Co_1.9K" n="0.0005000000000000001" />
+			<fraction ref="P_1.9K" n="0.0004500000000000001" />
+			<fraction ref="C_1.9K" n="0.00030000000000000003" />
+			<fraction ref="S_1.9K" n="0.00030000000000000003" />
+			<fraction ref="Ta_1.9K" n="0.00010000000000000003" />
+			<fraction ref="B_1.9K" n="2.0000000000000005e-05" />
+		</material>
+		<material name="NbTiBBin">
+			<D value="7.5497" />
+			<fraction ref="Cu_1.9K" n="0.35" />
+			<fraction ref="Nb_1.9K" n="0.06" />
+			<fraction ref="Ti_1.9K" n="0.05" />
+			<fraction ref="Sn_1.9K" n="0.324" />
+			<fraction ref="Pb_1.9K" n="0.216" />
+		</material>
+		<material name="fccEHCAL">
+			<D value="7.4472" />
+			<fraction ref="ARG_87K" n="0.037490600494145446" />
+			<fraction ref="Cu_87K" n="0.9625093995058545" />
+		</material>
+		<material name="GraphWir">
+			<D value="0.0203575" />
+			<fraction ref="CARBON_element" n="1.0" />
+		</material>
+		<material name="POLY-LIF">
+			<D value="1.0" />
+			<fraction ref="H_CH2" n="0.12935129351293514" />
+			<fraction ref="G4_B" n="0.7706577065770659" />
+			<fraction ref="LITHIU-6" n="0.0017210172101721022" />
+			<fraction ref="LITHIU-7" n="0.025029250292502928" />
+			<fraction ref="FLUORINE" n="0.07324073240732408" />
+		</material>
+		<material name="GraphWbc">
+			<D value="0.05654867" />
+			<fraction ref="CARBON_element" n="1.0" />
+		</material>
+		<material name="MHC">
+			<D value="10.2" />
+			<fraction ref="MOLYBDEN" n="0.98715" />
+			<fraction ref="G4_B" n="0.00085" />
+			<fraction ref="HAFNIUM" n="0.012" />
+		</material>
+		<material name="MoGRMG64">
+			<D value="2.48" />
+			<fraction ref="MOLYBDEN_element" n="0.10584365594347948" />
+			<fraction ref="CARBON_element" n="0.8941563440565204" />
+		</material>
+		<material name="G4POLY">
+			<D value="1.06" />
+			<fraction ref="HYDROGEN_element" n="0.006986224659543833" />
+			<fraction ref="CARBON_element" n="0.9930137753404562" />
+		</material>
+		<material name="Polystyr">
+			<D value="1.06" />
+			<fraction ref="HYDROGEN_element" n="0.07735443232447381" />
+			<fraction ref="CARBON_element" n="0.9226455676755262" />
+		</material>
+		<material name="ETHYPROP">
+			<D value="0.86" />
+			<fraction ref="HYDROGEN_element" n="0.04789460333565857" />
+			<fraction ref="CARBON_element" n="0.9521053966643415" />
+		</material>
+		<material name="G11">
+			<D value="1.85" />
+			<fraction ref="G4_H" n="0.007113515679791605" />
+			<fraction ref="O_1.9K" n="0.5310089169421902" />
+			<fraction ref="Si_1.9K" n="0.2705139765554554" />
+			<fraction ref="Ca_1.9K" n="0.19136359082256288" />
+		</material>
+		<material name="CL_PF">
+			<D value="1.09" />
+			<fraction ref="HYDROGEN_element" n="0.06420351302241066" />
+			<fraction ref="C_1.9K_element" n="0.7657878797538972" />
+			<fraction ref="O_1.9K_element" n="0.17000860722369218" />
+		</material>
+		<material name="BORETH">
+			<D value="0.918" />
+			<fraction ref="HYDROGEN_element" n="0.04054598163955548" />
+			<fraction ref="CARBON_element" n="0.24180624899339667" />
+			<fraction ref="BORON_element" n="0.21764776936704786" />
+			<fraction ref="HYDROGEN_element" n="0.04054598163955548" />
+			<fraction ref="CARBON_element" n="0.24180624899339667" />
+			<fraction ref="BORON_element" n="0.21764776936704786" />
+		</material>
+		<material name="PVA">
+			<D value="1.25" />
+			<fraction ref="C_1.9K_element" n="0.5453472269518036" />
+			<fraction ref="HYDROGEN_element" n="0.09144361960543938" />
+			<fraction ref="O_1.9K_element" n="0.36320915344275695" />
+		</material>
+		<material name="POLYE87K">
+			<D value="0.94" />
+			<fraction ref="HYDROGEN_element" n="0.1436007130124777" />
+			<fraction ref="C_1.9K_element" n="0.8563992869875223" />
+		</material>
+		<material name="CyanoEst">
+			<D value="1.123" />
+			<fraction ref="C_1.9K_element" n="0.48488151467441765" />
+			<fraction ref="HYDROGEN_element" n="0.05081546970247466" />
+			<fraction ref="N_1.9K_element" n="0.1413649025069638" />
+			<fraction ref="O_1.9K_element" n="0.3229381131161439" />
+		</material>
+		<material name="CUDIAM75">
+			<D value="5.4" />
+			<fraction ref="COPPER_element" n="0.6205462018968333" />
+			<fraction ref="CARBON_element" n="0.3752917530367507" />
+			<fraction ref="BORON_element" n="0.004162045066415989" />
+		</material>
+		<material name="C35300">
+			<D value="8.47" />
+			<fraction ref="G4_Cu" n="0.615" />
+			<fraction ref="ZINC" n="0.365" />
+			<fraction ref="G4_Pb" n="0.02" />
+		</material>
+		<material name="CUDIAM">
+			<D value="5.42" />
+			<fraction ref="G4_Cu" n="0.35" />
+			<fraction ref="G4_B" n="0.65" />
+		</material>
+		<material name="CUCR">
+			<D value="8.8" />
+			<fraction ref="G4_Cu" n="0.991" />
+			<fraction ref="CHROMIUM" n="0.009000000000000001" />
+		</material>
+		<material name="BRONZE">
+			<D value="8.82" />
+			<fraction ref="G4_Cu" n="0.89" />
+			<fraction ref="G4_Sn" n="0.09" />
+			<fraction ref="G4_Pb" n="0.02" />
+		</material>
+		<material name="Steel235">
+			<D value="7.85" />
+			<fraction ref="IRON_element" n="0.9995691687686922" />
+			<fraction ref="CARBON_element" n="0.0004308312313078395" />
+		</material>
+		<material name="lcSteel">
+			<D value="7.87" />
+			<fraction ref="G4_B" n="0.0020000000000000005" />
+			<fraction ref="G4_Fe" n="0.9851000000000001" />
+			<fraction ref="MANGANES" n="0.009000000000000001" />
+			<fraction ref="PHOSPHO" n="0.0004000000000000001" />
+			<fraction ref="SULFUR" n="0.0005000000000000001" />
+			<fraction ref="COBALT" n="0.0030000000000000005" />
+		</material>
+		<material name="CuCrZr">
+			<D value="8.9" />
+			<fraction ref="G4_Cu" n="0.98805" />
+			<fraction ref="CHROMIUM" n="0.0085" />
+			<fraction ref="G4_Fe" n="0.0008" />
+			<fraction ref="G4_Si" n="0.001" />
+			<fraction ref="ZIRCONIU" n="0.00165" />
+		</material>
+		<material name="SiC">
+			<D value="3.16" />
+			<fraction ref="CARBON_element" n="0.29954859465795447" />
+			<fraction ref="SILICON_element" n="0.7004514053420456" />
+		</material>
+		<material name="MildSTL">
+			<D value="7.798" />
+			<fraction ref="G4_B" n="0.002" />
+			<fraction ref="MANGANES" n="0.005" />
+			<fraction ref="G4_Si" n="0.0015" />
+			<fraction ref="G4_Fe" n="0.9915" />
+		</material>
+		<material name="ELsteel">
+			<D value="7.65" />
+			<fraction ref="G4_Fe" n="0.9713599999999998" />
+			<fraction ref="G4_Si" n="0.026999999999999996" />
+			<fraction ref="MANGANES" n="0.0014999999999999998" />
+			<fraction ref="PHOSPHO" n="9.999999999999999e-05" />
+			<fraction ref="G4_B" n="2.9999999999999997e-05" />
+			<fraction ref="SULFUR" n="9.999999999999999e-06" />
+		</material>
+		<material name="S355J2H">
+			<D value="7.85" />
+			<fraction ref="G4_Fe" n="0.9725365099935205" />
+			<fraction ref="G4_Si" n="0.005482729402382495" />
+			<fraction ref="MANGANES" n="0.01594975826147635" />
+			<fraction ref="PHOSPHO" n="0.00034890096196979513" />
+			<fraction ref="SULFUR" n="0.0034890096196979518" />
+			<fraction ref="G4_B" n="0.0021930917609529984" />
+		</material>
+		<material name="CASTIRON">
+			<D value="7.2" />
+			<fraction ref="IRONS" n="0.94" />
+			<fraction ref="G4_B" n="0.04" />
+			<fraction ref="G4_Si" n="0.02" />
+		</material>
+		<material name="MG6403Fc">
+			<D value="2.55" />
+			<fraction ref="MOLYBDEN_element" n="0.130012156609076" />
+			<fraction ref="CARBON_element" n="0.8675206104800844" />
+			<fraction ref="TITANIUM_element" n="0.002467232910839576" />
+		</material>
+		<material name="TZM">
+			<D value="10.22" />
+			<fraction ref="MOLYBDEN_element" n="0.9939969101099387" />
+			<fraction ref="CARBON_element" n="0.00019904037117047765" />
+			<fraction ref="TITANIUM_element" n="0.005000350725458406" />
+			<fraction ref="ZIRCONIU_element" n="0.0008036987934325366" />
+		</material>
+		<material name="AA2219">
+			<D value="2.7" />
+			<fraction ref="G4_Al" n="0.9305583350010005" />
+			<fraction ref="G4_Cu" n="0.06303782269361616" />
+			<fraction ref="MANGANES" n="0.0030018010806483887" />
+			<fraction ref="ZIRCONIU" n="0.001801080648389033" />
+			<fraction ref="VANADIUM" n="0.0010006003602161294" />
+			<fraction ref="G4_Ti" n="0.0006003602161296776" />
+		</material>
+		<material name="ANTICO">
+			<D value="2.7" />
+			<fraction ref="G4_Al" n="0.9725" />
+			<fraction ref="G4_Si" n="0.006" />
+			<fraction ref="G4_Fe" n="0.005" />
+			<fraction ref="G4_Mg" n="0.004" />
+			<fraction ref="MANGANES" n="0.004" />
+			<fraction ref="CHROMIUM" n="0.0034999999999999996" />
+			<fraction ref="G4_Ti" n="0.002" />
+			<fraction ref="ZINC" n="0.002" />
+			<fraction ref="G4_Cu" n="0.001" />
+		</material>
+		<material name="fccCSTL">
+			<D value="7.87" />
+			<fraction ref="G4_Fe" n="0.9841070000000001" />
+			<fraction ref="G4_Al" n="0.004100000000000001" />
+			<fraction ref="G4_B" n="2.0000000000000005e-05" />
+			<fraction ref="MANGANES" n="0.004960000000000001" />
+			<fraction ref="G4_Si" n="0.005700000000000001" />
+			<fraction ref="POTASSIU" n="0.0010800000000000002" />
+			<fraction ref="SULFUR" n="3.300000000000001e-05" />
+		</material>
+		<material name="AW6082">
+			<D value="2.7" />
+			<fraction ref="G4_Al" n="0.9625" />
+			<fraction ref="G4_Fe" n="0.005" />
+			<fraction ref="G4_Cu" n="0.001" />
+			<fraction ref="MANGANES" n="0.007" />
+			<fraction ref="G4_Mg" n="0.009" />
+			<fraction ref="CHROMIUM" n="0.0025" />
+			<fraction ref="ZINC" n="0.002" />
+			<fraction ref="G4_Ti" n="0.001" />
+			<fraction ref="G4_Si" n="0.01" />
+		</material>
+		<material name="AA6081">
+			<D value="2.7" />
+			<fraction ref="G4_Al" n="0.9640000000000001" />
+			<fraction ref="G4_Si" n="0.011000000000000001" />
+			<fraction ref="G4_Fe" n="0.005" />
+			<fraction ref="G4_Cu" n="0.001" />
+			<fraction ref="MANGANES" n="0.0045000000000000005" />
+			<fraction ref="ZINC" n="0.002" />
+			<fraction ref="CHROMIUM" n="0.001" />
+			<fraction ref="G4_Ti" n="0.0015" />
+			<fraction ref="G4_Mg" n="0.01" />
+		</material>
+		<material name="Al6061">
+			<D value="2.7" />
+			<fraction ref="G4_Al" n="0.9719902800971989" />
+			<fraction ref="CHROMIUM" n="0.0019499805001949979" />
+			<fraction ref="G4_Cu" n="0.002749972500274997" />
+			<fraction ref="G4_Fe" n="0.004089959100408995" />
+			<fraction ref="G4_Mg" n="0.009999900000999989" />
+			<fraction ref="MANGANES" n="0.0008799912000879991" />
+			<fraction ref="G4_Si" n="0.005999940000599994" />
+			<fraction ref="G4_Ti" n="0.0008799912000879991" />
+			<fraction ref="ZINC" n="0.0014599854001459984" />
+		</material>
+		<material name="AA6082">
+			<D value="2.685" />
+			<fraction ref="G4_Al" n="0.9535" />
+			<fraction ref="G4_Si" n="0.013" />
+			<fraction ref="G4_Fe" n="0.005" />
+			<fraction ref="G4_Cu" n="0.001" />
+			<fraction ref="MANGANES" n="0.01" />
+			<fraction ref="ZINC" n="0.002" />
+			<fraction ref="CHROMIUM" n="0.0025" />
+			<fraction ref="G4_Ti" n="0.001" />
+			<fraction ref="G4_Mg" n="0.012" />
+		</material>
+		<material name="Antico">
+			<D value="2.71" />
+			<fraction ref="G4_Al" n="0.9759157049673858" />
+			<fraction ref="G4_Ti" n="0.002007024586051179" />
+			<fraction ref="G4_Fe" n="0.005017561465127948" />
+			<fraction ref="ZINC" n="0.002007024586051179" />
+			<fraction ref="G4_Mg" n="0.004014049172102358" />
+			<fraction ref="MANGANES" n="0.004014049172102358" />
+			<fraction ref="G4_Si" n="0.006021073758153537" />
+			<fraction ref="G4_Cu" n="0.0010035122930255895" />
+		</material>
+		<material name="Ti-6-4">
+			<D value="4.43" />
+			<fraction ref="G4_Al" n="0.06" />
+			<fraction ref="G4_Ti" n="0.9" />
+			<fraction ref="VANADIUM" n="0.04" />
+		</material>
+		<material name="FortSTS">
+			<D value="2.8" />
+			<fraction ref="COPPER_element" n="0.0004174351788341429" />
+			<fraction ref="MAGNESIU_element" n="0.0002494689383862636" />
+			<fraction ref="CHROMIUM_element" n="4.909967482701332e-05" />
+			<fraction ref="ZINC_element" n="0.001503189688927972" />
+			<fraction ref="ALUMINUM_element" n="0.9977808065190247" />
+		</material>
+		<material name="CU_AL">
+			<D value="8.9" />
+			<fraction ref="G4_Cu" n="0.99" />
+			<fraction ref="G4_Al" n="0.01" />
+		</material>
+		<material name="Peraluma">
+			<D value="2.68" />
+			<fraction ref="ALUMINUM_element" n="0.935661438327779" />
+			<fraction ref="MAGNESIU_element" n="0.02662971412637583" />
+			<fraction ref="SILICON_element" n="0.0041029810105102735" />
+			<fraction ref="IRON_element" n="0.008158191787080618" />
+			<fraction ref="COPPER_element" n="0.0023208006773293268" />
+			<fraction ref="Mn_1.9K_element" n="0.010032114343241003" />
+			<fraction ref="Cr_1.9K_element" n="0.00569692909160682" />
+			<fraction ref="Zn_1.9K_element" n="0.0047755625305697085" />
+			<fraction ref="TITANIUM_element" n="0.002622268105507574" />
+		</material>
+		<material name="Alumnium">
+			<D value="2.69" />
+			<fraction ref="G4_Al" n="0.9804999999999999" />
+			<fraction ref="G4_Mg" n="0.0125" />
+			<fraction ref="G4_Si" n="0.006999999999999999" />
+		</material>
+		<material name="AA5086">
+			<D value="2.65" />
+			<fraction ref="G4_Al" n="0.9405000000000001" />
+			<fraction ref="G4_Si" n="0.004000000000000001" />
+			<fraction ref="G4_Fe" n="0.005000000000000001" />
+			<fraction ref="G4_Cu" n="0.0010000000000000002" />
+			<fraction ref="MANGANES" n="0.004000000000000001" />
+			<fraction ref="ZINC" n="0.0025000000000000005" />
+			<fraction ref="CHROMIUM" n="0.0015000000000000002" />
+			<fraction ref="G4_Ti" n="0.0015000000000000002" />
+			<fraction ref="G4_Mg" n="0.04000000000000001" />
+		</material>
+		<material name="Perunal">
+			<D value="2.8" />
+			<fraction ref="G4_Al" n="0.8842" />
+			<fraction ref="ZINC" n="0.056" />
+			<fraction ref="G4_Mg" n="0.025" />
+			<fraction ref="G4_Cu" n="0.016" />
+			<fraction ref="MANGANES" n="0.003" />
+			<fraction ref="G4_Fe" n="0.005" />
+			<fraction ref="CHROMIUM" n="0.0023" />
+			<fraction ref="G4_Si" n="0.004" />
+			<fraction ref="G4_Ti" n="0.002" />
+			<fraction ref="ZIRCONIU" n="0.0025" />
+		</material>
+		<material name="INCON600">
+			<D value="8.19" />
+			<fraction ref="G4_Ni" n="0.525" />
+			<fraction ref="COBALT" n="0.01" />
+			<fraction ref="CHROMIUM" n="0.19" />
+			<fraction ref="MOLYBDEN" n="0.03" />
+			<fraction ref="G4_Fe" n="0.17" />
+			<fraction ref="G4_Ta" n="0.05" />
+			<fraction ref="G4_Si" n="0.0035" />
+			<fraction ref="G4_Mg" n="0.0035" />
+			<fraction ref="G4_Ti" n="0.009" />
+			<fraction ref="G4_Al" n="0.006" />
+			<fraction ref="G4_Cu" n="0.003" />
+		</material>
+		<material name="304AirMi">
+			<D value="0.38" />
+			<fraction ref="G4_Fe" n="0.6672058228871817" />
+			<fraction ref="CHROMIUM" n="0.18701981399110393" />
+			<fraction ref="G4_Ni" n="0.1137282652648605" />
+			<fraction ref="MANGANES" n="0.020218358269308533" />
+			<fraction ref="G4_Si" n="0.010109179134654266" />
+			<fraction ref="COBALT" n="0.0010109179134654266" />
+			<fraction ref="G4_B" n="0.000303275374039628" />
+			<fraction ref="PHOSPHO" n="0.00020218358269308534" />
+			<fraction ref="SULFUR" n="0.00020218358269308534" />
+		</material>
+		<material name="ASTMF-15">
+			<D value="8.35" />
+			<fraction ref="G4_Fe" n="0.54" />
+			<fraction ref="G4_Ni" n="0.29" />
+			<fraction ref="COBALT" n="0.17" />
+		</material>
+		<material name="Stainles">
+			<D value="8.0" />
+			<fraction ref="CHROMIUM_element" n="0.08450051119519279" />
+			<fraction ref="IRON_element" n="0.3731065824822743" />
+			<fraction ref="NICKEL_element" n="0.04239290632253293" />
+			<fraction ref="CHROMIUM_element" n="0.08450051119519279" />
+			<fraction ref="IRON_element" n="0.3731065824822743" />
+			<fraction ref="NICKEL_element" n="0.04239290632253293" />
+		</material>
+		<material name="SSCrNiMo">
+			<D value="7.85" />
+			<fraction ref="G4_Fe" n="0.9263295854314686" />
+			<fraction ref="CHROMIUM" n="0.023453128233427607" />
+			<fraction ref="G4_Ni" n="0.023453128233427607" />
+			<fraction ref="MANGANES" n="0.011036766227495344" />
+			<fraction ref="G4_Si" n="0.005518383113747672" />
+			<fraction ref="PHOSPHO" n="0.0003448989446092295" />
+			<fraction ref="SULFUR" n="0.0004828585224529213" />
+			<fraction ref="G4_B" n="0.005242463958060288" />
+			<fraction ref="MOLYBDEN" n="0.004138787335310754" />
+		</material>
+		<material name="Bronze">
+			<D value="8.86" />
+			<fraction ref="G4_Cu" n="0.7958849776896383" />
+			<fraction ref="G4_Pb" n="0.0793257312840853" />
+			<fraction ref="G4_Sn" n="0.08924144769459595" />
+			<fraction ref="ZINC" n="0.00793257312840853" />
+			<fraction ref="G4_Fe" n="0.006941001487357464" />
+			<fraction ref="PHOSPHO" n="0.014873574615765993" />
+			<fraction ref="G4_Ni" n="0.004957858205255331" />
+			<fraction ref="G4_Al" n="4.957858205255331e-05" />
+			<fraction ref="SULFUR" n="0.000793257312840853" />
+		</material>
+		<material name="SS316L">
+			<D value="8.0" />
+			<fraction ref="G4_Fe" n="0.61395" />
+			<fraction ref="CHROMIUM" n="0.185" />
+			<fraction ref="G4_Ni" n="0.14" />
+			<fraction ref="MOLYBDEN" n="0.03" />
+			<fraction ref="MANGANES" n="0.02" />
+			<fraction ref="G4_Si" n="0.01" />
+			<fraction ref="PHOSPHO" n="0.00045" />
+			<fraction ref="SULFUR" n="0.0003" />
+			<fraction ref="G4_B" n="0.0003" />
+		</material>
+		<material name="304L">
+			<D value="8.0" />
+			<fraction ref="G4_Fe" n="0.6672058228871817" />
+			<fraction ref="CHROMIUM" n="0.18701981399110393" />
+			<fraction ref="G4_Ni" n="0.1137282652648605" />
+			<fraction ref="MANGANES" n="0.020218358269308533" />
+			<fraction ref="G4_Si" n="0.010109179134654266" />
+			<fraction ref="COBALT" n="0.0010109179134654266" />
+			<fraction ref="G4_B" n="0.000303275374039628" />
+			<fraction ref="PHOSPHO" n="0.00020218358269308534" />
+			<fraction ref="SULFUR" n="0.00020218358269308534" />
+		</material>
+		<material name="LowCSTL">
+			<D value="7.87" />
+			<fraction ref="G4_Fe" n="0.982" />
+			<fraction ref="G4_Ni" n="0.01" />
+			<fraction ref="G4_B" n="0.001" />
+			<fraction ref="MANGANES" n="0.004" />
+			<fraction ref="G4_Si" n="0.001" />
+			<fraction ref="G4_Cu" n="0.002" />
+		</material>
+		<material name="TC.Spr">
+			<D value="4.01" />
+			<fraction ref="G4_Fe" n="0.6714500000000001" />
+			<fraction ref="CHROMIUM" n="0.18500000000000003" />
+			<fraction ref="G4_Ni" n="0.11250000000000002" />
+			<fraction ref="MANGANES" n="0.020000000000000004" />
+			<fraction ref="G4_Si" n="0.010000000000000002" />
+			<fraction ref="PHOSPHO" n="0.00045000000000000004" />
+			<fraction ref="SULFUR" n="0.00030000000000000003" />
+			<fraction ref="G4_B" n="0.00030000000000000003" />
+		</material>
+		<material name="Fe360ST">
+			<D value="7.87" />
+			<fraction ref="G4_Fe" n="0.9858000000000001" />
+			<fraction ref="G4_Ni" n="0.0013000000000000002" />
+			<fraction ref="G4_B" n="0.0015000000000000002" />
+			<fraction ref="MANGANES" n="0.005200000000000001" />
+			<fraction ref="G4_Si" n="0.0020000000000000005" />
+			<fraction ref="G4_Cu" n="0.0025000000000000005" />
+			<fraction ref="CHROMIUM" n="0.0017000000000000001" />
+		</material>
+		<material name="SS304L">
+			<D value="8.02" />
+			<fraction ref="G4_Fe" n="0.6714500000000001" />
+			<fraction ref="CHROMIUM" n="0.18500000000000003" />
+			<fraction ref="G4_Ni" n="0.11250000000000002" />
+			<fraction ref="MANGANES" n="0.020000000000000004" />
+			<fraction ref="G4_Si" n="0.010000000000000002" />
+			<fraction ref="PHOSPHO" n="0.00045000000000000004" />
+			<fraction ref="SULFUR" n="0.00030000000000000003" />
+			<fraction ref="G4_B" n="0.00030000000000000003" />
+		</material>
+		<material name="Steel-37">
+			<D value="7.85" />
+			<fraction ref="G4_Fe" n="0.98331" />
+			<fraction ref="G4_B" n="0.0017" />
+			<fraction ref="MANGANES" n="0.014" />
+			<fraction ref="PHOSPHO" n="0.00045" />
+			<fraction ref="SULFUR" n="0.00045" />
+			<fraction ref="G4_Ni" n="9e-05" />
+		</material>
+		<material name="BLM.STEE">
+			<D value="7.7" />
+			<fraction ref="G4_Fe" n="0.8632863286328634" />
+			<fraction ref="CHROMIUM" n="0.11141114111411142" />
+			<fraction ref="G4_Ni" n="0.025302530253025306" />
+		</material>
+		<material name="Invar">
+			<D value="8.05" />
+			<fraction ref="NICKEL_element" n="0.3383164587242161" />
+			<fraction ref="IRON_element" n="0.6616835412757839" />
+		</material>
+		<material name="CuNiFeMn">
+			<D value="8.87" />
+			<fraction ref="G4_Cu" n="0.875" />
+			<fraction ref="G4_Ni" n="0.1" />
+			<fraction ref="G4_Fe" n="0.015" />
+			<fraction ref="MANGANES" n="0.01" />
+		</material>
+		<material name="MUMETAL">
+			<D value="8.6821" />
+			<fraction ref="G4_Ni" n="0.77" />
+			<fraction ref="G4_Fe" n="0.16" />
+			<fraction ref="G4_Cu" n="0.05" />
+			<fraction ref="CHROMIUM" n="0.02" />
+		</material>
+		<material name="B2O3">
+			<D value="2.46" />
+			<fraction ref="BORON_element" n="0.31057613582499033" />
+			<fraction ref="OXYGEN_element" n="0.6894238641750097" />
+		</material>
+		<material name="BLM.ALOX">
+			<D value="3.98" />
+			<fraction ref="ALUMINUM_element" n="0.5292611881013328" />
+			<fraction ref="OXYGEN_element" n="0.4707388118986671" />
+		</material>
+		<material name="QUARTZ">
+			<D value="2.65" />
+			<fraction ref="SILICON_element" n="0.46744557619332927" />
+			<fraction ref="OXYGEN_element" n="0.5325544238066706" />
+		</material>
+		<material name="OF_SiO2">
+			<D value="2.196" />
+			<fraction ref="SILICON_element" n="0.46744557619332927" />
+			<fraction ref="OXYGEN_element" n="0.5325544238066706" />
+		</material>
+		<material name="siPCBmix">
+			<D value="5.05" />
+			<fraction ref="CHLORINE_element" n="0.008894754585401881" />
+			<fraction ref="OXYGEN_element" n="0.02379709116855537" />
+			<fraction ref="SILICON_element" n="0.03271569809438617" />
+			<fraction ref="HYDROGEN_element" n="5.413818214557519e-05" />
+			<fraction ref="CARBON_element" n="0.0030134233301910133" />
+			<fraction ref="COPPER_element" n="0.93152489463932" />
+		</material>
+		<material name="MgO">
+			<D value="3.58" />
+			<fraction ref="MAGNESIU_element" n="0.6030418816990869" />
+			<fraction ref="OXYGEN_element" n="0.39695811830091304" />
+		</material>
+		<material name="Ti6Al4V">
+			<D value="4.42" />
+			<fraction ref="G4_Ti" n="0.8955" />
+			<fraction ref="G4_Al" n="0.06" />
+			<fraction ref="VANADIUM" n="0.04" />
+			<fraction ref="G4_Fe" n="0.0025" />
+			<fraction ref="G4_O" n="0.002" />
+		</material>
+		<material name="Epoxy">
+			<D value="1.85" />
+			<fraction ref="HYDROGEN_element" n="0.06752950643776824" />
+			<fraction ref="CARBON_element" n="0.7630661283035916" />
+			<fraction ref="OXYGEN_element" n="0.16940436525864017" />
+		</material>
+		<material name="K2O">
+			<D value="2.35" />
+			<fraction ref="POTASSIU_element" n="0.8301502202877011" />
+			<fraction ref="OXYGEN_element" n="0.16984977971229898" />
+		</material>
+		<material name="CuETP">
+			<D value="8.92" />
+			<fraction ref="COPPER_element" n="0.9997480411058203" />
+			<fraction ref="OXYGEN_element" n="0.0002519588941796739" />
+		</material>
+		<material name="Al2O3">
+			<D value="3.98" />
+			<fraction ref="ALUMINUM_element" n="0.5292611881013328" />
+			<fraction ref="OXYGEN_element" n="0.4707388118986671" />
+		</material>
+		<material name="NIZNFER2">
+			<D value="5.2" />
+			<fraction ref="NICKEL_element" n="0.11094765809091399" />
+			<fraction ref="ZINC_element" n="0.1510521541388118" />
+			<fraction ref="IRON_element" n="0.46917364486676183" />
+			<fraction ref="OXYGEN_element" n="0.2688265429035123" />
+		</material>
+		<material name="SiO2">
+			<D value="1.92" />
+			<fraction ref="SILICON_element" n="0.46744557619332927" />
+			<fraction ref="OXYGEN_element" n="0.5325544238066706" />
+		</material>
+		<material name="Ti-AirMi">
+			<D value="2.83" />
+			<fraction ref="G4_Ti" n="0.8955" />
+			<fraction ref="G4_Al" n="0.06" />
+			<fraction ref="VANADIUM" n="0.04" />
+			<fraction ref="G4_Fe" n="0.0025" />
+			<fraction ref="G4_O" n="0.002" />
+		</material>
+		<material name="MYLAR">
+			<D value="1.4" />
+			<fraction ref="G4_H" n="0.04195895804104196" />
+			<fraction ref="G4_B" n="0.625016374983625" />
+			<fraction ref="G4_O" n="0.333024666975333" />
+		</material>
+		<material name="PCBHcal">
+			<D value="1.06" />
+			<fraction ref="SILICON_element" n="0.249085332671271" />
+			<fraction ref="OXYGEN_element" n="0.3192519950924748" />
+			<fraction ref="CARBON_element" n="0.1645165983721959" />
+			<fraction ref="HYDROGEN_element" n="0.003373837348777555" />
+			<fraction ref="BROMINE_element" n="0.2637722365152807" />
+		</material>
+		<material name="MOLASSES">
+			<D value="2.4" />
+			<fraction ref="G4_Si" n="0.29400000000000004" />
+			<fraction ref="G4_O" n="0.5396000000000001" />
+			<fraction ref="G4_Ca" n="0.12240000000000002" />
+			<fraction ref="G4_H" n="0.007300000000000002" />
+			<fraction ref="G4_B" n="0.03670000000000001" />
+		</material>
+		<material name="Marble">
+			<D value="2.75" />
+			<fraction ref="CALCIUM_element" n="0.4004356253621886" />
+			<fraction ref="CARBON_element" n="0.12000679415702495" />
+			<fraction ref="OXYGEN_element" n="0.4795575804807865" />
+		</material>
+		<material name="TANMRBL">
+			<D value="2.75" />
+			<fraction ref="CALCIUM_element" n="0.4004356253621886" />
+			<fraction ref="CARBON_element" n="0.12000679415702495" />
+			<fraction ref="OXYGEN_element" n="0.4795575804807865" />
+		</material>
+		<material name="Concrete">
+			<D value="2.34" />
+			<fraction ref="CARBON_element" n="0.15408500714779338" />
+			<fraction ref="OXYGEN_element" n="0.3569490328586545" />
+			<fraction ref="SILICON_element" n="0.1879855716645072" />
+			<fraction ref="CALCIUM_element" n="0.2682505782656882" />
+			<fraction ref="HYDROGEN_element" n="0.005616720983946887" />
+			<fraction ref="MAGNESIU_element" n="0.02711308907940995" />
+		</material>
+		<material name="AA5754">
+			<D value="2.68" />
+			<fraction ref="G4_Si" n="0.004" />
+			<fraction ref="G4_Fe" n="0.004" />
+			<fraction ref="G4_Cu" n="0.001" />
+			<fraction ref="MANGANES" n="0.00501" />
+			<fraction ref="G4_Mg" n="0.036000000000000004" />
+			<fraction ref="CHROMIUM" n="0.00301" />
+			<fraction ref="ZINC" n="0.002" />
+			<fraction ref="G4_Ti" n="0.0015" />
+			<fraction ref="G4_Be" n="2.9999999999999997e-06" />
+			<fraction ref="G4_Al" n="0.943477" />
+		</material>
+		<material name="C17410">
+			<D value="8.8" />
+			<fraction ref="G4_Cu" n="0.9910000000000001" />
+			<fraction ref="G4_Be" n="0.0031000000000000003" />
+			<fraction ref="COBALT" n="0.005000000000000001" />
+			<fraction ref="G4_Al" n="0.0004000000000000001" />
+			<fraction ref="G4_Fe" n="0.00030000000000000003" />
+			<fraction ref="G4_Ni" n="0.00020000000000000004" />
+		</material>
+		<material name="IROAIR">
+			<D value="0.5" />
+			<fraction ref="G4_Fe" n="0.25" />
+			<fraction ref="GRAPHITE" n="0.25" />
+			<fraction ref="G4_AIR" n="0.5" />
+		</material>
+		<material name="W24">
+			<D value="17.8" />
+			<fraction ref="TUNGSTEN_element" n="0.9766764759401949" />
+			<fraction ref="NICKEL_element" n="0.020452382720270015" />
+			<fraction ref="Fe_1.9K_element" n="0.002871141339535089" />
+		</material>
+		<material name="W-26Re1b">
+			<D value="1.3083" />
+			<fraction ref="TUNGSTEN_element" n="0.7375310522184709" />
+			<fraction ref="RHENIUM_element" n="0.262468947781529" />
+		</material>
+		<material name="W-26Rea">
+			<D value="0.18620534" />
+			<fraction ref="TUNGSTEN_element" n="0.7375310522184709" />
+			<fraction ref="RHENIUM_element" n="0.262468947781529" />
+		</material>
+		<material name="INERM80p">
+			<D value="14.4" />
+			<fraction ref="G4_W" n="0.95" />
+			<fraction ref="G4_Ni" n="0.035" />
+			<fraction ref="G4_Cu" n="0.015" />
+		</material>
+		<material name="GG20">
+			<D value="7.65" />
+			<fraction ref="G4_B" n="0.027999999999999997" />
+			<fraction ref="G4_Al" n="0.0008" />
+			<fraction ref="G4_Si" n="0.018000000000000002" />
+			<fraction ref="SULFUR" n="0.004" />
+			<fraction ref="PHOSPHO" n="0.011000000000000001" />
+			<fraction ref="MANGANES" n="0.0075" />
+			<fraction ref="G4_Cu" n="0.0004" />
+			<fraction ref="G4_Ni" n="0.0005" />
+			<fraction ref="CHROMIUM" n="0.0006" />
+			<fraction ref="MOLYBDEN" n="0.0001" />
+			<fraction ref="G4_W" n="0.0001" />
+			<fraction ref="VANADIUM" n="0.0009" />
+			<fraction ref="G4_Ti" n="0.0006" />
+			<fraction ref="NIOBIUM" n="0.0001" />
+			<fraction ref="COBALT" n="0.0003" />
+			<fraction ref="ARSENIC" n="0.0002" />
+			<fraction ref="G4_Fe" n="0.9269" />
+		</material>
+		<material name="W-26Re3b">
+			<D value="0.73643" />
+			<fraction ref="TUNGSTEN_element" n="0.7375310522184709" />
+			<fraction ref="RHENIUM_element" n="0.262468947781529" />
+		</material>
+		<material name="W-26Re3a">
+			<D value="0.44186" />
+			<fraction ref="TUNGSTEN_element" n="0.7375310522184709" />
+			<fraction ref="RHENIUM_element" n="0.262468947781529" />
+		</material>
+		<material name="W-26Re2b">
+			<D value="1.1956" />
+			<fraction ref="TUNGSTEN_element" n="0.7375310522184709" />
+			<fraction ref="RHENIUM_element" n="0.262468947781529" />
+		</material>
+		<material name="W-26Rebc">
+			<D value="0.51723705" />
+			<fraction ref="TUNGSTEN_element" n="0.7375310522184709" />
+			<fraction ref="RHENIUM_element" n="0.262468947781529" />
+		</material>
+		<material name="W-26Re1a">
+			<D value="0.78498" />
+			<fraction ref="TUNGSTEN_element" n="0.7375310522184709" />
+			<fraction ref="RHENIUM_element" n="0.262468947781529" />
+		</material>
+		<material name="INERM180">
+			<D value="18.0" />
+			<fraction ref="G4_W" n="0.95" />
+			<fraction ref="G4_Ni" n="0.035" />
+			<fraction ref="G4_Cu" n="0.015" />
+		</material>
+		<material name="W-26Re2a">
+			<D value="0.71736" />
+			<fraction ref="TUNGSTEN_element" n="0.7375310522184709" />
+			<fraction ref="RHENIUM_element" n="0.262468947781529" />
+		</material>
+		<material name="INERM50p">
+			<D value="9.0" />
+			<fraction ref="G4_W" n="0.95" />
+			<fraction ref="G4_Ni" n="0.035" />
+			<fraction ref="G4_Cu" n="0.015" />
+		</material>
+		<material name="W-26Re">
+			<D value="19.757" />
+			<fraction ref="TUNGSTEN_element" n="0.7375310522184709" />
+			<fraction ref="RHENIUM_element" n="0.262468947781529" />
+		</material>
+		<material name="DRYMOLAS">
+			<D value="2.4" />
+			<fraction ref="G4_O" n="0.38968194876124146" />
+			<fraction ref="G4_Ca" n="0.2409917303196966" />
+			<fraction ref="G4_Si" n="0.18293955866275186" />
+			<fraction ref="G4_B" n="0.05033529968571258" />
+			<fraction ref="G4_Fe" n="0.0487671083203458" />
+			<fraction ref="G4_Al" n="0.04353357352532568" />
+			<fraction ref="POTASSIU" n="0.02158137450724025" />
+			<fraction ref="G4_Mg" n="0.008069645775729741" />
+			<fraction ref="G4_Ti" n="0.004457774438508884" />
+			<fraction ref="G4_Na" n="0.003344660880928329" />
+			<fraction ref="MANGANES" n="0.0014698175158701582" />
+			<fraction ref="BARIUM" n="0.0009407268118630928" />
+			<fraction ref="STRONTIU" n="0.0008683039778634487" />
+			<fraction ref="PHOSPHO" n="0.0006196142463109565" />
+			<fraction ref="CHROMIUM" n="0.000528050663308921" />
+			<fraction ref="ZINC" n="0.00029211143070002806" />
+			<fraction ref="ZIRCONIU" n="0.0002565100375712331" />
+			<fraction ref="SULFUR" n="0.00023169906668568812" />
+			<fraction ref="LANTHANU" n="0.00011048432339520404" />
+			<fraction ref="G4_Ni" n="0.00017219673828222472" />
+			<fraction ref="VANADIUM" n="0.00013971546724786347" />
+			<fraction ref="CERIUM" n="0.0001323651796215533" />
+			<fraction ref="CHLORINE" n="0.0001246248767334389" />
+			<fraction ref="G4_W" n="0.00010545412655706252" />
+			<fraction ref="G4_Cu" n="6.371249315268328e-05" />
+			<fraction ref="NEODYMIU" n="5.480214447915624e-05" />
+			<fraction ref="COBALT" n="4.2661669406584035e-05" />
+			<fraction ref="YTTRIUM" n="4.070159270623465e-05" />
+			<fraction ref="G4_Pb" n="3.777147804703889e-05" />
+			<fraction ref="G4_Au" n="3.484136338784313e-05" />
+			<fraction ref="GALLIUM" n="2.5360992408602234e-05" />
+			<fraction ref="LITHIUM" n="5.730224231123454e-06" />
+			<fraction ref="EUROPIUM" n="6.870268842551156e-08" />
+		</material>
+		<material name="EARTHBOH">
+			<D value="2.0" />
+			<fraction ref="G4_H" n="0.005999999999999998" />
+			<fraction ref="G4_B" n="0.029999999999999992" />
+			<fraction ref="G4_O" n="0.4999999999999999" />
+			<fraction ref="G4_Na" n="0.009999999999999998" />
+			<fraction ref="G4_Mg" n="0.004999999999999999" />
+			<fraction ref="G4_Al" n="0.029999999999999992" />
+			<fraction ref="G4_Si" n="0.19999999999999996" />
+			<fraction ref="POTASSIU" n="0.009999999999999998" />
+			<fraction ref="G4_Ca" n="0.19499999999999995" />
+			<fraction ref="G4_Fe" n="0.013999999999999997" />
+		</material>
+		<material name="CERNCONC">
+			<D value="2.35" />
+			<fraction ref="G4_H" n="0.005999999999999998" />
+			<fraction ref="G4_B" n="0.029999999999999992" />
+			<fraction ref="G4_O" n="0.4999999999999999" />
+			<fraction ref="G4_Na" n="0.009999999999999998" />
+			<fraction ref="G4_Mg" n="0.004999999999999999" />
+			<fraction ref="G4_Al" n="0.029999999999999992" />
+			<fraction ref="G4_Si" n="0.19999999999999996" />
+			<fraction ref="POTASSIU" n="0.009999999999999998" />
+			<fraction ref="G4_Ca" n="0.19499999999999995" />
+			<fraction ref="G4_Fe" n="0.013999999999999997" />
+		</material>
+		<material name="CONCRETE">
+			<D value="2.42" />
+			<fraction ref="G4_H" n="0.005978534549981057" />
+			<fraction ref="G4_B" n="0.055998940284822565" />
+			<fraction ref="G4_O" n="0.4911117027203189" />
+			<fraction ref="G4_Na" n="0.004513793585235698" />
+			<fraction ref="G4_Mg" n="0.006606280677729067" />
+			<fraction ref="G4_Al" n="0.020556194627684866" />
+			<fraction ref="G4_Si" n="0.18799501892415432" />
+			<fraction ref="POTASSIU" n="0.006536531107979289" />
+			<fraction ref="G4_Ca" n="0.20019122940611567" />
+			<fraction ref="G4_Fe" n="0.011140002711464703" />
+			<fraction ref="PHOSPHO" n="0.00047828276399848455" />
+			<fraction ref="SULFUR" n="0.00011957069099962114" />
+			<fraction ref="G4_Ti" n="0.0034575858147390445" />
+			<fraction ref="MANGANES" n="0.00038561547847377814" />
+			<fraction ref="ZINC" n="0.0002401378044242391" />
+			<fraction ref="ZIRCONIU" n="7.373525944976636e-05" />
+			<fraction ref="BARIUM" n="0.00017835961407443483" />
+			<fraction ref="G4_Pb" n="0.000462340005198535" />
+			<fraction ref="STRONTIU" n="0.003975725475737402" />
+			<fraction ref="EUROPIUM" n="4.1849741849867397e-07" />
+		</material>
+		<material name="EPOXYG">
+			<D value="1.43" />
+			<fraction ref="G4_H" n="0.03435" />
+			<fraction ref="G4_B" n="0.37345" />
+			<fraction ref="G4_O" n="0.21852" />
+			<fraction ref="G4_Na" n="0.12105" />
+			<fraction ref="G4_Si" n="0.14737" />
+			<fraction ref="G4_Ca" n="0.10526" />
+		</material>
+		<material name="BTresin">
+			<D value="1.2" />
+			<fraction ref="HYDROGEN_element" n="0.05623150279513317" />
+			<fraction ref="CARBON_element" n="0.7079628721932333" />
+			<fraction ref="OXYGEN_element" n="0.1488990091392479" />
+			<fraction ref="NITROGEN_element" n="0.08690661587238557" />
+		</material>
+		<material name="hBNpure">
+			<D value="2.25" />
+			<fraction ref="BORON_element" n="0.4356112498992667" />
+			<fraction ref="NITROGEN_element" n="0.5643887501007334" />
+		</material>
+		<material name="POLYURET">
+			<D value="1.18" />
+			<fraction ref="HYDROGEN_element" n="0.05158993176629556" />
+			<fraction ref="CARBON_element" n="0.653798001338418" />
+			<fraction ref="NITROGEN_element" n="0.08969962441043967" />
+			<fraction ref="OXYGEN_element" n="0.20491244248484677" />
+		</material>
+		<material name="TitAlRed">
+			<D value="0.04175" />
+			<fraction ref="G4_Al" n="0.06742751542092251" />
+			<fraction ref="G4_B" n="0.0007991409235072298" />
+			<fraction ref="G4_H" n="0.0012486576929800466" />
+			<fraction ref="G4_Fe" n="0.0029967784631521116" />
+			<fraction ref="G4_N" n="0.0004994630771920186" />
+			<fraction ref="G4_O" n="0.0019978523087680745" />
+			<fraction ref="G4_Ti" n="0.8800789151661963" />
+			<fraction ref="V_1.9K" n="0.04495167694728167" />
+		</material>
+		<material name="SS316LN">
+			<D value="8.03" />
+			<fraction ref="G4_Fe" n="0.6509300000000001" />
+			<fraction ref="CHROMIUM" n="0.17000000000000004" />
+			<fraction ref="G4_Ni" n="0.12000000000000002" />
+			<fraction ref="MOLYBDEN" n="0.02500000000000001" />
+			<fraction ref="MANGANES" n="0.020000000000000004" />
+			<fraction ref="G4_Si" n="0.0075000000000000015" />
+			<fraction ref="G4_Ti" n="0.0015000000000000005" />
+			<fraction ref="G4_N" n="0.0014000000000000002" />
+			<fraction ref="NIOBIUM" n="0.0010000000000000002" />
+			<fraction ref="G4_Cu" n="0.0010000000000000002" />
+			<fraction ref="COBALT" n="0.0005000000000000001" />
+			<fraction ref="PHOSPHO" n="0.0004500000000000001" />
+			<fraction ref="G4_B" n="0.00030000000000000003" />
+			<fraction ref="SULFUR" n="0.00030000000000000003" />
+			<fraction ref="G4_Ta" n="0.00010000000000000003" />
+			<fraction ref="BORON" n="2.0000000000000005e-05" />
+		</material>
+		<material name="TitAlRbc">
+			<D value="0.115977" />
+			<fraction ref="G4_Al" n="0.06742751542092251" />
+			<fraction ref="G4_B" n="0.0007991409235072298" />
+			<fraction ref="G4_H" n="0.0012486576929800466" />
+			<fraction ref="G4_Fe" n="0.0029967784631521116" />
+			<fraction ref="G4_N" n="0.0004994630771920186" />
+			<fraction ref="G4_O" n="0.0019978523087680745" />
+			<fraction ref="G4_Ti" n="0.8800789151661963" />
+			<fraction ref="V_1.9K" n="0.04495167694728167" />
+		</material>
+		<material name="S235JR">
+			<D value="7.8611" />
+			<fraction ref="G4_Fe" n="0.9738605697897892" />
+			<fraction ref="G4_B" n="0.0016928392898041284" />
+			<fraction ref="MANGANES" n="0.013941029445445766" />
+			<fraction ref="PHOSPHO" n="0.00034852573613614415" />
+			<fraction ref="SULFUR" n="0.0034852573613614415" />
+			<fraction ref="G4_Cu" n="0.005476832996425121" />
+			<fraction ref="G4_N" n="0.0011949453810382084" />
+		</material>
+		<material name="HVMmix">
+			<D value="5.19" />
+			<fraction ref="HYDROGEN_element" n="5.341202693514947e-05" />
+			<fraction ref="CARBON_element" n="0.019961600271002827" />
+			<fraction ref="NITROGEN_element" n="0.0024764722319782807" />
+			<fraction ref="OXYGEN_element" n="0.007920255720024092" />
+			<fraction ref="COPPER_element" n="0.9695882597500596" />
+		</material>
+		<material name="EPOXY_P2">
+			<D value="1.3" />
+			<fraction ref="HYDROGEN_element" n="0.09154893706465946" />
+			<fraction ref="CARBON_element" n="0.6660124401895364" />
+			<fraction ref="NITROGEN_element" n="0.036125165302870965" />
+			<fraction ref="OXYGEN_element" n="0.20631345744293303" />
+		</material>
+		<material name="SS317LN">
+			<D value="7.9" />
+			<fraction ref="G4_Fe" n="0.6868" />
+			<fraction ref="G4_B" n="0.0002" />
+			<fraction ref="CHROMIUM" n="0.17" />
+			<fraction ref="MOLYBDEN" n="0.032" />
+			<fraction ref="G4_Ni" n="0.11" />
+			<fraction ref="G4_N" n="0.001" />
+		</material>
+		<material name="TiGr2">
+			<D value="4.51" />
+			<fraction ref="G4_Ti" n="0.9932500000000001" />
+			<fraction ref="G4_Fe" n="0.0030000000000000005" />
+			<fraction ref="G4_B" n="0.0008000000000000001" />
+			<fraction ref="G4_O" n="0.0025000000000000005" />
+			<fraction ref="G4_N" n="0.00030000000000000003" />
+			<fraction ref="G4_H" n="0.00015000000000000001" />
+		</material>
+		<material name="TITNAT">
+			<D value="5.22" />
+			<fraction ref="G4_Ti" n="0.77" />
+			<fraction ref="G4_N" n="0.23" />
+		</material>
+		<material name="AlN">
+			<D value="3.3" />
+			<fraction ref="NITROGEN_element" n="0.3417258288809193" />
+			<fraction ref="ALUMINUM_element" n="0.6582741711190807" />
+		</material>
+		<material name="fccTR">
+			<D value="1.88094" />
+			<fraction ref="G4_Si" n="0.24764213637861923" />
+			<fraction ref="GRAPHITE" n="0.4019266962263549" />
+			<fraction ref="G4_Cu" n="0.09527151317958044" />
+			<fraction ref="G4_Al" n="0.0860952502472168" />
+			<fraction ref="G4_POLYSTYRENE" n="0.16906440396822864" />
+		</material>
+		<material name="fccHCAL">
+			<D value="6.51" />
+			<fraction ref="G4_Fe" n="0.9674407175328665" />
+			<fraction ref="G4_POLYSTYRENE" n="0.03255928246713356" />
+		</material>
+		<material name="fccHCAL2">
+			<D value="6.3031" />
+			<fraction ref="G4_Fe" n="0.9719047078341505" />
+			<fraction ref="G4_POLYSTYRENE" n="0.028084779261283162" />
+			<fraction ref="G4_AIR" n="1.0512904566382746e-05" />
+		</material>
+		<material name="C10100">
+			<D value="8.94" />
+			<fraction ref="ANTIMONY" n="4e-06" />
+			<fraction ref="ARSENIC" n="5e-06" />
+			<fraction ref="G4_O" n="5e-06" />
+			<fraction ref="PHOSPHO" n="3e-06" />
+			<fraction ref="BISMUTH" n="1e-06" />
+			<fraction ref="CADMIUM" n="1e-06" />
+			<fraction ref="G4_Fe" n="1e-05" />
+			<fraction ref="G4_Pb" n="5e-06" />
+			<fraction ref="MANGANES" n="5e-07" />
+			<fraction ref="G4_Ni" n="1e-05" />
+			<fraction ref="G4_Ag" n="2.5e-05" />
+			<fraction ref="SULFUR" n="1.5e-05" />
+			<fraction ref="G4_Sn" n="2e-06" />
+			<fraction ref="ZINC" n="1e-06" />
+			<fraction ref="G4_Cu" n="0.9999125" />
+		</material>
+		<material name="RPLglass">
+			<D value="2.6041" />
+			<fraction ref="G4_O" n="0.0007868682796506562" />
+			<fraction ref="PHOSPHO" n="0.6640344531062851" />
+			<fraction ref="G4_Na" n="0.12351843391143014" />
+			<fraction ref="G4_Al" n="0.19101794486817092" />
+			<fraction ref="G4_Ag" n="0.02064229983446333" />
+		</material>
+		<material name="CU_OFE">
+			<D value="8.961309" />
+			<fraction ref="G4_Cu" n="0.9990040517518144" />
+			<fraction ref="G4_Ag" n="0.0009959482481856166" />
+		</material>
+		<material name="fccEMCAL">
+			<D value="4.079" />
+			<fraction ref="ARG_87K" n="0.2217471046398811" />
+			<fraction ref="Pb_87K" n="0.6037444189889931" />
+			<fraction ref="POLY_87K" n="0.016369821677291445" />
+			<fraction ref="Cu_87K" n="0.15813865469383434" />
+		</material>
+		<material name="NbTiBBup">
+			<D value="6.516" />
+			<fraction ref="Cu_1.9K" n="0.74" />
+			<fraction ref="Nb_1.9K" n="0.12" />
+			<fraction ref="Ti_1.9K" n="0.1" />
+			<fraction ref="KAPTO87K" n="0.04" />
+		</material>
+		<material name="MB.COIL2">
+			<D value="7.120607" />
+			<fraction ref="Cu_1.9K" n="0.8018850000000001" />
+			<fraction ref="Nb_1.9K" n="0.09236800000000002" />
+			<fraction ref="Ti_1.9K" n="0.08191100000000001" />
+			<fraction ref="LHe_1.9K" n="0.0008760000000000002" />
+			<fraction ref="KAPTO87K" n="0.022960000000000005" />
+		</material>
+		<material name="MQ.COIL1">
+			<D value="6.917782" />
+			<fraction ref="Cu_1.9K" n="0.792942792942793" />
+			<fraction ref="Nb_1.9K" n="0.09450209450209451" />
+			<fraction ref="Ti_1.9K" n="0.08380308380308381" />
+			<fraction ref="LHe_1.9K" n="0.001038001038001038" />
+			<fraction ref="KAPTO87K" n="0.027714027714027714" />
+		</material>
+		<material name="MB.COIL1">
+			<D value="6.507414" />
+			<fraction ref="Cu_1.9K" n="0.7476430000000001" />
+			<fraction ref="Nb_1.9K" n="0.11248700000000002" />
+			<fraction ref="Ti_1.9K" n="0.09975300000000001" />
+			<fraction ref="LHe_1.9K" n="0.0011300000000000001" />
+			<fraction ref="KAPTO87K" n="0.03898700000000001" />
+		</material>
+		<material name="MQ.COIL2">
+			<D value="6.925714" />
+			<fraction ref="Cu_1.9K" n="0.7939830000000001" />
+			<fraction ref="Nb_1.9K" n="0.09402700000000001" />
+			<fraction ref="Ti_1.9K" n="0.08338200000000001" />
+			<fraction ref="LHe_1.9K" n="0.0010330000000000003" />
+			<fraction ref="KAPTO87K" n="0.027575000000000002" />
+		</material>
+		<material name="CL19">
+			<D value="6.130147" />
+			<fraction ref="Cu_1.9K" n="0.699623" />
+			<fraction ref="Nb_1.9K" n="0.13903" />
+			<fraction ref="Ti_1.9K" n="0.123291" />
+			<fraction ref="LHe_1.9K" n="0.002441" />
+			<fraction ref="KAPTO87K" n="0.035615" />
+		</material>
+		<material name="CL45">
+			<D value="6.127591" />
+			<fraction ref="Cu_4.5K" n="0.699915" />
+			<fraction ref="Nb_4.5K" n="0.139088" />
+			<fraction ref="Ti_4.5K" n="0.123342" />
+			<fraction ref="LHe_4.5K" n="0.002025" />
+			<fraction ref="KAPT4.5K" n="0.03563" />
+		</material>
+		<material name="NbTi.2">
+			<D value="7.9008" />
+			<fraction ref="NbTi" n="0.27832062263256485" />
+			<fraction ref="Cu_1.9K" n="0.7216793773674353" />
+		</material>
+		<material name="NbTi.1">
+			<D value="8.4206" />
+			<fraction ref="NbTi" n="0.13298776585567534" />
+			<fraction ref="Cu_1.9K" n="0.8670122341443246" />
+		</material>
+		<material name="NbTi_1.5">
+			<D value="7.7948" />
+			<fraction ref="NbTi" n="0.31031297627661375" />
+			<fraction ref="Cu_1.9K" n="0.6896870237233862" />
+		</material>
+		<material name="Nb3Sn.c1">
+			<D value="7.954" />
+			<fraction ref="Nb3Sn" n="0.9716300895518786" />
+			<fraction ref="G10" n="0.028369910448121403" />
+		</material>
+		<material name="CTD_422B">
+			<D value="1.2458" />
+			<fraction ref="CyanoEst" n="0.5408572804623535" />
+			<fraction ref="EPOXY87K" n="0.45914271953764646" />
+		</material>
+		<material name="GLIDCP15">
+			<D value="8.9" />
+			<fraction ref="G4_Cu" n="0.9985" />
+			<fraction ref="Al2O3" n="0.0015" />
+		</material>
+		<material name="MACOR">
+			<D value="2.52" />
+			<fraction ref="SiO2" n="0.46" />
+			<fraction ref="MgO" n="0.17" />
+			<fraction ref="Al2O3" n="0.16" />
+			<fraction ref="K2O" n="0.1" />
+			<fraction ref="B2O3" n="0.07" />
+			<fraction ref="FLUORINE" n="0.04" />
+		</material>
+		<material name="CL_FG">
+			<D value="2.6" />
+			<fraction ref="SiO2" n="0.65" />
+			<fraction ref="MgO" n="0.1" />
+			<fraction ref="Al2O3" n="0.25" />
+		</material>
+		<material name="S2FIBGLS">
+			<D value="2.6" />
+			<fraction ref="SiO2" n="0.65" />
+			<fraction ref="MgO" n="0.1" />
+			<fraction ref="Al2O3" n="0.25" />
+		</material>
+		<material name="ALUMYLAR">
+			<D value="1.53" />
+			<fraction ref="MYLAR" n="0.9" />
+			<fraction ref="G4_Al" n="0.1" />
+		</material>
+		<material name="HCAL">
+			<D value="6.12336755" />
+			<fraction ref="G4_AIR" n="1.996681564540513e-05" />
+			<fraction ref="Steel235" n="0.9675277951631499" />
+			<fraction ref="G4POLY" n="0.019597059800119852" />
+			<fraction ref="G4_Cu" n="0.0055216872895935175" />
+			<fraction ref="PCBHcal" n="0.00733349093149139" />
+		</material>
+		<material name="MAGNET">
+			<D value="3.836" />
+			<fraction ref="CERNCONC" n="0.445" />
+			<fraction ref="G4_Fe" n="0.555" />
+		</material>
+		<material name="SIPOREX">
+			<D value="0.58780125" />
+			<fraction ref="CONCRETE" n="0.9985086860167444" />
+			<fraction ref="G4_AIR" n="0.0014913139832555128" />
+		</material>
+		<material name="BN5000">
+			<D value="1.925" />
+			<fraction ref="hBNpure" n="0.9289999999999999" />
+			<fraction ref="SiO2" n="0.002" />
+			<fraction ref="G4_O" n="0.039999999999999994" />
+			<fraction ref="B2O3" n="0.004" />
+			<fraction ref="G4_Ca" n="0.024999999999999998" />
+		</material>
+		<material name="ECAL">
+			<D value="9.02995833" />
+			<fraction ref="W24" n="0.7757072881621839" />
+			<fraction ref="G10" n="0.0350926123858114" />
+			<fraction ref="HVMmix" n="0.011903964593618376" />
+			<fraction ref="G4_Si" n="0.026709377204756454" />
+			<fraction ref="G4_AIR" n="9.633266145124698e-06" />
+			<fraction ref="siPCBmix" n="0.15057712438748486" />
+		</material>
+		<material name="NbTi.w4">
+			<D value="6.6541" />
+			<fraction ref="NbTi.2" n="0.783164656086754" />
+			<fraction ref="PVA" n="0.21683534391324602" />
+		</material>
+		<material name="NbTi.w3">
+			<D value="6.274" />
+			<fraction ref="NbTi.2" n="0.783164656086754" />
+			<fraction ref="PVA" n="0.21683534391324602" />
+		</material>
+		<material name="NbTi.w1">
+			<D value="6.5789" />
+			<fraction ref="NbTi.1" n="0.7937896513041921" />
+			<fraction ref="PVA" n="0.20621034869580793" />
+		</material>
+		<material name="NbTi.w2">
+			<D value="6.7921" />
+			<fraction ref="NbTi.1" n="0.7937896513041921" />
+			<fraction ref="PVA" n="0.20621034869580793" />
+		</material>
+		<material name="NbTi_SF">
+			<D value="7.1858" />
+			<fraction ref="NbTi_1.5" n="0.9838764898772473" />
+			<fraction ref="CTD_422B" n="0.016123510122752788" />
+		</material>
+		<material name="CL_INS">
+			<D value="1.8" />
+			<fraction ref="CL_FG" n="0.6" />
+			<fraction ref="CL_PF" n="0.4" />
+		</material>
+		<material name="INSUL_P2">
+			<D value="1.8" />
+			<fraction ref="S2FIBGLS" n="0.6" />
+			<fraction ref="EPOXY_P2" n="0.4" />
+		</material>
+		<material name="INSUL_P3">
+			<D value="1.915" />
+			<fraction ref="S2FIBGLS" n="0.6" />
+			<fraction ref="EPOXY_P2" n="0.4" />
+		</material>
+		<material name="GFRP">
+			<D value="1.74" />
+			<fraction ref="S2FIBGLS" n="0.67" />
+			<fraction ref="BTresin" n="0.33" />
+		</material>
+		<material name="MQI_COND">
+			<D value="5.08451" />
+			<fraction ref="C10100" n="0.7914391646524583" />
+			<fraction ref="G4_WATER" n="0.03053429853803702" />
+			<fraction ref="S2FIBGLS" n="0.15827466588453717" />
+			<fraction ref="POLYURET" n="0.019751870924967635" />
+		</material>
+	</materials>
+	<solids>
+		<box name="world_solid" x="16000.0" y="16000.0" z="14000.0" lunit="mm" />
+		<tube name="D10_EU24_s" rmin="0.0" rmax="6773.549999" z="11899.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<box name="pLn_s" x="236989.08146669753" y="236989.08146669753" z="236989.08146669753" lunit="mm" />
+		<intersection name="Int0_pLn_s_DET_LAT_zone0">
+			<first ref="D10_EU24_s" />
+			<second ref="pLn_s" />
+			<position name="Int0_pLn_s_DET_LAT_zone0_translation" x="0.000000000000000" y="0.000000000003638" z="-119494.540734348760452" unit="mm" />
+		</intersection>
+		<cone name="LWo1_e" rmin1="0.0" rmax1="553.7803306781217" rmin2="0.0" rmax2="171.96703318783543" z="5050.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub0_LWo1_e_DET_LAT_zone0">
+			<first ref="Int0_pLn_s_DET_LAT_zone0" />
+			<second ref="LWo1_e" />
+			<position name="Sub0_LWo1_e_DET_LAT_zone0_translation" x="0.000000000000000" y="0.000000000000000" z="-3475.000000000000000" unit="mm" />
+		</subtraction>
+		<box name="pRn_s" x="236989.08146669753" y="236989.08146669753" z="236989.08146669753" lunit="mm" />
+		<intersection name="Int0_pRn_s_DET_LAT_zone1">
+			<first ref="D10_EU24_s" />
+			<second ref="pRn_s" />
+			<position name="Int0_pRn_s_DET_LAT_zone1_translation" x="0.000000000000000" y="0.000000000003638" z="-117494.540734348760452" unit="mm" />
+		</intersection>
+		<box name="pLn_e" x="236989.08146669753" y="236989.08146669753" z="236989.08146669753" lunit="mm" />
+		<subtraction name="Sub0_pLn_e_DET_LAT_zone1">
+			<first ref="Int0_pRn_s_DET_LAT_zone1" />
+			<second ref="pLn_e" />
+			<position name="Sub0_pLn_e_DET_LAT_zone1_translation" x="0.000000000000000" y="0.000000000003638" z="-119494.540732348774327" unit="mm" />
+		</subtraction>
+		<cone name="LDETto_e" rmin1="0.0" rmax1="184.56371190138032" rmin2="0.0" rmax2="1.1836519645767511" z="1040.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub1_LDETto_e_DET_LAT_zone1">
+			<first ref="Sub0_pLn_e_DET_LAT_zone1" />
+			<second ref="LDETto_e" />
+			<position name="Sub1_LDETto_e_DET_LAT_zone1_translation" x="0.000000000000000" y="0.000000000000000" z="-530.000000000000000" unit="mm" />
+		</subtraction>
+		<cone name="RDETto_e" rmin1="0.0" rmax1="184.56371190138032" rmin2="0.0" rmax2="1.1836519645767511" z="1040.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub2_RDETto_e_DET_LAT_zone1">
+			<first ref="Sub1_LDETto_e_DET_LAT_zone1" />
+			<second ref="RDETto_e" />
+			<position name="Sub2_RDETto_e_DET_LAT_zone1_translation" x="0.000000000000000" y="0.000000000000000" z="530.000000000000000" unit="mm" />
+			<rotation name="Sub2_RDETto_e_DET_LAT_zone1_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</subtraction>
+		<tube name="cham_o_e" rmin="0.0" rmax="24.000001" z="24808.788409825007" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub3_cham_o_e_DET_LAT_zone1">
+			<first ref="Sub2_RDETto_e_DET_LAT_zone1" />
+			<second ref="cham_o_e" />
+		</subtraction>
+		<box name="pRn_e" x="236989.08146669753" y="236989.08146669753" z="236989.08146669753" lunit="mm" />
+		<subtraction name="Sub0_pRn_e_DET_LAT_zone2">
+			<first ref="D10_EU24_s" />
+			<second ref="pRn_e" />
+			<position name="Sub0_pRn_e_DET_LAT_zone2_translation" x="0.000000000000000" y="0.000000000003638" z="-117494.540732348774327" unit="mm" />
+		</subtraction>
+		<cone name="RWo1_e" rmin1="0.0" rmax1="553.7803306781217" rmin2="0.0" rmax2="171.96703318783543" z="5050.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub1_RWo1_e_DET_LAT_zone2">
+			<first ref="Sub0_pRn_e_DET_LAT_zone2" />
+			<second ref="RWo1_e" />
+			<position name="Sub1_RWo1_e_DET_LAT_zone2_translation" x="0.000000000000000" y="0.000000000000000" z="3475.000000000000000" unit="mm" />
+			<rotation name="Sub1_RWo1_e_DET_LAT_zone2_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</subtraction>
+		<multiUnion name="DET_LAT_solid">
+			<multiUnionNode name="DET_LAT_solid-node-1">
+				<solid ref="Sub0_LWo1_e_DET_LAT_zone0" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="DET_LAT_solid-node-1-position" />
+			</multiUnionNode>
+			<multiUnionNode name="DET_LAT_solid-node-2">
+				<solid ref="Sub3_cham_o_e_DET_LAT_zone1" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="DET_LAT_solid-node-2-position" />
+			</multiUnionNode>
+			<multiUnionNode name="DET_LAT_solid-node-3">
+				<solid ref="Sub1_RWo1_e_DET_LAT_zone2" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="DET_LAT_solid-node-3-position" />
+			</multiUnionNode>
+		</multiUnion>
+		<intersection name="Int0_pLn_s_BP_VAC_zone0">
+			<first ref="D10_EU24_s" />
+			<second ref="pLn_s" />
+			<position name="Int0_pLn_s_BP_VAC_zone0_translation" x="0.000000000000000" y="0.000000000003638" z="-119494.540734348760452" unit="mm" />
+		</intersection>
+		<cone name="LBPb_s" rmin1="0.0" rmax1="17.94949394949495" rmin2="0.0" rmax2="2.8505040505050503" z="5049.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int1_LBPb_s_BP_VAC_zone0">
+			<first ref="Int0_pLn_s_BP_VAC_zone0" />
+			<second ref="LBPb_s" />
+			<position name="Int1_LBPb_s_BP_VAC_zone0_translation" x="0.000000000000000" y="0.000000000000000" z="-3475.000000000000000" unit="mm" />
+		</intersection>
+		<box name="pLt_s" x="208175.18652671567" y="208175.18652671567" z="208175.18652671567" lunit="mm" />
+		<intersection name="Int0_pLt_s_BP_VAC_zone1">
+			<first ref="D10_EU24_s" />
+			<second ref="pLt_s" />
+			<position name="Int0_pLt_s_BP_VAC_zone1_translation" x="0.000000000000000" y="0.000000000000000" z="-104237.593264357827138" unit="mm" />
+		</intersection>
+		<cone name="LBPt1_s" rmin1="0.0" rmax1="2.8235284117647055" rmin2="0.0" rmax2="6.176469588235294" z="949.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int1_LBPt1_s_BP_VAC_zone1">
+			<first ref="Int0_pLt_s_BP_VAC_zone1" />
+			<second ref="LBPt1_s" />
+			<position name="Int1_LBPt1_s_BP_VAC_zone1_translation" x="0.000000000000000" y="0.000000000000000" z="-575.000000000000000" unit="mm" />
+		</intersection>
+		<subtraction name="Sub0_pLn_e_BP_VAC_zone1">
+			<first ref="Int1_LBPt1_s_BP_VAC_zone1" />
+			<second ref="pLn_e" />
+			<position name="Sub0_pLn_e_BP_VAC_zone1_translation" x="0.000000000000000" y="0.000000000003638" z="-119494.540732348774327" unit="mm" />
+		</subtraction>
+		<box name="pRt_s" x="208175.18652671567" y="208175.18652671567" z="208175.18652671567" lunit="mm" />
+		<intersection name="Int0_pRt_s_BP_VAC_zone2">
+			<first ref="D10_EU24_s" />
+			<second ref="pRt_s" />
+			<position name="Int0_pRt_s_BP_VAC_zone2_translation" x="-0.000000000000227" y="0.000000000000000" z="-103937.593264357827138" unit="mm" />
+		</intersection>
+		<cone name="LBPt2_s" rmin1="0.0" rmax1="3.7777767777777775" rmin2="0.0" rmax2="12.222221222222224" z="189.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int1_LBPt2_s_BP_VAC_zone2">
+			<first ref="Int0_pRt_s_BP_VAC_zone2" />
+			<second ref="LBPt2_s" />
+			<position name="Int1_LBPt2_s_BP_VAC_zone2_translation" x="0.000000000000000" y="0.000000000000000" z="-105.000000000000000" unit="mm" />
+		</intersection>
+		<box name="pLt_e" x="208175.18652671567" y="208175.18652671567" z="208175.18652671567" lunit="mm" />
+		<subtraction name="Sub0_pLt_e_BP_VAC_zone2">
+			<first ref="Int1_LBPt2_s_BP_VAC_zone2" />
+			<second ref="pLt_e" />
+			<position name="Sub0_pLt_e_BP_VAC_zone2_translation" x="0.000000000000000" y="0.000000000000000" z="-104237.593262357841013" unit="mm" />
+		</subtraction>
+		<intersection name="Int0_pRt_s_BP_VAC_zone3">
+			<first ref="D10_EU24_s" />
+			<second ref="pRt_s" />
+			<position name="Int0_pRt_s_BP_VAC_zone3_translation" x="-0.000000000000227" y="0.000000000000000" z="-103937.593264357827138" unit="mm" />
+		</intersection>
+		<cone name="RBPt2_s" rmin1="0.0" rmax1="3.7777767777777775" rmin2="0.0" rmax2="12.222221222222224" z="189.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int1_RBPt2_s_BP_VAC_zone3">
+			<first ref="Int0_pRt_s_BP_VAC_zone3" />
+			<second ref="RBPt2_s" />
+			<position name="Int1_RBPt2_s_BP_VAC_zone3_translation" x="0.000000000000000" y="0.000000000000000" z="105.000000000000000" unit="mm" />
+			<rotation name="Int1_RBPt2_s_BP_VAC_zone3_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</intersection>
+		<subtraction name="Sub0_pLt_e_BP_VAC_zone3">
+			<first ref="Int1_RBPt2_s_BP_VAC_zone3" />
+			<second ref="pLt_e" />
+			<position name="Sub0_pLt_e_BP_VAC_zone3_translation" x="0.000000000000000" y="0.000000000000000" z="-104237.593262357841013" unit="mm" />
+		</subtraction>
+		<intersection name="Int0_pRt_s_BP_VAC_zone4">
+			<first ref="D10_EU24_s" />
+			<second ref="pRt_s" />
+			<position name="Int0_pRt_s_BP_VAC_zone4_translation" x="-0.000000000000227" y="0.000000000000000" z="-103937.593264357827138" unit="mm" />
+		</intersection>
+		<tube name="cham_i_s" rmin="0.0" rmax="22.999999" z="13090.195592960341" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int1_cham_i_s_BP_VAC_zone4">
+			<first ref="Int0_pRt_s_BP_VAC_zone4" />
+			<second ref="cham_i_s" />
+		</intersection>
+		<subtraction name="Sub0_pLt_e_BP_VAC_zone4">
+			<first ref="Int1_cham_i_s_BP_VAC_zone4" />
+			<second ref="pLt_e" />
+			<position name="Sub0_pLt_e_BP_VAC_zone4_translation" x="0.000000000000000" y="0.000000000000000" z="-104237.593262357841013" unit="mm" />
+		</subtraction>
+		<cone name="LWto_e" rmin1="0.0" rmax1="184.56371190138032" rmin2="0.0" rmax2="1.1836519645767511" z="1040.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub1_LWto_e_BP_VAC_zone4">
+			<first ref="Sub0_pLt_e_BP_VAC_zone4" />
+			<second ref="LWto_e" />
+			<position name="Sub1_LWto_e_BP_VAC_zone4_translation" x="0.000000000000000" y="0.000000000000000" z="-530.000000000000000" unit="mm" />
+		</subtraction>
+		<cone name="RWto_e" rmin1="0.0" rmax1="184.56371190138032" rmin2="0.0" rmax2="1.1836519645767511" z="1040.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub2_RWto_e_BP_VAC_zone4">
+			<first ref="Sub1_LWto_e_BP_VAC_zone4" />
+			<second ref="RWto_e" />
+			<position name="Sub2_RWto_e_BP_VAC_zone4_translation" x="0.000000000000000" y="0.000000000000000" z="530.000000000000000" unit="mm" />
+			<rotation name="Sub2_RWto_e_BP_VAC_zone4_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</subtraction>
+		<intersection name="Int0_pRn_s_BP_VAC_zone5">
+			<first ref="D10_EU24_s" />
+			<second ref="pRn_s" />
+			<position name="Int0_pRn_s_BP_VAC_zone5_translation" x="0.000000000000000" y="0.000000000003638" z="-117494.540734348760452" unit="mm" />
+		</intersection>
+		<cone name="RBPt1_s" rmin1="0.0" rmax1="2.8235284117647055" rmin2="0.0" rmax2="6.176469588235294" z="949.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int1_RBPt1_s_BP_VAC_zone5">
+			<first ref="Int0_pRn_s_BP_VAC_zone5" />
+			<second ref="RBPt1_s" />
+			<position name="Int1_RBPt1_s_BP_VAC_zone5_translation" x="0.000000000000000" y="0.000000000000000" z="575.000000000000000" unit="mm" />
+			<rotation name="Int1_RBPt1_s_BP_VAC_zone5_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</intersection>
+		<box name="pRt_e" x="208175.18652671567" y="208175.18652671567" z="208175.18652671567" lunit="mm" />
+		<subtraction name="Sub0_pRt_e_BP_VAC_zone5">
+			<first ref="Int1_RBPt1_s_BP_VAC_zone5" />
+			<second ref="pRt_e" />
+			<position name="Sub0_pRt_e_BP_VAC_zone5_translation" x="-0.000000000000227" y="0.000000000000000" z="-103937.593262357841013" unit="mm" />
+		</subtraction>
+		<cone name="RBPb_s" rmin1="0.0" rmax1="17.94949394949495" rmin2="0.0" rmax2="2.8505040505050503" z="5049.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int0_RBPb_s_BP_VAC_zone6">
+			<first ref="D10_EU24_s" />
+			<second ref="RBPb_s" />
+			<position name="Int0_RBPb_s_BP_VAC_zone6_translation" x="0.000000000000000" y="0.000000000000000" z="3475.000000000000000" unit="mm" />
+			<rotation name="Int0_RBPb_s_BP_VAC_zone6_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</intersection>
+		<subtraction name="Sub0_pRn_e_BP_VAC_zone6">
+			<first ref="Int0_RBPb_s_BP_VAC_zone6" />
+			<second ref="pRn_e" />
+			<position name="Sub0_pRn_e_BP_VAC_zone6_translation" x="0.000000000000000" y="0.000000000003638" z="-117494.540732348774327" unit="mm" />
+		</subtraction>
+		<intersection name="Int0_pRn_s_BP_VAC_zone7">
+			<first ref="D10_EU24_s" />
+			<second ref="pRn_s" />
+			<position name="Int0_pRn_s_BP_VAC_zone7_translation" x="0.000000000000000" y="0.000000000003638" z="-117494.540734348760452" unit="mm" />
+		</intersection>
+		<intersection name="Int1_cham_i_s_BP_VAC_zone7">
+			<first ref="Int0_pRn_s_BP_VAC_zone7" />
+			<second ref="cham_i_s" />
+		</intersection>
+		<subtraction name="Sub0_pLn_e_BP_VAC_zone7">
+			<first ref="Int1_cham_i_s_BP_VAC_zone7" />
+			<second ref="pLn_e" />
+			<position name="Sub0_pLn_e_BP_VAC_zone7_translation" x="0.000000000000000" y="0.000000000003638" z="-119494.540732348774327" unit="mm" />
+		</subtraction>
+		<subtraction name="Sub1_LWto_e_BP_VAC_zone7">
+			<first ref="Sub0_pLn_e_BP_VAC_zone7" />
+			<second ref="LWto_e" />
+			<position name="Sub1_LWto_e_BP_VAC_zone7_translation" x="0.000000000000000" y="0.000000000000000" z="-530.000000000000000" unit="mm" />
+		</subtraction>
+		<subtraction name="Sub2_RWto_e_BP_VAC_zone7">
+			<first ref="Sub1_LWto_e_BP_VAC_zone7" />
+			<second ref="RWto_e" />
+			<position name="Sub2_RWto_e_BP_VAC_zone7_translation" x="0.000000000000000" y="0.000000000000000" z="530.000000000000000" unit="mm" />
+			<rotation name="Sub2_RWto_e_BP_VAC_zone7_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</subtraction>
+		<multiUnion name="BP_VAC_solid">
+			<multiUnionNode name="BP_VAC_solid-node-1">
+				<solid ref="Int1_LBPb_s_BP_VAC_zone0" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="BP_VAC_solid-node-1-position" />
+			</multiUnionNode>
+			<multiUnionNode name="BP_VAC_solid-node-2">
+				<solid ref="Sub0_pLn_e_BP_VAC_zone1" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="BP_VAC_solid-node-2-position" />
+			</multiUnionNode>
+			<multiUnionNode name="BP_VAC_solid-node-3">
+				<solid ref="Sub0_pLt_e_BP_VAC_zone2" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="BP_VAC_solid-node-3-position" />
+			</multiUnionNode>
+			<multiUnionNode name="BP_VAC_solid-node-4">
+				<solid ref="Sub0_pLt_e_BP_VAC_zone3" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="BP_VAC_solid-node-4-position" />
+			</multiUnionNode>
+			<multiUnionNode name="BP_VAC_solid-node-5">
+				<solid ref="Sub2_RWto_e_BP_VAC_zone4" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="BP_VAC_solid-node-5-position" />
+			</multiUnionNode>
+			<multiUnionNode name="BP_VAC_solid-node-6">
+				<solid ref="Sub0_pRt_e_BP_VAC_zone5" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="BP_VAC_solid-node-6-position" />
+			</multiUnionNode>
+			<multiUnionNode name="BP_VAC_solid-node-7">
+				<solid ref="Sub0_pRn_e_BP_VAC_zone6" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="BP_VAC_solid-node-7-position" />
+			</multiUnionNode>
+			<multiUnionNode name="BP_VAC_solid-node-8">
+				<solid ref="Sub2_RWto_e_BP_VAC_zone7" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="BP_VAC_solid-node-8-position" />
+			</multiUnionNode>
+		</multiUnion>
+		<intersection name="Int0_pLn_s_LW_zone0">
+			<first ref="D10_EU24_s" />
+			<second ref="pLn_s" />
+			<position name="Int0_pLn_s_LW_zone0_translation" x="0.000000000000000" y="0.000000000003638" z="-119494.540734348760452" unit="mm" />
+		</intersection>
+		<cone name="LBoc1i_s" rmin1="0.0" rmax1="433.7803286781217" rmin2="0.0" rmax2="51.96703118783543" z="5049.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int1_LBoc1i_s_LW_zone0">
+			<first ref="Int0_pLn_s_LW_zone0" />
+			<second ref="LBoc1i_s" />
+			<position name="Int1_LBoc1i_s_LW_zone0_translation" x="0.000000000000000" y="0.000000000000000" z="-3475.000000000000000" unit="mm" />
+		</intersection>
+		<cone name="LBPb_e" rmin1="0.0" rmax1="17.949495949494953" rmin2="0.0" rmax2="2.8505060505050506" z="5050.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub0_LBPb_e_LW_zone0">
+			<first ref="Int1_LBoc1i_s_LW_zone0" />
+			<second ref="LBPb_e" />
+			<position name="Sub0_LBPb_e_LW_zone0_translation" x="0.000000000000000" y="0.000000000000000" z="-3475.000000000000000" unit="mm" />
+		</subtraction>
+		<intersection name="Int0_pLn_s_LW_zone1">
+			<first ref="D10_EU24_s" />
+			<second ref="pLn_s" />
+			<position name="Int0_pLn_s_LW_zone1_translation" x="0.000000000000000" y="0.000000000003638" z="-119494.540734348760452" unit="mm" />
+		</intersection>
+		<cone name="LWo1_s" rmin1="0.0" rmax1="553.7803286781217" rmin2="0.0" rmax2="171.96703118783543" z="5049.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int1_LWo1_s_LW_zone1">
+			<first ref="Int0_pLn_s_LW_zone1" />
+			<second ref="LWo1_s" />
+			<position name="Int1_LWo1_s_LW_zone1_translation" x="0.000000000000000" y="0.000000000000000" z="-3475.000000000000000" unit="mm" />
+		</intersection>
+		<cone name="LBoc1o_e" rmin1="0.0" rmax1="513.7803306781217" rmin2="0.0" rmax2="131.96703318783543" z="5050.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub0_LBoc1o_e_LW_zone1">
+			<first ref="Int1_LWo1_s_LW_zone1" />
+			<second ref="LBoc1o_e" />
+			<position name="Sub0_LBoc1o_e_LW_zone1_translation" x="0.000000000000000" y="0.000000000000000" z="-3475.000000000000000" unit="mm" />
+		</subtraction>
+		<intersection name="Int0_pLt_s_LW_zone2">
+			<first ref="D10_EU24_s" />
+			<second ref="pLt_s" />
+			<position name="Int0_pLt_s_LW_zone2_translation" x="0.000000000000000" y="0.000000000000000" z="-104237.593264357827138" unit="mm" />
+		</intersection>
+		<cone name="LWto_s" rmin1="0.0" rmax1="184.56370990138032" rmin2="0.0" rmax2="1.1836499645767513" z="1039.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int1_LWto_s_LW_zone2">
+			<first ref="Int0_pLt_s_LW_zone2" />
+			<second ref="LWto_s" />
+			<position name="Int1_LWto_s_LW_zone2_translation" x="0.000000000000000" y="0.000000000000000" z="-530.000000000000000" unit="mm" />
+		</intersection>
+		<subtraction name="Sub0_pLn_e_LW_zone2">
+			<first ref="Int1_LWto_s_LW_zone2" />
+			<second ref="pLn_e" />
+			<position name="Sub0_pLn_e_LW_zone2_translation" x="0.000000000000000" y="0.000000000003638" z="-119494.540732348774327" unit="mm" />
+		</subtraction>
+		<cone name="LBPt1_e" rmin1="0.0" rmax1="2.8235304117647058" rmin2="0.0" rmax2="6.1764715882352945" z="950.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub1_LBPt1_e_LW_zone2">
+			<first ref="Sub0_pLn_e_LW_zone2" />
+			<second ref="LBPt1_e" />
+			<position name="Sub1_LBPt1_e_LW_zone2_translation" x="0.000000000000000" y="0.000000000000000" z="-575.000000000000000" unit="mm" />
+		</subtraction>
+		<intersection name="Int0_LWto_s_LW_zone3">
+			<first ref="D10_EU24_s" />
+			<second ref="LWto_s" />
+			<position name="Int0_LWto_s_LW_zone3_translation" x="0.000000000000000" y="0.000000000000000" z="-530.000000000000000" unit="mm" />
+		</intersection>
+		<subtraction name="Sub0_pLt_e_LW_zone3">
+			<first ref="Int0_LWto_s_LW_zone3" />
+			<second ref="pLt_e" />
+			<position name="Sub0_pLt_e_LW_zone3_translation" x="0.000000000000000" y="0.000000000000000" z="-104237.593262357841013" unit="mm" />
+		</subtraction>
+		<cone name="LBPt2_e" rmin1="0.0" rmax1="3.777778777777778" rmin2="0.0" rmax2="12.222223222222222" z="190.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub1_LBPt2_e_LW_zone3">
+			<first ref="Sub0_pLt_e_LW_zone3" />
+			<second ref="LBPt2_e" />
+			<position name="Sub1_LBPt2_e_LW_zone3_translation" x="0.000000000000000" y="0.000000000000000" z="-105.000000000000000" unit="mm" />
+		</subtraction>
+		<tube name="bor_n_s" rmin="0.0" rmax="134.7473608659571" z="13201.374925807526" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int0_bor_n_s_LW_zone4">
+			<first ref="D10_EU24_s" />
+			<second ref="bor_n_s" />
+		</intersection>
+		<intersection name="Int1_pLn_s_LW_zone4">
+			<first ref="Int0_bor_n_s_LW_zone4" />
+			<second ref="pLn_s" />
+			<position name="Int1_pLn_s_LW_zone4_translation" x="0.000000000000000" y="0.000000000003638" z="-119494.540734348760452" unit="mm" />
+		</intersection>
+		<subtraction name="Sub0_LBPb_e_LW_zone4">
+			<first ref="Int1_pLn_s_LW_zone4" />
+			<second ref="LBPb_e" />
+			<position name="Sub0_LBPb_e_LW_zone4_translation" x="0.000000000000000" y="0.000000000000000" z="-3475.000000000000000" unit="mm" />
+		</subtraction>
+		<multiUnion name="LW_solid">
+			<multiUnionNode name="LW_solid-node-1">
+				<solid ref="Sub0_LBPb_e_LW_zone0" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="LW_solid-node-1-position" />
+			</multiUnionNode>
+			<multiUnionNode name="LW_solid-node-2">
+				<solid ref="Sub0_LBoc1o_e_LW_zone1" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="LW_solid-node-2-position" />
+			</multiUnionNode>
+			<multiUnionNode name="LW_solid-node-3">
+				<solid ref="Sub1_LBPt1_e_LW_zone2" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="LW_solid-node-3-position" />
+			</multiUnionNode>
+			<multiUnionNode name="LW_solid-node-4">
+				<solid ref="Sub1_LBPt2_e_LW_zone3" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="LW_solid-node-4-position" />
+			</multiUnionNode>
+			<multiUnionNode name="LW_solid-node-5">
+				<solid ref="Sub0_LBPb_e_LW_zone4" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="LW_solid-node-5-position" />
+			</multiUnionNode>
+		</multiUnion>
+		<cone name="RBoc1i_s" rmin1="0.0" rmax1="433.7803286781217" rmin2="0.0" rmax2="51.96703118783543" z="5049.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int0_RBoc1i_s_RW_zone0">
+			<first ref="D10_EU24_s" />
+			<second ref="RBoc1i_s" />
+			<position name="Int0_RBoc1i_s_RW_zone0_translation" x="0.000000000000000" y="0.000000000000000" z="3475.000000000000000" unit="mm" />
+			<rotation name="Int0_RBoc1i_s_RW_zone0_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</intersection>
+		<subtraction name="Sub0_pRn_e_RW_zone0">
+			<first ref="Int0_RBoc1i_s_RW_zone0" />
+			<second ref="pRn_e" />
+			<position name="Sub0_pRn_e_RW_zone0_translation" x="0.000000000000000" y="0.000000000003638" z="-117494.540732348774327" unit="mm" />
+		</subtraction>
+		<cone name="RBPb_e" rmin1="0.0" rmax1="17.949495949494953" rmin2="0.0" rmax2="2.8505060505050506" z="5050.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub1_RBPb_e_RW_zone0">
+			<first ref="Sub0_pRn_e_RW_zone0" />
+			<second ref="RBPb_e" />
+			<position name="Sub1_RBPb_e_RW_zone0_translation" x="0.000000000000000" y="0.000000000000000" z="3475.000000000000000" unit="mm" />
+			<rotation name="Sub1_RBPb_e_RW_zone0_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</subtraction>
+		<cone name="RWo1_s" rmin1="0.0" rmax1="553.7803286781217" rmin2="0.0" rmax2="171.96703118783543" z="5049.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int0_RWo1_s_RW_zone1">
+			<first ref="D10_EU24_s" />
+			<second ref="RWo1_s" />
+			<position name="Int0_RWo1_s_RW_zone1_translation" x="0.000000000000000" y="0.000000000000000" z="3475.000000000000000" unit="mm" />
+			<rotation name="Int0_RWo1_s_RW_zone1_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</intersection>
+		<subtraction name="Sub0_pRn_e_RW_zone1">
+			<first ref="Int0_RWo1_s_RW_zone1" />
+			<second ref="pRn_e" />
+			<position name="Sub0_pRn_e_RW_zone1_translation" x="0.000000000000000" y="0.000000000003638" z="-117494.540732348774327" unit="mm" />
+		</subtraction>
+		<cone name="RBoc1o_e" rmin1="0.0" rmax1="513.7803306781217" rmin2="0.0" rmax2="131.96703318783543" z="5050.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub1_RBoc1o_e_RW_zone1">
+			<first ref="Sub0_pRn_e_RW_zone1" />
+			<second ref="RBoc1o_e" />
+			<position name="Sub1_RBoc1o_e_RW_zone1_translation" x="0.000000000000000" y="0.000000000000000" z="3475.000000000000000" unit="mm" />
+			<rotation name="Sub1_RBoc1o_e_RW_zone1_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</subtraction>
+		<intersection name="Int0_pRn_s_RW_zone2">
+			<first ref="D10_EU24_s" />
+			<second ref="pRn_s" />
+			<position name="Int0_pRn_s_RW_zone2_translation" x="0.000000000000000" y="0.000000000003638" z="-117494.540734348760452" unit="mm" />
+		</intersection>
+		<cone name="RWto_s" rmin1="0.0" rmax1="184.56370990138032" rmin2="0.0" rmax2="1.1836499645767513" z="1039.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int1_RWto_s_RW_zone2">
+			<first ref="Int0_pRn_s_RW_zone2" />
+			<second ref="RWto_s" />
+			<position name="Int1_RWto_s_RW_zone2_translation" x="0.000000000000000" y="0.000000000000000" z="530.000000000000000" unit="mm" />
+			<rotation name="Int1_RWto_s_RW_zone2_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</intersection>
+		<subtraction name="Sub0_pRt_e_RW_zone2">
+			<first ref="Int1_RWto_s_RW_zone2" />
+			<second ref="pRt_e" />
+			<position name="Sub0_pRt_e_RW_zone2_translation" x="-0.000000000000227" y="0.000000000000000" z="-103937.593262357841013" unit="mm" />
+		</subtraction>
+		<cone name="RBPt1_e" rmin1="0.0" rmax1="2.8235304117647058" rmin2="0.0" rmax2="6.1764715882352945" z="950.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub1_RBPt1_e_RW_zone2">
+			<first ref="Sub0_pRt_e_RW_zone2" />
+			<second ref="RBPt1_e" />
+			<position name="Sub1_RBPt1_e_RW_zone2_translation" x="0.000000000000000" y="0.000000000000000" z="575.000000000000000" unit="mm" />
+			<rotation name="Sub1_RBPt1_e_RW_zone2_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</subtraction>
+		<intersection name="Int0_pRt_s_RW_zone3">
+			<first ref="D10_EU24_s" />
+			<second ref="pRt_s" />
+			<position name="Int0_pRt_s_RW_zone3_translation" x="-0.000000000000227" y="0.000000000000000" z="-103937.593264357827138" unit="mm" />
+		</intersection>
+		<intersection name="Int1_RWto_s_RW_zone3">
+			<first ref="Int0_pRt_s_RW_zone3" />
+			<second ref="RWto_s" />
+			<position name="Int1_RWto_s_RW_zone3_translation" x="0.000000000000000" y="0.000000000000000" z="530.000000000000000" unit="mm" />
+			<rotation name="Int1_RWto_s_RW_zone3_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</intersection>
+		<cone name="RBPt2_e" rmin1="0.0" rmax1="3.777778777777778" rmin2="0.0" rmax2="12.222223222222222" z="190.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub0_RBPt2_e_RW_zone3">
+			<first ref="Int1_RWto_s_RW_zone3" />
+			<second ref="RBPt2_e" />
+			<position name="Sub0_RBPt2_e_RW_zone3_translation" x="0.000000000000000" y="0.000000000000000" z="105.000000000000000" unit="mm" />
+			<rotation name="Sub0_RBPt2_e_RW_zone3_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</subtraction>
+		<intersection name="Int0_bor_n_s_RW_zone4">
+			<first ref="D10_EU24_s" />
+			<second ref="bor_n_s" />
+		</intersection>
+		<subtraction name="Sub0_pRn_e_RW_zone4">
+			<first ref="Int0_bor_n_s_RW_zone4" />
+			<second ref="pRn_e" />
+			<position name="Sub0_pRn_e_RW_zone4_translation" x="0.000000000000000" y="0.000000000003638" z="-117494.540732348774327" unit="mm" />
+		</subtraction>
+		<subtraction name="Sub1_RBPb_e_RW_zone4">
+			<first ref="Sub0_pRn_e_RW_zone4" />
+			<second ref="RBPb_e" />
+			<position name="Sub1_RBPb_e_RW_zone4_translation" x="0.000000000000000" y="0.000000000000000" z="3475.000000000000000" unit="mm" />
+			<rotation name="Sub1_RBPb_e_RW_zone4_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</subtraction>
+		<multiUnion name="RW_solid">
+			<multiUnionNode name="RW_solid-node-1">
+				<solid ref="Sub1_RBPb_e_RW_zone0" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="RW_solid-node-1-position" />
+			</multiUnionNode>
+			<multiUnionNode name="RW_solid-node-2">
+				<solid ref="Sub1_RBoc1o_e_RW_zone1" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="RW_solid-node-2-position" />
+			</multiUnionNode>
+			<multiUnionNode name="RW_solid-node-3">
+				<solid ref="Sub1_RBPt1_e_RW_zone2" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="RW_solid-node-3-position" />
+			</multiUnionNode>
+			<multiUnionNode name="RW_solid-node-4">
+				<solid ref="Sub0_RBPt2_e_RW_zone3" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="RW_solid-node-4-position" />
+			</multiUnionNode>
+			<multiUnionNode name="RW_solid-node-5">
+				<solid ref="Sub1_RBPb_e_RW_zone4" />
+				<position x="0.000000000000000" y="-30000.000000000000000" z="85000.000000000000000" unit="mm" name="RW_solid-node-5-position" />
+			</multiUnionNode>
+		</multiUnion>
+		<intersection name="Int0_pLn_s_LBb_zone">
+			<first ref="D10_EU24_s" />
+			<second ref="pLn_s" />
+			<position name="Int0_pLn_s_LBb_zone_translation" x="0.000000000000000" y="0.000000000003638" z="-119494.540734348760452" unit="mm" />
+		</intersection>
+		<cone name="LBoc1o_s" rmin1="0.0" rmax1="513.7803286781217" rmin2="0.0" rmax2="131.96703118783543" z="5049.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int1_LBoc1o_s_LBb_zone">
+			<first ref="Int0_pLn_s_LBb_zone" />
+			<second ref="LBoc1o_s" />
+			<position name="Int1_LBoc1o_s_LBb_zone_translation" x="0.000000000000000" y="0.000000000000000" z="-3475.000000000000000" unit="mm" />
+		</intersection>
+		<cone name="LBoc1i_e" rmin1="0.0" rmax1="433.7803306781217" rmin2="0.0" rmax2="51.967033187835426" z="5050.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub0_LBoc1i_e_LBb_zone">
+			<first ref="Int1_LBoc1o_s_LBb_zone" />
+			<second ref="LBoc1i_e" />
+			<position name="Sub0_LBoc1i_e_LBb_zone_translation" x="0.000000000000000" y="0.000000000000000" z="-3475.000000000000000" unit="mm" />
+		</subtraction>
+		<tube name="bor_n_e" rmin="0.0" rmax="134.7473628659571" z="13185.820715166547" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub1_bor_n_e_LBb_zone">
+			<first ref="Sub0_LBoc1i_e_LBb_zone" />
+			<second ref="bor_n_e" />
+		</subtraction>
+		<cone name="RBoc1o_s" rmin1="0.0" rmax1="513.7803286781217" rmin2="0.0" rmax2="131.96703118783543" z="5049.999998" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int0_RBoc1o_s_RBb_zone">
+			<first ref="D10_EU24_s" />
+			<second ref="RBoc1o_s" />
+			<position name="Int0_RBoc1o_s_RBb_zone_translation" x="0.000000000000000" y="0.000000000000000" z="3475.000000000000000" unit="mm" />
+			<rotation name="Int0_RBoc1o_s_RBb_zone_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</intersection>
+		<subtraction name="Sub0_pRn_e_RBb_zone">
+			<first ref="Int0_RBoc1o_s_RBb_zone" />
+			<second ref="pRn_e" />
+			<position name="Sub0_pRn_e_RBb_zone_translation" x="0.000000000000000" y="0.000000000003638" z="-117494.540732348774327" unit="mm" />
+		</subtraction>
+		<cone name="RBoc1i_e" rmin1="0.0" rmax1="433.7803306781217" rmin2="0.0" rmax2="51.967033187835426" z="5050.000002" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub1_RBoc1i_e_RBb_zone">
+			<first ref="Sub0_pRn_e_RBb_zone" />
+			<second ref="RBoc1i_e" />
+			<position name="Sub1_RBoc1i_e_RBb_zone_translation" x="0.000000000000000" y="0.000000000000000" z="3475.000000000000000" unit="mm" />
+			<rotation name="Sub1_RBoc1i_e_RBb_zone_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</subtraction>
+		<subtraction name="Sub2_bor_n_e_RBb_zone">
+			<first ref="Sub1_RBoc1i_e_RBb_zone" />
+			<second ref="bor_n_e" />
+		</subtraction>
+		<tube name="cham_o_s" rmin="0.0" rmax="23.999999" z="315.63509512854375" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<intersection name="Int0_cham_o_s_DET_CHAM_zone">
+			<first ref="D10_EU24_s" />
+			<second ref="cham_o_s" />
+		</intersection>
+		<subtraction name="Sub0_LWto_e_DET_CHAM_zone">
+			<first ref="Int0_cham_o_s_DET_CHAM_zone" />
+			<second ref="LWto_e" />
+			<position name="Sub0_LWto_e_DET_CHAM_zone_translation" x="0.000000000000000" y="0.000000000000000" z="-530.000000000000000" unit="mm" />
+		</subtraction>
+		<subtraction name="Sub1_RWto_e_DET_CHAM_zone">
+			<first ref="Sub0_LWto_e_DET_CHAM_zone" />
+			<second ref="RWto_e" />
+			<position name="Sub1_RWto_e_DET_CHAM_zone_translation" x="0.000000000000000" y="0.000000000000000" z="530.000000000000000" unit="mm" />
+			<rotation name="Sub1_RWto_e_DET_CHAM_zone_rotation" x="3.141592653589793" y="-0.000000000000000" z="3.141592653589793" unit="rad" />
+		</subtraction>
+		<tube name="cham_i_e" rmin="0.0" rmax="23.000001" z="315.63509512854375" startphi="0.0" deltaphi="6.283185307179586" lunit="mm" aunit="rad" />
+		<subtraction name="Sub2_cham_i_e_DET_CHAM_zone">
+			<first ref="Sub1_RWto_e_DET_CHAM_zone" />
+			<second ref="cham_i_e" />
+		</subtraction>
+	</solids>
+	<structure>
+		<volume name="DET_LAT_lv">
+			<materialref ref="G4_Galactic" />
+			<solidref ref="DET_LAT_solid" />
+		</volume>
+		<volume name="BP_VAC_lv">
+			<materialref ref="G4_Galactic" />
+			<solidref ref="BP_VAC_solid" />
+		</volume>
+		<volume name="LW_lv">
+			<materialref ref="INERM180" />
+			<solidref ref="LW_solid" />
+		</volume>
+		<volume name="RW_lv">
+			<materialref ref="INERM180" />
+			<solidref ref="RW_solid" />
+		</volume>
+		<volume name="LBb_lv">
+			<materialref ref="BORETH" />
+			<solidref ref="Sub1_bor_n_e_LBb_zone" />
+		</volume>
+		<volume name="RBb_lv">
+			<materialref ref="BORETH" />
+			<solidref ref="Sub2_bor_n_e_RBb_zone" />
+		</volume>
+		<volume name="DET_CHAM_lv">
+			<materialref ref="G4_Be" />
+			<solidref ref="Sub2_cham_i_e_DET_CHAM_zone" />
+		</volume>
+		<volume name="wl">
+			<materialref ref="G4_Galactic" />
+			<solidref ref="world_solid" />
+			<physvol name="DET_LAT_pv">
+				<volumeref ref="DET_LAT_lv" />
+				<position name="DET_LAT_pv_pos" unit="mm" x="0.0" y="30000.0" z="-85000.0" />
+			</physvol>
+			<physvol name="BP_VAC_pv">
+				<volumeref ref="BP_VAC_lv" />
+				<position name="BP_VAC_pv_pos" unit="mm" x="0.0" y="30000.0" z="-85000.0" />
+			</physvol>
+			<physvol name="LW_pv">
+				<volumeref ref="LW_lv" />
+				<position name="LW_pv_pos" unit="mm" x="0.0" y="30000.0" z="-85000.0" />
+			</physvol>
+			<physvol name="RW_pv">
+				<volumeref ref="RW_lv" />
+				<position name="RW_pv_pos" unit="mm" x="0.0" y="30000.0" z="-85000.0" />
+			</physvol>
+			<physvol name="LBb_pv">
+				<volumeref ref="LBb_lv" />
+				<position name="LBb_pv_pos" x="0.0" y="0.0" z="0.0" unit="mm" />
+			</physvol>
+			<physvol name="RBb_pv">
+				<volumeref ref="RBb_lv" />
+				<position name="RBb_pv_pos" x="0.0" y="0.0" z="0.0" unit="mm" />
+			</physvol>
+			<physvol name="DET_CHAM_pv">
+				<volumeref ref="DET_CHAM_lv" />
+				<position name="DET_CHAM_pv_pos" x="0.0" y="0.0" z="0.0" unit="mm" />
+			</physvol>
+		</volume>
+	</structure>
+	<setup name="Default" version="1.0">
+		<world ref="wl" />
+	</setup>
+</gdml>

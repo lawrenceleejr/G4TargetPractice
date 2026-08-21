@@ -26,14 +26,19 @@ GENERATORS = ("geant4", "genie", "achilles", "pythia", "decay", "external")
 # decay is not one of them -- it is a single Geant4 stage that decays AND
 # transports.
 VERTEX_LEVEL_GENERATORS = ("genie", "achilles", "pythia", "external")
-# mudecay_*: the neutrino energy spectrum from in-flight muon decay (the
+# mudecay_*: the DAUGHTER energy spectra from in-flight muon decay (the
 # neutrino-factory / muon-collider "neutrino slice" flux, angle-integrated over
 # the ~1/gamma cone; unpolarized). energy.value is the PARENT MUON energy E_mu:
 #   mudecay_numu (nu_mu / anti-nu_mu): dN/dy = 5/3 - 3y^2 + 4/3 y^3, y = E/E_mu
 #   mudecay_nue  (nu_e  / anti-nu_e ): dN/dy = 2 - 6y^2 + 4y^3
-ENERGY_MODES = ("mono", "gauss", "exp", "arb", "mudecay_numu", "mudecay_nue")
+#   mudecay_e    (e- / e+, the Michel daughter): the SAME shape as mudecay_numu.
+#     For an unpolarized muon the charged lepton and the nu_mu share the
+#     rest-frame Michel spectrum 2x^2(3-2x), so they share the boosted one too:
+#     <E> = 0.35 E_mu each, leaving the nu_e the remaining 0.30 E_mu.
+ENERGY_MODES = ("mono", "gauss", "exp", "arb",
+                "mudecay_numu", "mudecay_nue", "mudecay_e")
 # Modes with no native g4sim gun command: the host samples them into a beam file.
-SAMPLED_ENERGY_MODES = ("mudecay_numu", "mudecay_nue")
+SAMPLED_ENERGY_MODES = ("mudecay_numu", "mudecay_nue", "mudecay_e")
 
 # Pythia 8 process presets (pythia.process). Each expands to a small set of
 # Pythia settings in the backend; raw pythia.settings are appended after them so

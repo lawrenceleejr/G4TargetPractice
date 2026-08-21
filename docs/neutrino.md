@@ -174,6 +174,13 @@ detector concept (`gdml/MAIA_v0.gdml`): all four flavor components, both
 collider stages, slice phase-space painting in the tungsten nozzles, and a
 fast spectrum-only variant. See `examples/maia/README.md`.
 
+The other end of the same physics is `examples/mucoll/`: a muon decaying in the
+last few metres of beam pipe *before* the interaction point, in the v0.8
+lattice's machine-detector interface, with the decay νμ and the Michel electron
+followed separately (`mudecay_e` is the charged daughter's spectrum — the same
+shape as `mudecay_numu`, since an unpolarized muon gives them the same
+rest-frame Michel spectrum). See `examples/mucoll/README.md`.
+
 ## TeV energies: the HEDIS tune
 
 The standard `G18_10a` tune's DIS model and cross-section splines top out

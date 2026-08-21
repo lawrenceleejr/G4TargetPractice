@@ -71,6 +71,10 @@ gtp $GEANT4   run --config examples/water_proton.yaml -o out
 # BSM decay — an HNL decaying in flight inside a detector (Geant4 decays AND transports)
 gtp $GEANT4   run --config examples/maia/hnl_decay.yaml -o out
 
+# Muon collider — the electron from a beam-muon decay flying into the v0.8
+# interaction region, through the tungsten nozzle (examples/mucoll/README.md)
+gtp $GEANT4   run --config examples/mucoll/mudecay_electron_ip.yaml -o out
+
 # GENIE — 2 GeV muon-neutrinos on liquid argon, then Geant4 through the detector.
 # The GENIE image CONTAINS the Geant4 engine, so one container runs both stages.
 gtp $GENIE    run --config examples/nu_argon.yaml -o out
@@ -265,9 +269,11 @@ the command line (`--energy "200 MeV"` beats the YAML value): **flag > YAML >
 default**.
 
 Common fields: `generator`, `geometry.gdml`, `beam.{particle,position,direction,angle_sigma}`,
-`beam.energy.{mode,value,sigma,min,max,bins}` (modes `mono|gauss|exp|arb|mudecay_numu|mudecay_nue`
-— the `mudecay_*` modes are the exact neutrino spectra from in-flight muon decay,
-with `value` the parent muon energy; see `examples/maia/`),
+`beam.energy.{mode,value,sigma,min,max,bins}` (modes
+`mono|gauss|exp|arb|mudecay_numu|mudecay_nue|mudecay_e` — the `mudecay_*` modes are
+the exact spectra of the daughters of in-flight muon decay, neutrinos and the
+Michel electron, with `value` the parent muon energy; see `examples/maia/` and
+`examples/mucoll/`),
 `run.{events,output,seed}`. Backend-specific blocks (`geant4:`, `genie:`) are
 read only by their backend and ignored by the other.
 
@@ -535,8 +541,8 @@ GDMLTargetPractice/
 ├── achilles/                # in-container Achilles driver (run_achilles.py)
 ├── docker/                  # checked-in Dockerfiles: geant4, geant4-celeritas, genie, achilles
 ├── docs/                    # topic guides (neutrino quickstart, BSM decay backend)
-├── examples/                # example YAML run configs
-├── gdml/                    # example GDML geometries
+├── examples/                # example YAML run configs (maia/, mucoll/, ...)
+├── gdml/                    # example GDML geometries (+ mucoll_ip_extract.py)
 ├── macros/                  # example Geant4 macros + README (branch reference)
 ├── tests/                   # pytest suite (pure Python; no Geant4/GENIE/Docker needed)
 └── .github/                 # CI: workflows/, plus ci/ + scripts/ for the docker-run tests

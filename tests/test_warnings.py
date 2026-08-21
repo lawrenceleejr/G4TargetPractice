@@ -91,18 +91,34 @@ def _neutrino_examples(repo_root):
             yield path, cfg
 
 
+# The examples that deliberately let Geant4 itself do the neutrino interaction:
+# biased all-Geant4 runs for energy deposition / detector response, each saying
+# so in its own header. Everything else must go through a generator.
+ALL_GEANT4_NEUTRINO_EXAMPLES = {
+    "nu_slice_geant4_biased.yaml",      # the MAIA slice, as the contrast run
+    "mudecay_neutrino_ip.yaml",         # the muon-collider IP, where the only
+                                        # material a decay neutrino crosses is
+                                        # the nozzle it happens to clip
+}
+
+
 def test_every_shipped_neutrino_example_ends_in_geant4(repo_root):
     """Any neutrino example must propagate its final state through the geometry:
-    with a generator that means the Geant4 hand-off, and the only example
-    allowed to skip it is the deliberate all-Geant4 contrast run (where Geant4
-    is doing the transport anyway)."""
+    with a generator that means the Geant4 hand-off, and the only examples
+    allowed to skip it are the deliberate all-Geant4 runs (where Geant4 is
+    doing the transport anyway)."""
     checked = 0
     for path, cfg in _neutrino_examples(repo_root):
         checked += 1
         if cfg.generator == "geant4":
-            assert path.name == "nu_slice_geant4_biased.yaml", (
+            assert path.name in ALL_GEANT4_NEUTRINO_EXAMPLES, (
                 f"{path}: a neutrino beam on the geant4 backend is generator-free "
                 f"physics; use genie/achilles/pythia")
+            # and it has to have asked for the biasing explicitly, not drifted
+            # into Geant4's bare neutrino model by accident
+            assert cfg.geant4.get("neutrino_bias"), (
+                f"{path}: an all-Geant4 neutrino run must set "
+                f"geant4.neutrino_bias explicitly")
             continue
         assert run._wants_transport(cfg), f"{path}: transport is disabled"
     assert checked >= 12, f"only found {checked} neutrino examples -- glob broken?"
