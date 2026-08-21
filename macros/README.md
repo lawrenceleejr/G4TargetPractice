@@ -250,6 +250,39 @@ particle source:
 | `/gun/energyMax` | value unit | Upper energy bound for `exp` mode |
 | `/gun/addEnergyBin` | energy unit weight | Add a bin to the arbitrary histogram |
 | `/gun/clearEnergyBins` | _(none)_ | Clear all histogram bins |
+| `/gun/beamFile` | path | Replay one host-sampled primary per event (`<name\|pdg> x y z px py pz`) |
+| `/gun/hepmcFile` | path | Replay a HepMC3 file: every status-1 particle becomes a primary, fired from **its own** production vertex and time |
+
+### Exit export: HepMC3 out of Geant4
+
+The interchange runs both ways. These `/analysis/exit*` commands write the
+particles **leaving** a volume as HepMC3 — a scoring plane / phase-space file —
+so a run can feed the next stage (via `/gun/hepmcFile`) or any downstream tool
+that reads HepMC3. Issue them before `/run/beamOn`; the file opens at run start.
+
+| Command | Argument(s) | Description |
+|---|---|---|
+| `/analysis/exitHepMC` | path | Write crossings to this file (empty = off, the default) |
+| `/analysis/exitVolume` | name | Volume whose exit surface is watched (default `World` = everything escaping). Matches either the physical-volume name or the logical name from the GDML, so a GDML `<volume name="X">` placed without an explicit physvol name (Geant4 calls it `X_PV`) is found as `X` |
+| `/analysis/exitMinKE` | value unit | Skip crossings below this kinetic energy (default 0) |
+| `/analysis/exitKill` | `true`\|`false` | Stop tracks at the surface once recorded (default `false`) |
+
+One `GenEvent` per Geant4 event; one vertex **per crossing**, positioned at the
+point and time that particle crossed, with the crossing particle outgoing
+(status 1) and the event's primary as an incoming status-4 leg (provenance — and
+HepMC3's ASCII reader will not parse a vertex with no incoming particle). The
+source volume travels as the `gdmltp_exit_volume` event attribute. Units are
+MeV/mm, with vertex times stored as c·t in HepMC3's convention.
+
+`exitKill` is what makes a staged run add up: stage 2 continues from the
+surface, so stage 1 must not keep transporting past it.
+
+```
+/analysis/exitHepMC exit.hepmc
+/analysis/exitVolume WaterPhantom_vol
+/analysis/exitMinKE 1 MeV
+/analysis/exitKill true
+```
 
 ### Energy modes explained
 

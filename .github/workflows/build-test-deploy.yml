@@ -240,6 +240,78 @@ jobs:
           python3 -c "import uproot,sys; t=uproot.open('output.root')['tree']; import numpy as np; pdg=t['primaryPDG'].array(library='np'); print('primaries',pdg.tolist()); sys.exit(0 if (t.num_entries==2 and (pdg==2212).all()) else 1)"
           rm -f output.root pdg.mac
 
+      - name: Exit HepMC3 export + replay (the staged-simulation round trip)
+        # g4sim reads HepMC3 already; this proves it now WRITES it too, and that
+        # the file it writes is replayable -- stage 1 records everything leaving
+        # the phantom, stage 2 fires those particles as its primaries. The
+        # per-particle vertices are the crux: crossings happen at different
+        # points and times, so a reader that applied one vertex to all of them
+        # would put every stage-2 primary in the wrong place.
+        run: |
+          cat > exit_stage1.mac << 'EOF'
+          /detector/readGDML gdml/water_phantom_30cm.gdml
+          /run/initialize
+          /analysis/neutrinoMode off
+          /analysis/exitHepMC exit.hepmc
+          /analysis/exitVolume WaterPhantom_vol
+          /analysis/exitMinKE 1 MeV
+          /random/setSeeds 21 22
+          /gun/particle proton
+          /gun/energy 150 MeV
+          /gun/position 0 0 -20 cm
+          /gun/direction 0 0 1
+          /run/beamOn 5
+          EOF
+          ./build/g4sim exit_stage1.mac > exit_stage1.log 2>&1 \
+            || { cat exit_stage1.log; exit 1; }
+          cat exit_stage1.log
+          test -f exit.hepmc
+          python3 - << 'PY'
+          import pyhepmc
+          events, particles, vertices = 0, 0, set()
+          with pyhepmc.open("exit.hepmc") as f:
+              for ev in f:
+                  events += 1
+                  for p in ev.particles:
+                      if p.status == 4:
+                          continue          # the incoming primary leg
+                      assert p.status == 1, f"exit particle status {p.status}"
+                      particles += 1
+                      pv = p.production_vertex
+                      assert pv is not None, "exit particle has no crossing vertex"
+                      pos = pv.position
+                      vertices.add((round(pos.x, 6), round(pos.y, 6), round(pos.z, 6)))
+                  assert ev.attributes.get("gdmltp_primary_pdg") is not None
+                  assert "WaterPhantom_vol" in str(ev.attributes["gdmltp_exit_volume"])
+          print(f"exit.hepmc: {events} events, {particles} particles, "
+                f"{len(vertices)} distinct crossing points")
+          assert events == 5, events
+          assert particles > 0, "nothing crossed the phantom surface"
+          # the whole point of per-particle vertices: they are NOT all the same
+          assert len(vertices) > 1, "every crossing landed at one point"
+          PY
+          # ... and stage 2 replays that file as its primaries
+          cat > exit_stage2.mac << 'EOF'
+          /detector/readGDML gdml/liquid_argon_1m3.gdml
+          /run/initialize
+          /analysis/neutrinoMode off
+          /gun/hepmcFile exit.hepmc
+          /run/beamOn 5
+          EOF
+          ./build/g4sim exit_stage2.mac > exit_stage2.log 2>&1 \
+            || { cat exit_stage2.log; exit 1; }
+          grep -q "loaded 5 HepMC3 hand-off event(s)" exit_stage2.log
+          python3 - << 'PY'
+          import uproot, awkward as ak
+          t = uproot.open("output.root")["tree"]
+          assert t.num_entries == 5, t.num_entries
+          n = t["nTracks"].array(library="np")
+          print("stage 2 tracks per event:", n.tolist())
+          assert n.sum() > 0, "stage 2 transported nothing"
+          PY
+          rm -f exit.hepmc output.root exit_stage1.mac exit_stage2.mac \
+                exit_stage1.log exit_stage2.log
+
       - name: Python-written ntuples must open in REAL ROOT as a TTree
         # The regression this guards: uproot 5.7 writes an RNTuple for
         # `f["tree"] = data`, which uproot itself reads back fine (so every

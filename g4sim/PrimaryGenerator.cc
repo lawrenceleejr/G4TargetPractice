@@ -256,12 +256,16 @@ void PrimaryGenerator::LoadEventFile(const G4String& path)
         evt.set_units(HepMC3::Units::MEV, HepMC3::Units::MM);  // normalize to ours
 
         HandoffEvent h;
+        // Fallback for a particle with no production vertex of its own: the
+        // event's first vertex, else the origin.
+        G4ThreeVector fallbackPos(0, 0, 0);
+        G4double fallbackTime = 0.0;
         const auto& verts = evt.vertices();
         if (!verts.empty()) {
             const auto pos = verts.front()->position();
-            h.vertex = G4ThreeVector(pos.x() * mm, pos.y() * mm, pos.z() * mm);
+            fallbackPos = G4ThreeVector(pos.x() * mm, pos.y() * mm, pos.z() * mm);
             // HepMC stores the position time as a length (c*t); recover ns.
-            h.time = (pos.t() * mm) / CLHEP::c_light;
+            fallbackTime = (pos.t() * mm) / CLHEP::c_light;
         }
         for (const auto& p : evt.particles()) {
             if (p->status() != 1) continue;      // final state only
@@ -273,8 +277,19 @@ void PrimaryGenerator::LoadEventFile(const G4String& path)
                              + std::to_string(p->pid())).c_str());
             }
             const auto m = p->momentum();
-            h.particles.emplace_back(
-                def, G4ThreeVector(m.px() * MeV, m.py() * MeV, m.pz() * MeV));
+            HandoffParticle hp;
+            hp.def = def;
+            hp.momentum = G4ThreeVector(m.px() * MeV, m.py() * MeV, m.pz() * MeV);
+            // EACH particle starts from its OWN production vertex: a generator
+            // hand-off shares one, an exit/scoring-plane file does not.
+            hp.position = fallbackPos;
+            hp.time = fallbackTime;
+            if (auto prod = p->production_vertex()) {
+                const auto pos = prod->position();
+                hp.position = G4ThreeVector(pos.x() * mm, pos.y() * mm, pos.z() * mm);
+                hp.time = (pos.t() * mm) / CLHEP::c_light;
+            }
+            h.particles.push_back(hp);
         }
         fEvents.push_back(std::move(h));
     }
@@ -362,11 +377,11 @@ void PrimaryGenerator::GeneratePrimaries(G4Event* event)
                         "More events requested than event-file entries; reusing the last.");
         }
         const HandoffEvent& evt = fEvents[std::min(i, fEvents.size() - 1)];
-        fParticleGun->SetParticlePosition(evt.vertex);
-        fParticleGun->SetParticleTime(evt.time);   // decay/interaction time (ns)
-        for (const auto& [def, mom] : evt.particles) {
-            fParticleGun->SetParticleDefinition(def);
-            fParticleGun->SetParticleMomentum(mom);
+        for (const auto& hp : evt.particles) {
+            fParticleGun->SetParticleDefinition(hp.def);
+            fParticleGun->SetParticleMomentum(hp.momentum);
+            fParticleGun->SetParticlePosition(hp.position);
+            fParticleGun->SetParticleTime(hp.time);   // interaction/crossing time
             fParticleGun->GeneratePrimaryVertex(event);
         }
         return;

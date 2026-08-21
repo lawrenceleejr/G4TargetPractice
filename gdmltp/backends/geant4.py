@@ -67,6 +67,34 @@ def _neutrino_bias_lines(cfg):
     return [f"/gdmltp/neutrinoBias {cc:g} {nc:g} {nuc:g} {det}"]
 
 
+def _exit_hepmc_lines(cfg):
+    """`geant4.exit_hepmc` -> the /analysis/exit* commands (see g4sim/ExitWriter).
+
+    Writes the particles LEAVING a volume as HepMC3 -- a scoring-plane /
+    phase-space file. g4sim also READS HepMC3 (`/gun/hepmcFile`), so this is how
+    one run feeds the next: stage 1 records what crosses the surface, stage 2
+    replays it as its primaries. Everything but the filename is optional:
+
+      exit_hepmc:   exit.hepmc     # enables the export
+      exit_volume:  Detector       # default World = everything that escapes
+      exit_min_ke:  "1 MeV"        # skip soft crossings (shower exits are huge)
+      exit_kill:    true           # stop tracks at the surface (staged runs)
+    """
+    path = cfg.geant4.get("exit_hepmc")
+    if not path:
+        return []
+    lines = [f"/analysis/exitHepMC {path}"]
+    volume = cfg.geant4.get("exit_volume")
+    if volume:
+        lines.append(f"/analysis/exitVolume {volume}")
+    min_ke = cfg.geant4.get("exit_min_ke")
+    if min_ke:
+        lines.append(f"/analysis/exitMinKE {min_ke}")
+    if cfg.geant4.get("exit_kill"):
+        lines.append("/analysis/exitKill true")
+    return lines
+
+
 def build_macro(cfg, beam_file=None) -> str:
     """Render `cfg` to Geant4 macro text.
 
@@ -90,6 +118,7 @@ def build_macro(cfg, beam_file=None) -> str:
         "/run/initialize",
         f"/analysis/neutrinoMode {nmode}",
     ]
+    lines += _exit_hepmc_lines(cfg)          # must precede /run/beamOn
     if cfg.run.seed is not None:
         lines.append(f"/random/setSeeds {int(cfg.run.seed)} {int(cfg.run.seed) + 1}")
     field = cfg.geant4.get("field")

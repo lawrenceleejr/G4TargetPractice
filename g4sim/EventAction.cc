@@ -19,9 +19,11 @@ void EventAction::BeginOfEventAction(const G4Event* event)
     // Per-event collections
     steps.clear();
     trackTable.clear();
+    if (fRunAction) fRunAction->GetExitWriter()->BeginEvent();
 
     // Primary kinematics
     E = x = y = z = 0;
+    primaryMass = 0;
     px = py = pz = 0;
     finalE = finalX = finalY = finalZ = 0;
     finalPx = finalPy = finalPz = 0;
@@ -114,6 +116,11 @@ void EventAction::EndOfEventAction(const G4Event*)
         xBj = (2.0 * nucleonMass * qEnergy > 0.0) ? Q2 / (2.0 * nucleonMass * qEnergy) : 0.0;
         yBj = qEnergy / E;
     }
+
+    // One HepMC3 event per Geant4 event when the exit export is on, written
+    // before the ntuple fill so both records describe the same event.
+    fRunAction->GetExitWriter()->EndEvent(eventID, primaryPDG, E, primaryMass,
+                                          G4ThreeVector(px, py, pz));
 
     // --- Event scalars ---
     fRunAction->eventID = eventID;

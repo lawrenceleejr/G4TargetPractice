@@ -14,6 +14,10 @@ public:
     void UserSteppingAction(const G4Step* step) override;
 
 private:
+    /// Optional HepMC3 export: record the track if this step leaves the
+    /// watched volume (no-op unless /analysis/exitHepMC is set).
+    void RecordExitCrossing(const G4Step* step);
+
     EventAction* fEventAction;
   RunAction* fRunAction;
 };

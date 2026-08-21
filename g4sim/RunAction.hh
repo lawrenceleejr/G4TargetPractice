@@ -5,6 +5,7 @@
 #include "TFile.h"
 #include "TTree.h"
 #include "globals.hh"
+#include "ExitWriter.hh"
 #include <vector>
 #include <string>
 
@@ -30,6 +31,8 @@ public:
     // Configuration (messenger / main)
     void SetNeutrinoMode(NuMode mode) { fNuMode = mode; }
     void SetGenerator(PrimaryGenerator* gen) { fGenerator = gen; }
+    /// Optional HepMC3 export of particles leaving a volume (see ExitWriter).
+    ExitWriter* GetExitWriter() { return &fExitWriter; }
     bool NeutrinoBranchesEnabled() const { return fNeutrinoBranches; }
 
     // ============================================================
@@ -48,6 +51,8 @@ public:
     double primaryEndX = 0, primaryEndY = 0, primaryEndZ = 0;
     double primaryEndPx = 0, primaryEndPy = 0, primaryEndPz = 0;
     double totalEdep = 0;
+
+    ExitWriter fExitWriter;
 
     // --- Per-track vectors (one entry per track) ---
     std::vector<int> trk_id, trk_parentID, trk_pdg;

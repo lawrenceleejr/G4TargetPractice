@@ -190,6 +190,36 @@ leaving an untransported file behind. The run directory keeps the whole chain �
 `events.hepmc`, `gdmltp_transport.mac`, `gdmltp_transport.json`,
 `vertex_level.root` — so stage 2 is re-runnable and inspectable.
 
+### Exporting what leaves: HepMC3 out of Geant4
+
+The interchange runs both ways. `g4sim` reads HepMC3 (`/gun/hepmcFile`) and can
+also **write** the particles *leaving* a volume — a scoring-plane / phase-space
+file — so one run can feed the next stage, or any downstream tool that speaks
+HepMC3:
+
+```yaml
+geant4:
+  exit_hepmc: exit.hepmc        # enables the export
+  exit_volume: WaterPhantom_vol # default World = everything that escapes
+  exit_min_ke: "1 MeV"          # skip soft crossings (a shower exit is mostly them)
+  exit_kill: true               # stop tracks at the surface (staged runs)
+```
+
+Then replay it as the primaries of the next run — different geometry, different
+physics list, whatever the stage needs:
+
+```bash
+gtp $GEANT4 run --config stage1.yaml -o stage1     # writes stage1/exit.hepmc
+# stage 2: a macro with /gun/hepmcFile stage1/exit.hepmc, or external backend
+```
+
+One `GenEvent` per event, one vertex **per crossing** at the point and time that
+particle crossed (they are not all the same place, and the reader honours each
+particle's own vertex), the primary as an incoming status-4 leg for provenance,
+and the source volume as an event attribute. `exit_kill` matters for staging: it
+stops the track at the surface so the next stage, which continues from there,
+does not double count.
+
 ## The YAML front-end
 
 Every run is a YAML file: a **target** (a GDML geometry), a **beam**, and a

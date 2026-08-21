@@ -108,10 +108,18 @@ private:
     std::vector<BeamEntry> fBeam;   ///< non-empty => beam-file replay mode
 
     /// One hand-off interaction: a vertex plus its final-state particles.
+    /// One primary from a hand-off file, with the point it starts from. The
+    /// position is PER PARTICLE, not per event: a generator hand-off shares one
+    /// interaction vertex, but an exit/scoring-plane file (see ExitWriter) has
+    /// every particle crossing at its own point and time.
+    struct HandoffParticle {
+        G4ParticleDefinition* def = nullptr;
+        G4ThreeVector momentum;    ///< MeV/c
+        G4ThreeVector position;    ///< mm
+        G4double      time = 0.0;  ///< ns
+    };
     struct HandoffEvent {
-        G4ThreeVector vertex;                                        ///< mm
-        G4double      time = 0.0;                                    ///< ns (optional)
-        std::vector<std::pair<G4ParticleDefinition*, G4ThreeVector>> particles;  ///< MeV/c
+        std::vector<HandoffParticle> particles;
     };
     std::vector<HandoffEvent> fEvents;   ///< non-empty => event-file replay mode
 

@@ -47,6 +47,7 @@ set(SOURCES
     RunActionMessenger.cc
     EventAction.cc
     SteppingAction.cc
+    ExitWriter.cc
     main.cc
 )
 

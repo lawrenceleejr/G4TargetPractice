@@ -38,6 +38,8 @@ void RunAction::BeginOfRunAction([[maybe_unused]] const G4Run* run) {
            << (fNeutrinoBranches ? "ENABLED" : "disabled")
            << " (/analysis/neutrinoMode)." << G4endl;
 
+    fExitWriter.BeginRun();
+
     fFile = new TFile("output.root", "RECREATE");
     fTree = new TTree("tree", "Simulation data");
 
@@ -163,6 +165,8 @@ void RunAction::EndOfRunAction([[maybe_unused]] const G4Run* run) {
 #ifdef USE_CELERITAS
     celeritas::TrackingManagerIntegration::Instance().EndOfRunAction(run);
 #endif
+    fExitWriter.EndRun();
+
     if (fTree && fFile) {
         fFile->cd();
         fTree->Write();
