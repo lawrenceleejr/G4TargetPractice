@@ -1,0 +1,37 @@
+# A 0.1 nm X-ray beam onto the layered tissue phantom behind a 1 mm lead filter.
+#   gdmltp run --config examples/tissue_lead_xray.yaml -o out
+#
+# Beam energy from the wavelength: E = hc/lambda, with hc = 1239.84 eV.nm, so
+# lambda = 0.1 nm (1 A) is a 12.398 keV photon -- a hard X-ray of the kind
+# crystallography and synchrotron beamlines run on, and one that sits just
+# below lead's L3 absorption edge at 13.04 keV.
+#
+# What the run shows: lead is opaque at this energy. Interpolating the NIST
+# tables below that edge gives mu/rho ~ 76 cm2/g, and at 11.35 g/cm3 that is an
+# attenuation length of ~12 um -- the 1 mm slab is ~86 of them (transmission
+# ~1e-38), so every primary is absorbed within the first few tens of microns
+# and the tissue behind sees nothing. Same beam on
+# gdml/tissue_phantom_layered.gdml is the unshielded reference to compare
+# against.
+generator: geant4
+
+geometry:
+  gdml: gdml/tissue_phantom_lead_1mm.gdml
+
+beam:
+  particle: gamma
+  energy:
+    mode: mono
+    value: "12.398 keV"        # lambda = 0.1 nm
+  position: "0 0 -20 cm"       # upstream of the lead, on the beam axis
+  direction: "0 0 1"
+
+run:
+  events: 5000
+  output: output.root
+  seed: 12345
+
+geant4:
+  neutrino_mode: off
+  field: null
+  celeritas: false             # the Celeritas offload swallows gamma steps

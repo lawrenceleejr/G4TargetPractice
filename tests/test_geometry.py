@@ -233,3 +233,28 @@ def test_unit_conversion_rotation():
         assert p.transform[:3, :3] @ np.array([1, 0, 0]) == pytest.approx([0, 1, 0], abs=1e-12)
     finally:
         os.unlink(path)
+
+
+def test_tissue_phantom_lead_filter_sits_in_front_of_an_unmoved_phantom(repo_root):
+    """The lead-filtered phantom is the layered one plus a 1 mm G4_Pb slab
+    flush against the entrance face: the lead spans z = -1..0 mm and every
+    tissue layer keeps the position it has in the unshielded file, so the two
+    geometries stay comparable bin for bin (see macros/README.md)."""
+    def layers(name):
+        prims = geometry.parse_gdml(repo_root / "gdml" / name)
+        return sorted(((p.material, round(float(p.transform[2, 3]), 6),
+                        round(p.params["sz"], 6)) for p in prims),
+                      key=lambda l: l[1])
+
+    bare = layers("tissue_phantom_layered.gdml")
+    shielded = layers("tissue_phantom_lead_1mm.gdml")
+
+    lead = shielded[0]
+    assert lead[0] == "G4_Pb"
+    assert lead[2] == pytest.approx(1.0)               # 1 mm thick
+    assert lead[1] == pytest.approx(-0.5)              # spanning z = -1..0 mm
+    assert shielded[1:] == bare                        # nothing else moved
+
+    pb = next(p for p in geometry.parse_gdml(repo_root / "gdml" / "tissue_phantom_lead_1mm.gdml")
+              if p.material == "G4_Pb")
+    assert (pb.params["sx"], pb.params["sy"]) == pytest.approx((300.0, 300.0))

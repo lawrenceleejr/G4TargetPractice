@@ -188,3 +188,23 @@ def test_prepare_verbatim_mac_is_copied(tmp_path):
     prep = backends.get("geant4").prepare(cfg, out)
     assert prep.argv == ["my.mac"]
     assert (out / "my.mac").exists()
+
+
+def test_xray_example_energy_is_the_0p1nm_wavelength(repo_root):
+    """examples/tissue_lead_xray.yaml quotes its beam as a wavelength (0.1 nm)
+    and its energy as the photon energy that follows, E = hc/lambda. Keep the
+    two in step: a 12.4 keV gamma is the whole point of the example."""
+    from gdmltp.beam import _ene_mev
+
+    cfg = config.from_yaml(str(repo_root / "examples" / "tissue_lead_xray.yaml")).validate()
+    assert cfg.beam.particle == "gamma"
+    assert cfg.gdml == "gdml/tissue_phantom_lead_1mm.gdml"
+
+    hc_eV_nm = 1239.841984                       # CODATA h*c, eV.nm
+    expected_MeV = hc_eV_nm / 0.1 * 1e-6         # lambda = 0.1 nm
+    assert _ene_mev(cfg.beam.energy.value) == pytest.approx(expected_MeV, rel=1e-4)
+
+    mac = geant4.build_macro(cfg)
+    assert "/detector/readGDML tissue_phantom_lead_1mm.gdml" in mac
+    assert "/gun/particle gamma" in mac
+    assert f"/gun/energy {cfg.beam.energy.value}" in mac
