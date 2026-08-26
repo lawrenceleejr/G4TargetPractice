@@ -1,0 +1,56 @@
+# =============================================================================
+# xrays_tissue_lead_0p1nm.mac
+#
+# Shielding check: a 0.1 nm (12.4 keV) X-ray pencil beam onto the layered
+# chest-wall phantom with a 1 mm lead filter flush against its entrance face.
+# The beam energy follows from the wavelength, E = hc/lambda with
+# hc = 1239.84 eV.nm, so lambda = 0.1 nm (1 A) is a 12.398 keV photon -- a hard
+# X-ray of the kind crystallography and synchrotron beamlines run on, and one
+# that sits just below lead's L3 absorption edge at 13.04 keV.
+#
+# Detector: gdml/tissue_phantom_lead_1mm.gdml
+#   - World: 60x60x60 cm (G4_AIR), phantom entrance face at z = 0
+#   - Layers along z:
+#      -0.1 -  0.0 cm lead filter (1 mm)
+#       0.0 -  0.5 cm soft tissue (skin)
+#       0.5 -  2.0 cm cortical bone (rib proxy)
+#       2.0 - 12.0 cm lung
+#      12.0 - 14.0 cm soft tissue
+#
+# Beam:
+#   - Particle : gamma
+#   - Energy   : monoenergetic, 12.398 keV (lambda = 0.1 nm)
+#   - Position : upstream on the beam axis (z = -20 cm)
+#   - Direction: along +z
+#
+# Expect the lead to swallow the beam whole: mu/rho ~ 76 cm2/g (interpolated
+# below that edge from the NIST tables) at 11.35 g/cm3 is an attenuation length
+# of ~12 um, so the 1 mm slab is ~86 of them -- a transmission of ~1e-38, with
+# no primary surviving the first few tens of microns. The deposit is a sharp
+# exponential right at the lead entrance face and nothing at all downstream
+# (z in mm, edep in MeV):
+#
+#   tree->Draw("step_z>>hPb(200,-1,0)",   "step_edep");   // inside the lead
+#   tree->Draw("step_z>>hTis(140,0,140)", "step_edep");   // tissue: empty
+#
+# For comparison, point /detector/readGDML at gdml/tissue_phantom_layered.gdml
+# to get the same beam on the bare phantom, and see macros/photons_tissue_6MV.mac
+# for the energies where a millimetre of lead is a perturbation, not a wall.
+# =============================================================================
+
+# --- Load geometry ---
+/detector/readGDML gdml/tissue_phantom_lead_1mm.gdml
+
+# --- Physics ---
+/run/initialize
+
+# --- Beam ---
+/gun/particle    gamma
+/gun/energyMode  mono
+/gun/energy      12.398 keV
+/gun/position    0 0 -20 cm
+/gun/direction   0 0 1
+
+# --- Run ---
+/run/printProgress 500
+/run/beamOn 5000

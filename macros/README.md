@@ -17,6 +17,7 @@ in the repository.
 | `gdml/liquid_argon_1m3.gdml` | 1 m³ liquid-argon cube in a 2 m³ air box |
 | `gdml/water_phantom_30cm.gdml` | 30×30 cm water tank, 40 cm deep, entrance face at z = 0 |
 | `gdml/tissue_phantom_layered.gdml` | Layered soft-tissue/bone/lung phantom (chest-wall analogue), entrance face at z = 0 |
+| `gdml/tissue_phantom_lead_1mm.gdml` | The same layered phantom behind a 1 mm lead filter (z = -1 mm to 0), tissue layers unmoved |
 | `gdml/water_phantom_tumor.gdml` | Water tank as above with a r = 1.5 cm soft-tissue tumor sphere at 10 cm depth |
 | `gdml/dt_target_mucf.gdml` | Liquid D–T cell (0.18 g/cm³, 50:50, 20 K) in a 2 mm steel vessel, in vacuum; entrance face at z = 0 |
 | `gdml/graphite_target.gdml` | 10×10×60 cm graphite pion-production target in vacuum, entrance face at z = 0 |
@@ -69,6 +70,39 @@ All beams are pencil beams along +z starting at z = -20 cm. Note that if
 you run with a Celeritas-enabled build (see the main README), offloaded
 `e-`/`e+`/`gamma` tracks do not appear in the step-level output — for dose
 studies use the standard image or set `CELER_DISABLE=1`.
+
+### X-rays through a lead filter
+
+`gdml/tissue_phantom_lead_1mm.gdml` is the layered phantom above with a 1 mm
+lead slab flush against its entrance face (z = -1 mm to 0). Every tissue layer
+keeps the position it has in the unshielded file, so depth in the phantom is
+still z and the two geometries compare bin for bin.
+
+| Macro | Particle | Beam | What it shows |
+|---|---|---|---|
+| `xrays_tissue_lead_0p1nm.mac` | `gamma` | 12.398 keV mono (λ = 0.1 nm) | 1 mm of lead is ~86 attenuation lengths at this energy: nothing reaches the tissue |
+
+The beam is specified by its wavelength: E = hc/λ with hc = 1239.84 eV·nm, so
+λ = 0.1 nm (1 Å) is a 12.398 keV photon — a hard X-ray of the kind
+crystallography and synchrotron beamlines run on, sitting just below lead's L3
+absorption edge at 13.04 keV. Interpolating the NIST mass-attenuation tables
+below that edge gives μ/ρ ≈ 76 cm²/g, so at ρ = 11.35 g/cm³ the attenuation
+length is ~12 µm and the 1 mm slab is ~86 of them (transmission ~10⁻³⁸). The
+run is that statement made concrete: the deposit is a sharp exponential in the
+first few tens of microns of the lead and there is none at all downstream.
+
+```cpp
+tree->Draw("step_z>>hPb(200,-1,0)",   "step_edep");   // inside the lead
+tree->Draw("step_z>>hTis(140,0,140)", "step_edep");   // tissue: empty
+```
+
+Point `/detector/readGDML` at `gdml/tissue_phantom_layered.gdml` for the same
+beam on the bare phantom. The same run as a YAML config is
+`examples/tissue_lead_xray.yaml`:
+
+```bash
+gdmltp run --config examples/tissue_lead_xray.yaml -o out
+```
 
 ### Shielding & collider-detector studies
 
